@@ -20,6 +20,17 @@ import {
 } from "./router.js";
 import { registerCommands } from "./commands.js";
 
+/** Check if all three tiers have identical model configurations */
+function allTiersIdentical(config: SmartRouterConfig): boolean {
+  const { light, medium, flagship } = config.tiers;
+  const modelsJson = (tc: typeof light) =>
+    tc.models.map((m) => `${m.provider}/${m.model}`).sort().join(",");
+  const a = modelsJson(light);
+  const b = modelsJson(medium);
+  const c = modelsJson(flagship);
+  return a === b && b === c;
+}
+
 export default function smartRouterExtension(pi: ExtensionAPI) {
   let config: SmartRouterConfig;
   let state: RouterState;
@@ -63,6 +74,15 @@ export default function smartRouterExtension(pi: ExtensionAPI) {
       state.currentProvider = m.provider;
     }
     updateBar(ctx.ui, config, state);
+
+    // Hint when tiers are unconfigured (all identical)
+    if (allTiersIdentical(config)) {
+      console.warn(
+        "[SmartRouter] All tiers share the same model configuration. " +
+        "Run '/router config' to set up tier-specific routing " +
+        "for optimal model selection."
+      );
+    }
   });
 
   // ── Before each turn ────────────────────────────────────────
@@ -84,6 +104,12 @@ export default function smartRouterExtension(pi: ExtensionAPI) {
         const name = state.currentModelId?.split("/").pop() ?? "";
         ctx.ui.notify(`${formatTierDisplay(state.currentTier, state.currentModelId)}`, "info");
       }
+    } else if (!state.currentModelId && state.currentTier) {
+      // No model active yet — resolve one for the current tier
+      const m = findBestModelForTier(state.currentTier, config, ctx.modelRegistry as any);
+      if (m) {
+        await applyModelSwitch(m, state, ctx.modelRegistry as any, (model) => pi.setModel(model));
+      }
     }
 
     updateBar(ctx.ui, config, state);
@@ -102,5 +128,6 @@ export default function smartRouterExtension(pi: ExtensionAPI) {
       clearManualOverride(state);
     },
     (tier: Tier) => setManualOverrideTier(state, tier),
+    (ui: any) => updateBar(ui, config, state),
   );
 }

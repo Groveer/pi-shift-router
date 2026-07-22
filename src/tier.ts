@@ -57,9 +57,9 @@ export function tierLabel(tier: Tier, config: SmartRouterConfig): string {
 export function tierEmoji(tier: Tier): string {
   switch (tier) {
     case "flagship":
-      return "🚀";
+      return "🧠";
     case "medium":
-      return "🟡";
+      return "🦾";
     case "light":
       return "⚡";
   }

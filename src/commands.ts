@@ -68,15 +68,15 @@ async function routeConfigWizard(
     return false;
   }
 
-  type MenuChoice = "light" | "medium" | "flagship" | "judge" | "ux" | "done" | "cancel";
+  type MenuChoice = "light" | "medium" | "flagship" | "ux" | "done" | "cancel";
 
   async function menu(): Promise<MenuChoice> {
+    const lightSuffix = config.tiers.light.models.length > 0 ? " (also Judge)" : "";
     const choice = await ctx.ui.select("Smart Router — Configuration", [
-      `⚡ Light — ${config.tiers.light.models.length} model(s)`,
-      `🟡 Medium — ${config.tiers.medium.models.length} model(s)`,
-      `🚀 Flagship — ${config.tiers.flagship.models.length} model(s)`,
+      `⚡ Light — ${config.tiers.light.models.length} model(s)${lightSuffix}`,
+      `🦾 Medium — ${config.tiers.medium.models.length} model(s)`,
+      `🧠 Flagship — ${config.tiers.flagship.models.length} model(s)`,
       "---",
-      "🤖 Judge model",
       "🎨 UX settings",
       "---",
       "💾 Save & exit",
@@ -85,9 +85,8 @@ async function routeConfigWizard(
 
     if (!choice) return "cancel";
     if (choice.startsWith("⚡")) return "light";
-    if (choice.startsWith("🟡")) return "medium";
-    if (choice.startsWith("🚀")) return "flagship";
-    if (choice.startsWith("🤖")) return "judge";
+    if (choice.startsWith("🦾")) return "medium";
+    if (choice.startsWith("🧠")) return "flagship";
     if (choice.startsWith("🎨")) return "ux";
     if (choice.startsWith("💾")) return "done";
     return "cancel";
@@ -95,86 +94,42 @@ async function routeConfigWizard(
 
   async function editTier(tier: Tier): Promise<void> {
     const cfg = config.tiers[tier];
-    const current = cfg.models.map((m) => `${m.provider}/${m.model}`);
+    const selectedKey = cfg.models[0]
+      ? `${cfg.models[0].provider}/${cfg.models[0].model}`
+      : null;
 
-    // Pick a model to toggle: if already in tier → remove; else → add
     const options = allModels
       .filter((m) => m.cost?.input != null)
       .map((m) => {
         const key = `${m.provider}/${m.id}`;
-        const inTier = current.includes(key);
+        const isSelected = key === selectedKey;
+        const judgeSuffix = (tier === "light" && isSelected) ? "  (Judge)" : "";
         return {
           key,
-          label: `${inTier ? "☑" : "☐"} ${key.padEnd(35)} $${m.cost!.input.toFixed(3)}/M`,
-          inTier,
+          label: `${isSelected ? "●" : "○"} ${key.padEnd(35)} $${m.cost!.input.toFixed(3)}/M${judgeSuffix}`,
+          isSelected,
         };
       })
-      .sort((a, b) => (a.inTier === b.inTier ? 0 : a.inTier ? -1 : 1));
+      .sort((a, b) => (a.isSelected === b.isSelected ? 0 : a.isSelected ? -1 : 1));
 
-    const header = `Edit ${tierEmoji(tier)} ${cfg.label} tier\nTap a model to toggle. [Done] when finished.`;
-    const labels = [...options.map((o) => o.label), "---", "✅ Done"];
+    const header = `Select ${tierEmoji(tier)} ${cfg.label} model`;
+    const labels: string[] = [];
+    if (selectedKey) labels.push("❌ Clear selection");
+    labels.push(...options.map((o) => o.label), "---", "✅ Done");
 
-    let done = false;
-    while (!done) {
-      const pick = await ctx.ui.select(header, labels);
-      if (!pick || pick.startsWith("✅")) { done = true; break; }
-
-      const idx = labels.indexOf(pick);
-      if (idx < 0 || idx >= options.length) continue;
-
-      const opt = options[idx];
-      const key = opt.key;
-      const [prov, modelId] = key.split("/");
-
-      if (opt.inTier) {
-        // Remove
-        cfg.models = cfg.models.filter((m) => !(m.provider === prov && m.model === modelId));
-        options[idx].inTier = false;
-        options[idx].label = options[idx].label.replace("☑", "☐");
-      } else {
-        // Add
-        cfg.models.push({ provider: prov, model: modelId, priority: cfg.models.length + 1 });
-        options[idx].inTier = true;
-        options[idx].label = options[idx].label.replace("☐", "☑");
-      }
-    }
-  }
-
-  async function editJudge(): Promise<void> {
-    const isAuto = config.judge.provider === "auto" && config.judge.model === "auto";
-
-    const choices = [
-      `${isAuto ? "☑" : "☐"} Auto — pick cheapest available model`,
-      "---",
-      ...allModels
-        .filter((m) => m.cost?.input != null)
-        .map((m) => {
-          const key = `${m.provider}/${m.id}`;
-          const selected = !isAuto && config.judge.provider === m.provider && config.judge.model === m.id;
-          return `${selected ? "☑" : "☐"} ${key.padEnd(35)} $${m.cost!.input.toFixed(3)}/M`;
-        }),
-      "---",
-      "✅ Done",
-    ];
-
-    const pick = await ctx.ui.select("🤖 Judge Model", choices);
+    const pick = await ctx.ui.select(header, labels);
     if (!pick || pick.startsWith("✅")) return;
 
-    // Manual pick
-    for (const m of allModels) {
-      const key = `${m.provider}/${m.id}`;
-      if (pick.includes(key)) {
-        config.judge.provider = m.provider;
-        config.judge.model = m.id;
-        return;
-      }
-    }
-    // Auto
-    if (pick.includes("Auto")) {
-      config.judge.provider = "auto";
-      config.judge.model = "auto";
-    }
+    if (pick.startsWith("❌")) { cfg.models = []; return; }
+
+    const picked = options.find((o) => pick.includes(o.key));
+    if (!picked) return;
+
+    const [prov, modelId] = picked.key.split("/");
+    cfg.models = [{ provider: prov, model: modelId, priority: 1 }];
   }
+
+  // Judge is no longer user-configurable — always uses light tier's model.
 
   async function editUX(): Promise<void> {
     const ux = config.ux;
@@ -201,8 +156,6 @@ async function routeConfigWizard(
     if (choice === "done") { saving = true; break; }
     if (choice === "light" || choice === "medium" || choice === "flagship") {
       await editTier(choice);
-    } else if (choice === "judge") {
-      await editJudge();
     } else if (choice === "ux") {
       await editUX();
     }
@@ -227,12 +180,13 @@ export function registerCommands(
   getState: () => RouterState,
   onConfigChanged: () => void,
   onManualOverrideTier: (tier: Tier) => void,
+  updateStatus: (ui: any) => void,
 ): void {
   // ── /router ──────────────────────────────────────────────────
   pi.registerCommand("router", {
     description: "Smart Router: show status, enable/disable",
     getArgumentCompletions: (prefix: string) => {
-      const cmds = ["on", "off", "status", "quiet"].filter((c) => c.startsWith(prefix));
+      const cmds = ["on", "off", "status", "quiet", "config"].filter((c) => c.startsWith(prefix));
       return cmds.length > 0 ? cmds.map((c) => ({ value: c, label: c })) : null;
     },
     handler: async (args, ctx) => {
@@ -243,13 +197,21 @@ export function registerCommands(
       if (arg === "on") {
         config.enabled = true;
         onConfigChanged();
+        updateStatus(ctx.ui);
         ctx.ui.notify("Smart Router: ✅ Enabled", "info");
         return;
       }
       if (arg === "off") {
         config.enabled = false;
         onConfigChanged();
+        updateStatus(ctx.ui);
         ctx.ui.notify("Smart Router: ⛔ Disabled", "info");
+        return;
+      }
+      if (arg === "config") {
+        await routeConfigWizard(getConfig(), ctx.cwd, ctx);
+        onConfigChanged();
+        updateStatus(ctx.ui);
         return;
       }
       if (arg === "quiet") {
@@ -320,12 +282,4 @@ export function registerCommands(
     },
   });
 
-  // ── /route-config ─────────────────────────────────────────────
-  pi.registerCommand("route-config", {
-    description: "Interactive configuration wizard",
-    handler: async (_args, ctx) => {
-      await routeConfigWizard(getConfig(), ctx.cwd, ctx);
-      onConfigChanged();
-    },
-  });
 }

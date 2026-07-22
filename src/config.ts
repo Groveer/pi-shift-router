@@ -125,62 +125,54 @@ export function modelRefsFromModels(
   return refs;
 }
 
-/** Build a full SmartRouterConfig, auto-assigning tiers if needed */
+/** Build a fresh SmartRouterConfig with defaults (no auto-tier assignment). */
 async function buildConfig(cwd: string): Promise<SmartRouterConfig> {
-  const store = await loadModelsStore();
-  const allModels = flattenModels(store);
-  const assigned = autoAssignTiers(allModels);
-
-  const config: SmartRouterConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
-
-  // Auto-assign model references
-  config.tiers.light.models = modelRefsFromModels(assigned.light, 1);
-  config.tiers.medium.models = modelRefsFromModels(assigned.medium, 10);
-  config.tiers.flagship.models = modelRefsFromModels(assigned.flagship, 20);
-
-  return config;
+  // All tiers start empty — user configures via "smart-router config".
+  return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
 }
 
 /**
  * Resolve endpoint info for the judge model.
- * If "auto", picks the cheapest available model.
+ * Prefers light tier's selected model; falls back to cheapest available.
  */
 export async function resolveJudgeEndpoint(config: SmartRouterConfig): Promise<ProviderEndpoint | null> {
   const store = await loadModelsStore();
   const auth = await loadAuthStore();
 
-  let provider = config.judge.provider;
-  let modelId = config.judge.model;
-
-  // Auto-detect: pick cheapest model with auth
-  if (provider === "auto" || modelId === "auto") {
-    const candidates: Array<{ provider: string; model: StoredModel; cost: number }> = [];
-    for (const [prov, entry] of Object.entries(store)) {
-      if (!auth[prov]?.key) continue;
-      for (const m of entry.models) {
-        const cost = m.cost?.input ?? 999;
-        if (cost > 0) candidates.push({ provider: prov, model: m, cost });
-      }
-    }
-    candidates.sort((a, b) => a.cost - b.cost);
-    if (candidates.length === 0) return null;
-    provider = candidates[0].provider;
-    modelId = candidates[0].model.id;
+  async function resolve(provider: string, modelId: string): Promise<ProviderEndpoint | null> {
+    const provEntry = store[provider];
+    if (!provEntry) return null;
+    const modelInfo = provEntry.models.find((m) => m.id === modelId);
+    if (!modelInfo) return null;
+    const apiKey = auth[provider]?.key;
+    if (!apiKey) return null;
+    return {
+      baseUrl: modelInfo.baseUrl ?? "",
+      apiType: modelInfo.api ?? "openai-completions",
+      apiKey,
+      modelId,
+    };
   }
 
-  const provEntry = store[provider];
-  if (!provEntry) return null;
-  const modelInfo = provEntry.models.find((m) => m.id === modelId);
-  if (!modelInfo) return null;
-  const apiKey = auth[provider]?.key;
-  if (!apiKey) return null;
+  // 1. Use light tier's model as judge
+  const lightFirst = config.tiers.light.models[0];
+  if (lightFirst) {
+    const ep = await resolve(lightFirst.provider, lightFirst.model);
+    if (ep) return ep;
+  }
 
-  return {
-    baseUrl: modelInfo.baseUrl ?? "",
-    apiType: modelInfo.api ?? "openai-completions",
-    apiKey,
-    modelId,
-  };
+  // 2. Fallback: cheapest model with auth
+  const candidates: Array<{ provider: string; model: StoredModel; cost: number }> = [];
+  for (const [prov, entry] of Object.entries(store)) {
+    if (!auth[prov]?.key) continue;
+    for (const m of entry.models) {
+      const cost = m.cost?.input ?? 999;
+      if (cost > 0) candidates.push({ provider: prov, model: m, cost });
+    }
+  }
+  candidates.sort((a, b) => a.cost - b.cost);
+  if (candidates.length === 0) return null;
+  return resolve(candidates[0].provider, candidates[0].model.id);
 }
 
 /** Save config to file */

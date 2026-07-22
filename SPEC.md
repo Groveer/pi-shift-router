@@ -55,8 +55,8 @@ Smart Router 解决了这三点：**自动、透明、动态适配**。
 
 | Tier | 定位 | 适用场景 |
 |------|------|---------|
-| **🚀 Flagship** | 规划、统筹、方向性决策、审核评估、复杂高难度开发/输出 | 架构设计、安全审计、多步骤推理、大型重构、策略规划 |
-| **🟡 Medium** | 多数执行阶段，日常开发/输出 | 编写代码、撰写文档、调试排错、常规分析、重构 |
+| **🧠 Flagship** | 规划、统筹、方向性决策、审核评估、复杂高难度开发/输出 | 架构设计、安全审计、多步骤推理、大型重构、策略规划 |
+| **🦾 Medium** | 多数执行阶段，日常开发/输出 | 编写代码、撰写文档、调试排错、常规分析、重构 |
 | **⚡ Light** | 大吞吐任务、智能要求不高、重复性、简单调研 | 简单问答、确认、状态查询、查阅资料、格式整理 |
 
 ### 2.3 层级之间的转换规则
@@ -161,7 +161,7 @@ Smart Router 解决了这三点：**自动、透明、动态适配**。
 [f]          light     🚀 旗舰     窗口=[f,l]
 [f,l]        medium    🚀 旗舰     窗口=[f,l,m]
 [f,l,m]      medium    🚀 旗舰     窗口=[f,l,m,m]
-[f,l,m,m]    medium    🟡 均衡     ⚡ 触发降级！(75%≥medium, 窗口≥4)
+[f,l,m,m]    medium    🦾 均衡     ⚡ 触发降级！(75%≥medium, 窗口≥4)
 
 → 5 轮对话（2 个简单）才触发一次降级。缓存只断裂一次 ✓
 ```
@@ -198,7 +198,7 @@ Smart Router 解决了这三点：**自动、透明、动态适配**。
                            → 但不等于不能降级，看看占比：
                            medium占比80%≥75%，所以会降到medium
 
-→ 正确的处理：80% medium ≥75% → 降到 🟡 均衡 ✓
+→ 正确的处理：80% medium ≥75% → 降到 🦾 均衡 ✓
 ```
 
 #### 场景 D：升级重置窗口逻辑
@@ -209,11 +209,11 @@ Smart Router 解决了这三点：**自动、透明、动态适配**。
                          ⚡ Light     (初始)
 []             light       ⚡ Light    窗口=[l]
 [l]            light       ⚡ Light    窗口=[l,l]
-[l,l]          medium      🟡 Medium   ⚡ 立即升级！
+[l,l]          medium      🦾 Medium   ⚡ 立即升级！
                窗口保留 [m]，丢弃 [l,l]（因为已不在 light 层级）
 
-[m]            light       🟡 均衡    窗口=[m,l]
-[m,l]          light       🟡 均衡    窗口=[m,l,l]
+[m]            light       🦾 均衡    窗口=[m,l]
+[m,l]          light       🦾 均衡    窗口=[m,l,l]
 [m,l,l]        light       ⚡ Light    ⚡ 触发降级！(100% light, 窗口≥3)
 ```
 
@@ -474,37 +474,15 @@ function heuristicClassify(prompt: string): Tier {
 }
 ```
 
-### 5.3 模型自动分配算法
+### 5.3 首次启动（已删除：自动分配算法）
 
-首次启动时（无配置文件），自动扫描用户现有的模型：
+~~首次启动时（无配置文件），按模型 input 价格自动分配到三档。~~
 
-```typescript
-function autoAssignModels(models: Model[]): Tiers {
-  // 1. 按 input 价格升序排列
-  const sorted = models
-    .filter(m => m.api !== "unknown")  // 排除无法识别的 API
-    .filter(m => m.cost?.input > 0)    // 排除免费/零成本模型
-    .sort((a, b) => a.cost.input - b.cost.input);
+**该设计已被移除。** 不同 Provider 之间价格体系不可比，按价格分配会导致模型能力误排。
 
-  // 2. 取有代表性的模型（跨 Provider 去重）
-  const seenModels = new Set<string>();
-  const unique = sorted.filter(m => {
-    const key = `${m.provider}:${m.id}`;
-    if (seenModels.has(key)) return false;
-    seenModels.add(key);
-    return true;
-  });
+现在首次启动时三档均为空（`models: []`），插件不干扰 Pi 当前使用的模型。用户可通过 `smart-router config` 命令手动配置各档位的模型。
 
-  // 3. 三等分分配
-  const third = Math.ceil(unique.length / 3);
-
-  return {
-    light: unique.slice(0, third),
-    medium: unique.slice(third, third * 2),
-    flagship: unique.slice(third * 2),
-  };
-}
-```
+启动时若检测到三档配置完全相同（包括初始空状态），会打印提示引导用户配置。
 
 ### 5.4 配置验证
 
@@ -585,7 +563,7 @@ function autoAssignModels(models: Model[]): Tiers {
 ### 7.3 Status Bar（常驻）
 
 ```
-⚡L:DS-Flash | 🟡M:DS-Pro | 🚀F:Kimi-K3     [SmartRouter ✅]
+⚡L:DS-Flash | 🦾M:DS-Pro | 🚀F:Kimi-K3     [SmartRouter ✅]
 ```
 
 格式：`{Tier图标}{层级}:{模型缩写}`，当没有启用路由时显示 SmartRouter ⛔。
@@ -603,7 +581,7 @@ function autoAssignModels(models: Model[]): Tiers {
 ```
 
 ```
-🔄 Smart Router: 🟡 DeepSeek Pro
+🔄 Smart Router: 🦾 DeepSeek Pro
 ```
 
 格式：固定前缀 + 目标 tier 图标 + 模型名。不写原因（原因在 `/route status` 里）。
