@@ -1,0 +1,15 @@
+{
+  "name": "pi-smart-router",
+  "version": "0.1.0",
+  "description": "Pi-agent extension: intelligent multi-provider model routing",
+  "keywords": ["pi-package", "smart-router", "model-routing"],
+  "license": "MIT",
+  "type": "module",
+  "pi": {
+    "extensions": ["./src/index.ts"]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  }
+}
