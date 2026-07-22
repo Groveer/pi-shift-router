@@ -1,8 +1,15 @@
-# Smart Router — MVP Development Plan
+# Smart Router — Development Plan
 
-## MVP Scope: Core Routing Engine + Heuristic Judge + Basic UI
+## Phase Status
 
-Phase 1 聚焦于在最简可用的前提下验证核心算法和 UX。LLM Judge、交互式配置引导等放在 Phase 2+。
+| Phase | Status |
+|-------|--------|
+| Phase 1 — Core Engine + Heuristic + Basic UI | ✅ Done |
+| Phase 2 — LLM Judge | ✅ Done |
+| Phase 3 — Interactive Config Wizard | ✅ Done |
+| Phase 4 — Polish & Publish | ⏳ Next |
+
+## File Structure
 
 ### 文件结构
 

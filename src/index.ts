@@ -7,10 +7,10 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { Tier, SmartRouterConfig, RouterState } from "./types.js";
-import { loadConfig } from "./config.js";
+import type { Tier, SmartRouterConfig, RouterState, ProviderEndpoint } from "./types.js";
+import { loadConfig, resolveJudgeEndpoint } from "./config.js";
 import { findBestModelForTier, tierEmoji, formatTierDisplay } from "./tier.js";
-import { classifyHeuristic } from "./judge.js";
+import { classify } from "./judge.js";
 import {
   createRouterState,
   processRoute,
@@ -23,28 +23,20 @@ import { registerCommands } from "./commands.js";
 export default function smartRouterExtension(pi: ExtensionAPI) {
   let config: SmartRouterConfig;
   let state: RouterState;
+  let judgeEndpoint: ProviderEndpoint | null = null;
   let initialized = false;
 
-  // Getter functions for commands module
   const getConfig = () => config;
   const getState = () => state;
 
   // ── Initialization ──────────────────────────────────────────
 
-  async function initialize(ctx: { cwd: string; ui?: any; modelRegistry?: any }) {
+  async function initialize(ctx: { cwd: string; ui?: any }) {
     if (initialized) return;
-
-    try {
-      config = await loadConfig(ctx.cwd);
-      state = createRouterState();
-      initialized = true;
-    } catch (err) {
-      console.warn(`[SmartRouter] Init error: ${err}`);
-      // Safe fallback: create minimal config
-      config = await loadConfig(ctx.cwd);
-      state = createRouterState();
-      initialized = true;
-    }
+    config = await loadConfig(ctx.cwd);
+    state = createRouterState();
+    judgeEndpoint = await resolveJudgeEndpoint(config);
+    initialized = true;
   }
 
   // ── Session lifecycle ───────────────────────────────────────
@@ -53,11 +45,10 @@ export default function smartRouterExtension(pi: ExtensionAPI) {
     await initialize(ctx);
 
     if (!config.enabled) {
-      ctx.ui.setStatus("smart-router", "SmartRouter ⛔");
+      ctx.ui.setStatus("smart-router", "SR ⛔");
       return;
     }
 
-    // Find best medium model as initial starting point
     const initialModel = findBestModelForTier("medium", config, pi);
     if (initialModel) {
       state.currentTier = "medium";
@@ -65,7 +56,6 @@ export default function smartRouterExtension(pi: ExtensionAPI) {
       state.currentProvider = initialModel.provider;
     }
 
-    // Update status bar
     updateStatusBar(ctx.ui, state, config);
   });
 
@@ -73,66 +63,51 @@ export default function smartRouterExtension(pi: ExtensionAPI) {
 
   pi.on("before_agent_start", async (event, ctx) => {
     if (!initialized) await initialize(ctx);
-    if (!config.enabled) return;
+    if (!config?.enabled) return;
+    if (!event.prompt?.trim()) return;
 
-    const prompt = event.prompt;
-    if (!prompt || prompt.trim().length === 0) return;
+    // 1. Classify: try LLM judge → fallback heuristic
+    const judgeResult = await classify(event.prompt, judgeEndpoint);
 
-    // 1. Classify the task
-    const judgeResult = classifyHeuristic(prompt);
-
-    // 2. Process route decision (synchronous — no API calls)
+    // 2. Route decision
     const result = processRoute(judgeResult, state, config, pi);
 
-    // 3. Apply model switch if needed
+    // 3. Apply switch
     if (result.switchTo) {
       const success = await applyModelSwitch(result.switchTo, state, pi);
-      if (success) {
-        // Notify on tier change (unless quiet mode)
-        if (!config.ux.quietMode && config.ux.inlineToast) {
-          const emoji = tierEmoji(state.currentTier);
-          const modelName = state.currentModelId?.split("/").pop() ?? state.currentModelId ?? "";
-          ctx.ui.notify(`🔄 SR: ${emoji} ${modelName}`, "info");
-        }
+      if (success && !config.ux.quietMode && config.ux.inlineToast) {
+        const emoji = tierEmoji(state.currentTier);
+        const name = state.currentModelId?.split("/").pop() ?? "";
+        ctx.ui.notify(`🔄 SR: ${emoji} ${name}`, "info");
       }
     }
 
-    // 4. Update status bar
-    if (config.ux.statusBar) {
-      updateStatusBar(ctx.ui, state, config);
-    }
+    updateStatusBar(ctx.ui, state, config);
 
-    // 5. Manual override: clear after one turn
-    if (state.manualOverride.active) {
-      clearManualOverride(state);
-    }
+    if (state.manualOverride.active) clearManualOverride(state);
   });
 
-  // ── Status bar update ───────────────────────────────────────
+  // ── Status bar ──────────────────────────────────────────────
 
   function updateStatusBar(ui: any, s: RouterState, cfg: SmartRouterConfig) {
-    if (!cfg.ux.statusBar) {
-      ui.setStatus("smart-router", undefined);
-      return;
-    }
-
+    if (!cfg.ux.statusBar) { ui.setStatus("smart-router", undefined); return; }
     const display = formatTierDisplay(s.currentTier, s.currentModelId, s.currentProvider);
     const mode = cfg.enabled ? "✅" : "⛔";
     ui.setStatus("smart-router", `SR ${mode} ${display}`);
   }
 
-  // ── Register commands ───────────────────────────────────────
+  // ── Commands ────────────────────────────────────────────────
 
   registerCommands(
     pi,
     getConfig,
     getState,
-    () => {
+    async () => {
+      // Called after config changes — re-resolve judge endpoint
+      judgeEndpoint = await resolveJudgeEndpoint(config);
       state.window = [];
       clearManualOverride(state);
     },
-    (tier: Tier) => {
-      setManualOverrideTier(state, tier);
-    },
+    (tier: Tier) => setManualOverrideTier(state, tier),
   );
 }

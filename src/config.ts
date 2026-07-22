@@ -11,7 +11,9 @@ import { join, resolve, dirname } from "node:path";
 import {
   type SmartRouterConfig,
   type ModelsStore,
+  type AuthStore,
   type StoredModel,
+  type ProviderEndpoint,
   DEFAULT_CONFIG,
   TIERS,
 } from "./types.js";
@@ -21,6 +23,7 @@ const CONFIG_FILENAME = "smartrouter.json";
 
 let _config: SmartRouterConfig | null = null;
 let _modelsStore: ModelsStore | null = null;
+let _authStore: AuthStore | null = null;
 let _configPath: string | null = null;
 
 /** Resolve config file path: project-local > user-global */
@@ -43,14 +46,25 @@ async function fileExists(path: string): Promise<boolean> {
 /** Load models-store.json */
 export async function loadModelsStore(): Promise<ModelsStore> {
   if (_modelsStore) return _modelsStore;
-
   const storePath = join(PI_AGENT_DIR, "models-store.json");
   try {
     const raw = await readFile(storePath, "utf-8");
     _modelsStore = JSON.parse(raw) as ModelsStore;
     return _modelsStore;
-  } catch (err) {
-    console.warn(`[SmartRouter] Failed to load models-store.json: ${err}`);
+  } catch {
+    return {};
+  }
+}
+
+/** Load auth.json */
+export async function loadAuthStore(): Promise<AuthStore> {
+  if (_authStore) return _authStore;
+  const authPath = join(PI_AGENT_DIR, "auth.json");
+  try {
+    const raw = await readFile(authPath, "utf-8");
+    _authStore = JSON.parse(raw) as AuthStore;
+    return _authStore;
+  } catch {
     return {};
   }
 }
@@ -125,6 +139,62 @@ async function buildConfig(cwd: string): Promise<SmartRouterConfig> {
   config.tiers.flagship.models = modelRefsFromModels(assigned.flagship, 20);
 
   return config;
+}
+
+/**
+ * Resolve endpoint info for the judge model.
+ * If "auto", picks the cheapest available model.
+ */
+export async function resolveJudgeEndpoint(config: SmartRouterConfig): Promise<ProviderEndpoint | null> {
+  const store = await loadModelsStore();
+  const auth = await loadAuthStore();
+
+  let provider = config.judge.provider;
+  let modelId = config.judge.model;
+
+  // Auto-detect: pick cheapest model with auth
+  if (provider === "auto" || modelId === "auto") {
+    const candidates: Array<{ provider: string; model: StoredModel; cost: number }> = [];
+    for (const [prov, entry] of Object.entries(store)) {
+      if (!auth[prov]?.key) continue;
+      for (const m of entry.models) {
+        const cost = m.cost?.input ?? 999;
+        if (cost > 0) candidates.push({ provider: prov, model: m, cost });
+      }
+    }
+    candidates.sort((a, b) => a.cost - b.cost);
+    if (candidates.length === 0) return null;
+    provider = candidates[0].provider;
+    modelId = candidates[0].model.id;
+  }
+
+  const provEntry = store[provider];
+  if (!provEntry) return null;
+  const modelInfo = provEntry.models.find((m) => m.id === modelId);
+  if (!modelInfo) return null;
+  const apiKey = auth[provider]?.key;
+  if (!apiKey) return null;
+
+  return {
+    baseUrl: modelInfo.baseUrl ?? "",
+    apiType: modelInfo.api ?? "openai-completions",
+    apiKey,
+    modelId,
+  };
+}
+
+/** Save config to file */
+export async function saveConfig(config: SmartRouterConfig, cwd: string): Promise<boolean> {
+  const configPath = _configPath ?? resolve(cwd, ".pi", CONFIG_FILENAME);
+  try {
+    const dir = dirname(configPath);
+    await access(dir).catch(() => {}); // ignore if dir missing
+    await writeFile(configPath, JSON.stringify(config, null, 2), "utf-8");
+    _configPath = configPath;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Validate that referenced models exist in the store */

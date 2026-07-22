@@ -153,6 +153,27 @@ export interface WindowEntry {
   timestamp: number;
 }
 
+/** Auth store shape — maps provider name to API key */
+export interface AuthStore {
+  [provider: string]: { type: string; key: string };
+}
+
+/** Resolved info for making an API call to a provider */
+export interface ProviderEndpoint {
+  baseUrl: string;
+  apiType: string;       // "openai-completions" | "anthropic-messages"
+  apiKey: string;
+  modelId: string;
+}
+
+/** Configured tier with resolved model info (for config display) */
+export interface TierEntry {
+  tier: Tier;
+  label: string;
+  description: string;
+  models: Array<{ provider: string; model: string }>;
+}
+
 /** Router internal state */
 export interface RouterState {
   currentTier: Tier;
