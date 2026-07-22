@@ -3,3 +3,5 @@ node_modules/
 dist/
 *.log
 .env
+.pnpm-store
+.npmrc

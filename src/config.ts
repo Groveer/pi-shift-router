@@ -264,7 +264,7 @@ export async function loadConfig(cwd: string): Promise<SmartRouterConfig> {
     const dir = dirname(configPath);
     await access(dir);
     await writeFile(configPath, JSON.stringify(_config, null, 2), "utf-8");
-    console.log(`[SmartRouter] Auto-generated config saved to ${configPath}`);
+    console.warn(`[SmartRouter] Auto-generated config saved to ${configPath}`);
   } catch {
     // Project .pi dir may not exist, that's fine
   }

@@ -8,8 +8,15 @@
   "pi": {
     "extensions": ["./src/index.ts"]
   },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf node_modules dist"
+  },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
     "typebox": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0"
   }
 }
