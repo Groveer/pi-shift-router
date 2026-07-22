@@ -279,7 +279,20 @@ Input: "security audit of the authentication flow" → flagship
 - **典型选择**：`deepseek-v4-flash`、`mimo-v2.5`
 - **用户可覆盖**：在配置中指定 `judgeModel` 和 `judgeProvider`
 
-### 4.4 Judge API 调用
+### 4.4 Judge API 调用（直连管道，不经过 Pi Agent Loop）
+
+Judge 调用使用原生 `fetch()` 直接向 Provider API 发起请求，**不经过 Pi 的 agent 推理管道**。
+
+#### 为什么 Judge 不走 Pi 管道
+
+| 对比维度 | 走 Pi 管道 | 直连 Provider API |
+|----------|-----------|-------------------|
+| 延迟 | 需加载 system prompt、工具列表、session 状态 | 一次简单 HTTP 请求 |
+| 成本 | 消耗完整上下文 tokens | 仅发送 Judge Prompt + 用户输入 |
+| 独立性 | 受当前模型切换影响 | 始终使用同一轻量模型 |
+| 复杂度 | 需处理工具注册、事件生命周期 | 一条 fetch 搞定 |
+
+> **正常业务请求**（用户的实际对话内容）仍然走 Pi 的完整推理管道，包含上下文管理、工具调用、会话持久化等一切现有能力。只有 Judge 分类这一小步走直连管道。
 
 使用 `fetch()` 直接调用 Provider API（复用 pi 已有的 auth 配置）：
 
@@ -317,7 +330,26 @@ async function judgeTask(prompt: string, config: Config): Promise<Tier> {
 }
 ```
 
-### 4.5 Judge 失败时的降级回退
+### 4.5 多 API 格式兼容
+
+Judge 需要支持不同 Provider 的 API 格式。配置中记录每个 Provider 的 `api` 类型：
+
+```typescript
+async function judgeTask(prompt: string, config: Config): Promise<Tier> {
+  const { baseUrl, apiKey, modelId, apiType } = resolveJudgeConfig(config);
+
+  switch (apiType) {
+    case "openai-completions":
+      return judgeViaOpenAI(baseUrl, apiKey, modelId, prompt);
+    case "anthropic-messages":
+      return judgeViaAnthropic(baseUrl, apiKey, modelId, prompt);
+    default:
+      return judgeViaOpenAI(baseUrl, apiKey, modelId, prompt); // fallback
+  }
+}
+```
+
+### 4.6 Judge 失败时的降级回退
 
 如果 Judge 调用失败（网络错误、超时、解析失败），使用启发式方法：
 
@@ -370,6 +402,8 @@ function heuristicClassify(prompt: string): Tier {
 
 用户级全局配置：`~/.pi/agent/smartrouter.json`
 项目级覆盖：`.pi/smartrouter.json`（可以团队共享）
+
+> 超参数（如 `threshold`, `minObservations` 等）的调优不属于第一阶段。Phase 1 使用文档约定的默认值，后续根据真实使用数据迭代。
 
 ### 5.2 配置结构
 
@@ -430,6 +464,12 @@ function heuristicClassify(prompt: string): Tier {
       },
       "maxWindowSize": 10        // 窗口最大容量
     }
+  },
+
+  "ux": {
+    "quietMode": false,          // true = 静默模式（仅 status bar，不弹 toast）
+    "statusBar": true,           // 是否在 Pi 底部状态栏显示
+    "inlineToast": true          // 是否在会话中显示切换 toast
   }
 }
 ```
@@ -519,28 +559,84 @@ function autoAssignModels(models: Model[]): Tiers {
 
 ---
 
-## 7. 通知与透明度
+## 7. UX 设计 — 既要清晰，又不打扰
 
-### 7.1 路由变更通知
+### 7.1 核心原则
 
-当 Smart Router 切换模型时，在会话中显示提示：
+> 用户只应该在路由状态**发生变化**时收到通知。"和上次一样"的情况不产生任何噪音。
+
+| 情况 | 是否通知 | 原因 |
+|------|---------|------|
+| **Tier 升级**（light→medium, any→flagship） | ✅ 通知 | 任务变复杂，用户需要知道模型已升级 |
+| **Tier 降级**（flagship→medium/light, medium→light） | ✅ 通知 | 成本优化行为，应让用户感知 |
+| **手动覆盖生效/失效** | ✅ 通知 | 用户操作需要明确反馈 |
+| **路由启用/禁用** | ✅ 通知一次 | 状态变更需要确认 |
+| **错误**（Judge 失败、模型不可用等） | ✅ 通知 | 需要用户注意 |
+| **层级不变** | ❌ 不通知 | 最常见情况，零噪音 |
+
+### 7.2 三通道通知系统
+
+| 通道 | 位置 | 用途 | 显示内容 |
+|------|------|------|---------|
+| **Status Bar** 🟢 | Pi 底部状态栏（`ctx.ui.setStatus`） | 一直显示当前状态，从不消失 | `⚡L DeepSeek Flash` |
+| **Inline Toast** 📋 | 会话中一条消息 | 仅 tier 变更时出现 | 见下方格式 |
+| **Detail View** 🔍 | `/route status` 命令 | 完整信息（窗口、计数等） | 完整状态面板 |
+
+### 7.3 Status Bar（常驻）
 
 ```
-🔄 Smart Router: 检测到复杂架构任务 → 🚀 Flagship (Kimi K3)
+⚡L:DS-Flash | 🟡M:DS-Pro | 🚀F:Kimi-K3     [SmartRouter ✅]
+```
+
+格式：`{Tier图标}{层级}:{模型缩写}`，当没有启用路由时显示 SmartRouter ⛔。
+
+### 7.4 Inline Toast（仅变更时出现）
+
+设计要点：**一行内完成，不展开**
+
+```
+🔄 Smart Router: 🚀 Kimi K3  ← 检测到复杂架构任务
 ```
 
 ```
-🔄 Smart Router: 连续 light 判定 → ⚡ Light  (DeepSeek V4 Flash)
+🔄 Smart Router: ⚡ DeepSeek Flash
 ```
 
-### 7.2 窗口与趋势通知（可选详细模式）
+```
+🔄 Smart Router: 🟡 DeepSeek Pro
+```
+
+格式：固定前缀 + 目标 tier 图标 + 模型名。不写原因（原因在 `/route status` 里）。
+
+### 7.5 Detail View
 
 ```
-🔄 Smart Router: 窗口分析
-   当前 Tier: 🚀 Flagship (Kimi K3)
-   窗口: [f, m, l, l, l, l]  (67% light, 窗口≥4)
-   状态: ⏳ 未达阈值 (需 ≥75%)，暂不降级
+┌─ Smart Router ═══════════════════════════════┐
+│ Status: ✅ Active                             │
+│ Mode:   Auto                                  │
+│ Tier:   🚀 Flagship — Kimi K3 (opencode-go)   │
+│ Judge:  DeepSeek V4 Flash (opencode-go)       │
+│                                                │
+│ Window: [f, m, l, f, f, f]  (threshold 4/4)   │
+│ History: Flagship(6) Medium(1) Light(1)        │
+│ Coverage: ↑83% flagship 下一轮不降级            │
+│ Manual: ✗ No override                          │
+└════════════════════════════════════════════════┘
 ```
+
+### 7.6 安静模式（可选）
+
+```jsonc
+{
+  "ux": {
+    "quietMode": false,        // true = 只显示 status bar，不弹 inline toast
+    "statusBar": true,          // status bar 总开关
+    "inlineToast": true         // inline toast 总开关
+  }
+}
+```
+
+用户如果觉得通知太多，可以 `/router quiet` 一键切换安静模式。
 
 ---
 
@@ -639,12 +735,20 @@ function autoAssignModels(models: Model[]): Tiers {
 - **无缝集成**：`pi.setModel()` 是原生 API，切换模型后上下文自动保留
 - **零部署**：用户只需安装 Extension，开箱即用
 
-### 10.2 为什么 Judge 用本地 fetch 而非通过 Pi 推理
+### 10.2 为什么 Judge 用直连 API 而非通过 Pi 推理管道
 
-- **速度**：直接 API 调用比经过 Pi 的完整推理流程快（省掉 system prompt 拼接等开销）
-- **控制**：可以精确控制 Judge 的 max_tokens、temperature
+- **速度**：直接 API 调用比经过 Pi 的完整推理流程快（省掉 system prompt 拼接、工具注册、session 管理等开销）
+- **控制**：可以精确控制 Judge 的 max_tokens、temperature，不受当前模型影响
 - **成本**：用最便宜的模型做 Judge，几毛钱成本
-- **可靠性**：独立于当前会话的模型状态，不受 `pi.setModel()` 影响
+- **独立性**：Judge 不受当前会话模型切换影响（Judge 和业务模型走不同的通道）
+- **架构清晰**：
+  ```
+  ┌──── 用户输入 ────┐
+       │          
+       ├──► [Judge 管道]  fetch() → Provider API → tier 判定  ← 直连
+       │
+       └──► [业务管道]  Pi Agent Loop → pi.setModel(判定结果) → 正常对话  ← 走 Pi
+  ```
 
 ### 10.3 为什么选择滑动窗口而非 Markov chain 等更复杂的算法
 
