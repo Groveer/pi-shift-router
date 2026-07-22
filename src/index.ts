@@ -1,15 +1,15 @@
 /**
  * Smart Router — Pi-agent Extension
  *
- * Intelligently routes tasks to the optimal model based on complexity.
- * Uses a sliding window trend detection algorithm to balance
- * output quality with cost efficiency while protecting prompt cache.
+ * Routes tasks to the optimal model based on complexity.
+ * Uses sliding window trend detection to balance quality and cost
+ * while protecting prompt cache.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { Tier, SmartRouterConfig, RouterState, ProviderEndpoint } from "./types.js";
 import { loadConfig, resolveJudgeEndpoint } from "./config.js";
-import { findBestModelForTier, tierEmoji, formatTierDisplay } from "./tier.js";
+import { findBestModelForTier, formatTierDisplay } from "./tier.js";
 import { classify } from "./judge.js";
 import {
   createRouterState,
@@ -29,9 +29,9 @@ export default function smartRouterExtension(pi: ExtensionAPI) {
   const getConfig = () => config;
   const getState = () => state;
 
-  // ── Initialization ──────────────────────────────────────────
+  // ── Init ────────────────────────────────────────────────────
 
-  async function initialize(ctx: { cwd: string; ui?: any }) {
+  async function init(ctx: { cwd: string; ui?: any }) {
     if (initialized) return;
     config = await loadConfig(ctx.cwd);
     state = createRouterState();
@@ -39,62 +39,56 @@ export default function smartRouterExtension(pi: ExtensionAPI) {
     initialized = true;
   }
 
-  // ── Session lifecycle ───────────────────────────────────────
+  // ── Status bar ──────────────────────────────────────────────
+
+  function updateBar(ui: any, cfg: SmartRouterConfig, s: RouterState) {
+    if (!cfg.ux.statusBar) { ui.setStatus("smart-router", undefined); return; }
+    const badge = cfg.enabled
+      ? formatTierDisplay(s.currentTier, s.currentModelId)
+      : "⛔";
+    ui.setStatus("smart-router", badge);
+  }
+
+  // ── Session start ───────────────────────────────────────────
 
   pi.on("session_start", async (_event, ctx) => {
-    await initialize(ctx);
+    await init(ctx);
 
-    if (!config.enabled) {
-      ctx.ui.setStatus("smart-router", "SR ⛔");
-      return;
-    }
+    if (!config.enabled) { updateBar(ctx.ui, config, state); return; }
 
-    const initialModel = findBestModelForTier("medium", config, pi);
-    if (initialModel) {
+    const m = findBestModelForTier("medium", config, ctx.modelRegistry as any);
+    if (m) {
       state.currentTier = "medium";
-      state.currentModelId = initialModel.modelId;
-      state.currentProvider = initialModel.provider;
+      state.currentModelId = m.modelId;
+      state.currentProvider = m.provider;
     }
-
-    updateStatusBar(ctx.ui, state, config);
+    updateBar(ctx.ui, config, state);
   });
 
-  // ── Before each agent turn: routing decision ────────────────
+  // ── Before each turn ────────────────────────────────────────
 
   pi.on("before_agent_start", async (event, ctx) => {
-    if (!initialized) await initialize(ctx);
-    if (!config?.enabled) return;
-    if (!event.prompt?.trim()) return;
+    if (!initialized) await init(ctx);
+    if (!config?.enabled || !event.prompt?.trim()) return;
 
-    // 1. Classify: try LLM judge → fallback heuristic
     const judgeResult = await classify(event.prompt, judgeEndpoint);
+    const result = processRoute(judgeResult, state, config, ctx.modelRegistry as any);
 
-    // 2. Route decision
-    const result = processRoute(judgeResult, state, config, pi);
-
-    // 3. Apply switch
     if (result.switchTo) {
-      const success = await applyModelSwitch(result.switchTo, state, pi);
-      if (success && !config.ux.quietMode && config.ux.inlineToast) {
-        const emoji = tierEmoji(state.currentTier);
+      const ok = await applyModelSwitch(
+        result.switchTo, state,
+        ctx.modelRegistry as any,
+        (m) => pi.setModel(m),
+      );
+      if (ok && !config.ux.quietMode && config.ux.inlineToast) {
         const name = state.currentModelId?.split("/").pop() ?? "";
-        ctx.ui.notify(`🔄 SR: ${emoji} ${name}`, "info");
+        ctx.ui.notify(`${formatTierDisplay(state.currentTier, state.currentModelId)}`, "info");
       }
     }
 
-    updateStatusBar(ctx.ui, state, config);
-
+    updateBar(ctx.ui, config, state);
     if (state.manualOverride.active) clearManualOverride(state);
   });
-
-  // ── Status bar ──────────────────────────────────────────────
-
-  function updateStatusBar(ui: any, s: RouterState, cfg: SmartRouterConfig) {
-    if (!cfg.ux.statusBar) { ui.setStatus("smart-router", undefined); return; }
-    const display = formatTierDisplay(s.currentTier, s.currentModelId, s.currentProvider);
-    const mode = cfg.enabled ? "✅" : "⛔";
-    ui.setStatus("smart-router", `SR ${mode} ${display}`);
-  }
 
   // ── Commands ────────────────────────────────────────────────
 
@@ -103,7 +97,6 @@ export default function smartRouterExtension(pi: ExtensionAPI) {
     getConfig,
     getState,
     async () => {
-      // Called after config changes — re-resolve judge endpoint
       judgeEndpoint = await resolveJudgeEndpoint(config);
       state.window = [];
       clearManualOverride(state);

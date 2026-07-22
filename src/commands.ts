@@ -13,7 +13,6 @@ import { TIERS } from "./types.js";
 import {
   isValidTier,
   tierEmoji,
-  tierBadge,
   tierLabel,
   formatTierDisplay,
 } from "./tier.js";
@@ -32,7 +31,8 @@ import {
 
 function formatWindow(window: RouterState["window"]): string {
   if (window.length === 0) return "(empty)";
-  return "[" + window.map((e) => tierBadge(e.tier).toLowerCase()).join(", ") + "]";
+  const badge: Record<string,string> = { light: "l", medium: "m", flagship: "f" };
+  return "[" + window.map((e) => badge[e.tier] ?? "?").join(", ") + "]";
 }
 
 function tierEntries(config: SmartRouterConfig): TierEntry[] {
@@ -265,7 +265,7 @@ export function registerCommands(
           [
             `Mode: ${config.routing.mode.toUpperCase()}  Enabled: ${config.enabled ? "✅" : "⛔"}  Quiet: ${config.ux.quietMode ? "🔇" : "🔊"}`,
             ``,
-            `Current: ${formatTierDisplay(state.currentTier, state.currentModelId, state.currentProvider)}`,
+            `Current: ${formatTierDisplay(state.currentTier, state.currentModelId)}`,
             `Window: ${formatWindow(state.window)}  (${state.window.length} entries)`,
             `Counts: F=${counts.flagship} M=${counts.medium} L=${counts.light}`,
             `Manual: ${state.manualOverride.active ? `✅ ${state.manualOverride.tier ?? state.manualOverride.modelId ?? "active"}` : "✗ None"}`,
@@ -281,7 +281,7 @@ export function registerCommands(
 
       // Default: compact status
       ctx.ui.notify(
-        `SR ${config.enabled ? "✅" : "⛔"} | ${formatTierDisplay(state.currentTier, state.currentModelId, state.currentProvider)}${state.manualOverride.active ? " (manual)" : ""}`,
+        `${config.enabled ? "" : "⛔ "}${formatTierDisplay(state.currentTier, state.currentModelId)}${state.manualOverride.active ? " (manual)" : ""}`,
         "info",
       );
     },

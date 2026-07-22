@@ -5,7 +5,6 @@
  * and integration with pi's model registry.
  */
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { SmartRouterConfig, Tier, ModelRef } from "./types.js";
 import { TIERS } from "./types.js";
 
@@ -23,18 +22,16 @@ export interface ResolvedModel {
 export function findBestModelForTier(
   tier: Tier,
   config: SmartRouterConfig,
-  pi: ExtensionAPI,
+  modelRegistry: { find: (provider: string, modelId: string) => unknown } | undefined,
 ): ResolvedModel | null {
   const tierConfig = config.tiers[tier];
-  if (!tierConfig?.models?.length) return null;
+  if (!tierConfig?.models?.length || !modelRegistry?.find) return null;
 
   const sorted = [...tierConfig.models].sort((a, b) => a.priority - b.priority);
-  const registry = (pi as any).modelRegistry;
-  if (!registry?.find) return null;
 
   for (const ref of sorted) {
     try {
-      if (registry.find(ref.provider, ref.model)) {
+      if (modelRegistry.find(ref.provider, ref.model)) {
         return { provider: ref.provider, modelId: ref.model, tier };
       }
     } catch {
@@ -68,27 +65,13 @@ export function tierEmoji(tier: Tier): string {
   }
 }
 
-/** Get short badge for status bar */
-export function tierBadge(tier: Tier): string {
-  switch (tier) {
-    case "flagship":
-      return "F";
-    case "medium":
-      return "M";
-    case "light":
-      return "L";
-  }
-}
-
-/** Format tier info for display: "🚀 F:model-name" */
+/** Format tier for status bar: "[🚀 kimi-k3]" */
 export function formatTierDisplay(
-  tier: Tier,
+  tier: Tier | null,
   modelId: string | null,
-  provider: string | null,
 ): string {
+  if (!tier) return "";
   const emoji = tierEmoji(tier);
-  const badge = tierBadge(tier);
-  const model = modelId ? modelId.split("/").pop() ?? modelId : "?";
-  const prov = provider ? provider.split("/").pop() ?? provider : "";
-  return `${emoji} ${badge}:${model}${prov ? `(${prov})` : ""}`;
+  const model = modelId?.split("/").pop() ?? "…";
+  return `[${emoji} ${model}]`;
 }
