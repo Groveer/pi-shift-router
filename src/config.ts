@@ -231,7 +231,7 @@ export async function loadConfig(cwd: string): Promise<SmartRouterConfig> {
       const userConfig = JSON.parse(raw) as Partial<SmartRouterConfig>;
       // Merge with defaults
       const merged: SmartRouterConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
-      deepMerge(merged, userConfig);
+      deepMerge(merged as unknown as Record<string, unknown>, userConfig as unknown as Record<string, unknown>);
       _config = merged;
 
       // Validate

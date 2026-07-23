@@ -25,26 +25,32 @@
     "url": "https://github.com/green-dalii"
   },
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "pi": {
-    "extensions": ["./src/index.ts"]
+    "extensions": [
+      "./dist/index.js"
+    ]
   },
   "files": [
-    "src",
-    "prompts",
+    "dist",
     "README.md",
     "LICENSE",
     "CHANGELOG.md",
     "package.json"
   ],
   "scripts": {
+    "build": "tsc && node scripts/copy-assets.mjs",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf node_modules dist"
+    "clean": "rm -rf node_modules dist",
+    "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
     "typebox": "*"
   },
   "devDependencies": {
+    "@types/node": "^22.20.1",
     "typescript": "^5.8.0"
   }
 }

@@ -22,7 +22,7 @@ const FALLBACK_PROMPT =
 function loadJudgePrompt(): string {
   try {
     const here = dirname(fileURLToPath(import.meta.url));
-    const path = resolve(here, "../prompts/judge.md");
+    const path = resolve(here, "./prompts/judge.md");
     return readFileSync(path, "utf-8").trim();
   } catch (err) {
     console.warn("[SlimRouter] Failed to load prompts/judge.md, using fallback:", err);

@@ -98,7 +98,7 @@ export default function smartRouterExtension(pi: ExtensionAPI) {
       const ok = await applyModelSwitch(
         result.switchTo, state,
         ctx.modelRegistry as any,
-        (m) => pi.setModel(m),
+        (m) => pi.setModel(m as any),
       );
       if (ok && !config.ux.quietMode && config.ux.inlineToast) {
         const name = state.currentModelId?.split("/").pop() ?? "";
@@ -108,7 +108,7 @@ export default function smartRouterExtension(pi: ExtensionAPI) {
       // No model active yet — resolve one for the current tier
       const m = findBestModelForTier(state.currentTier, config, ctx.modelRegistry as any);
       if (m) {
-        await applyModelSwitch(m, state, ctx.modelRegistry as any, (model) => pi.setModel(model));
+        await applyModelSwitch(m, state, ctx.modelRegistry as any, (model) => pi.setModel(model as any));
       }
     }
 

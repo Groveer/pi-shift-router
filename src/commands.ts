@@ -8,7 +8,7 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { SmartRouterConfig, RouterState, Tier } from "./types.js";
+import type { SmartRouterConfig, RouterState, Tier, TierEntry } from "./types.js";
 import { TIERS } from "./types.js";
 import {
   isValidTier,
@@ -48,7 +48,7 @@ function formatTierList(config: SmartRouterConfig): string {
   return tierEntries(config)
     .map(
       (e) =>
-        `  ${tierEmoji(e.tier)} ${e.label.padEnd(14)} ${e.models.map((m) => `${m.provider}/${m.model}`).join(", ") || "(none)"}`,
+        `  ${tierEmoji(e.tier)} ${e.label.padEnd(14)} ${e.models.map((m: { provider: string; model: string }) => `${m.provider}/${m.model}`).join(", ") || "(none)"}`,
     )
     .join("\n");
 }
