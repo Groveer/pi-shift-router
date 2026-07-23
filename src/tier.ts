@@ -1,5 +1,5 @@
 /**
- * Smart Router — Tier management
+ * Slim Router — Tier management
  *
  * Handles model lookup across tiers, priority-based fallback,
  * and integration with pi's model registry.

@@ -1,5 +1,5 @@
 /**
- * Smart Router — Configuration loader
+ * Slim Router — Configuration loader
  *
  * Reads pi-agent's models-store.json and auth.json, auto-assigns models
  * to tiers, and manages the smartrouter.json config file.

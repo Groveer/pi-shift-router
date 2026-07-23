@@ -1,5 +1,5 @@
 /**
- * Smart Router — Slash commands
+ * Slim Router — Slash commands
  *
  * /router          — Show status, enable/disable
  * /route-force     — Manual override for current turn
@@ -72,7 +72,7 @@ async function routeConfigWizard(
 
   async function menu(): Promise<MenuChoice> {
     const lightSuffix = config.tiers.light.models.length > 0 ? " (also Judge)" : "";
-    const choice = await ctx.ui.select("Smart Router — Configuration", [
+    const choice = await ctx.ui.select("Slim Router — Configuration", [
       `⚡ Light — ${config.tiers.light.models.length} model(s)${lightSuffix}`,
       `🦾 Medium — ${config.tiers.medium.models.length} model(s)`,
       `🧠 Flagship — ${config.tiers.flagship.models.length} model(s)`,
@@ -165,9 +165,9 @@ async function routeConfigWizard(
 
   const saved = await saveConfig(config, cwd);
   if (saved) {
-    ctx.ui.notify(`Smart Router: 💾 Configuration saved to ${getConfigPath() ?? ".pi/smartrouter.json"}`, "info");
+    ctx.ui.notify(`Slim Router: 💾 Configuration saved to ${getConfigPath() ?? ".pi/smartrouter.json"}`, "info");
   } else {
-    ctx.ui.notify("Smart Router: ⚠ Failed to save configuration", "error");
+    ctx.ui.notify("Slim Router: ⚠ Failed to save configuration", "error");
   }
   return saved;
 }
@@ -184,7 +184,7 @@ export function registerCommands(
 ): void {
   // ── /router ──────────────────────────────────────────────────
   pi.registerCommand("router", {
-    description: "Smart Router: show status, enable/disable",
+    description: "Slim Router: show status, enable/disable",
     getArgumentCompletions: (prefix: string) => {
       const cmds = ["on", "off", "status", "quiet", "config"].filter((c) => c.startsWith(prefix));
       return cmds.length > 0 ? cmds.map((c) => ({ value: c, label: c })) : null;
@@ -198,14 +198,14 @@ export function registerCommands(
         config.enabled = true;
         onConfigChanged();
         updateStatus(ctx.ui);
-        ctx.ui.notify("Smart Router: ✅ Enabled", "info");
+        ctx.ui.notify("Slim Router: ✅ Enabled", "info");
         return;
       }
       if (arg === "off") {
         config.enabled = false;
         onConfigChanged();
         updateStatus(ctx.ui);
-        ctx.ui.notify("Smart Router: ⛔ Disabled", "info");
+        ctx.ui.notify("Slim Router: ⛔ Disabled", "info");
         return;
       }
       if (arg === "config") {
@@ -216,7 +216,7 @@ export function registerCommands(
       }
       if (arg === "quiet") {
         config.ux.quietMode = !config.ux.quietMode;
-        ctx.ui.notify(`Smart Router: ${config.ux.quietMode ? "🔇 Quiet" : "🔊 Notifications"}`, "info");
+        ctx.ui.notify(`Slim Router: ${config.ux.quietMode ? "🔇 Quiet" : "🔊 Notifications"}`, "info");
         return;
       }
       if (arg === "status") {
@@ -260,13 +260,13 @@ export function registerCommands(
       const arg = args.trim().toLowerCase();
       if (!arg || arg === "auto") {
         clearManualOverride(getState());
-        ctx.ui.notify("Smart Router: Manual override cleared", "info");
+        ctx.ui.notify("Slim Router: Manual override cleared", "info");
         return;
       }
 
       if (isValidTier(arg)) {
         onManualOverrideTier(arg);
-        ctx.ui.notify(`Smart Router: ${tierEmoji(arg)} Forcing "${tierLabel(arg, getConfig())}" tier`, "info");
+        ctx.ui.notify(`Slim Router: ${tierEmoji(arg)} Forcing "${tierLabel(arg, getConfig())}" tier`, "info");
         return;
       }
 
@@ -274,7 +274,7 @@ export function registerCommands(
       const parts = arg.split("/");
       if (parts.length === 2) {
         setManualOverrideModel(getState(), parts[0], parts[1]);
-        ctx.ui.notify(`Smart Router: 🎯 Forcing ${parts[0]}/${parts[1]}`, "info");
+        ctx.ui.notify(`Slim Router: 🎯 Forcing ${parts[0]}/${parts[1]}`, "info");
         return;
       }
 

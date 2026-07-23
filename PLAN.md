@@ -1,4 +1,4 @@
-# Smart Router — Development Plan
+# Slim Router — Development Plan
 
 ## Phase Status
 

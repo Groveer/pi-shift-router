@@ -1,5 +1,5 @@
 /**
- * Smart Router — Task classifier (Judge)
+ * Slim Router — Task classifier (Judge)
  *
  * Two-tier classification:
  *   LLM Judge (direct API call) → fallback Heuristic

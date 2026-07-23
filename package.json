@@ -1,24 +1,24 @@
 {
-  "name": "pi-smart-router",
+  "name": "pi-slim-router",
   "version": "0.1.0",
-  "description": "Intelligent model router for pi-agent — automatically selects the optimal model for every task",
+  "description": "Task-complexity router for pi-agent — automatically matches the right model to every task",
   "keywords": [
     "pi-package",
     "pi-extension",
-    "smart-router",
+    "slim-router",
     "model-routing",
     "ai-router",
     "llm-router",
     "model-selection"
   ],
   "license": "Apache-2.0",
-  "homepage": "https://github.com/green-dalii/smart-router#readme",
+  "homepage": "https://github.com/green-dalii/pi-slim-router#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/green-dalii/smart-router.git"
+    "url": "git+https://github.com/green-dalii/pi-slim-router.git"
   },
   "bugs": {
-    "url": "https://github.com/green-dalii/smart-router/issues"
+    "url": "https://github.com/green-dalii/pi-slim-router/issues"
   },
   "type": "module",
   "pi": {

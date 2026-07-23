@@ -1,5 +1,5 @@
 /**
- * Smart Router — Type definitions
+ * Slim Router — Type definitions
  */
 
 /** The three routing tiers */
@@ -67,7 +67,7 @@ export interface RoutingConfig {
   downgrade: DowngradeConfig;
 }
 
-/** Full SMART Router configuration */
+/** Full SLIM Router configuration */
 export interface SmartRouterConfig {
   enabled: boolean;
   judge: JudgeConfig;

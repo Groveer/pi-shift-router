@@ -1,5 +1,5 @@
 /**
- * Smart Router — Routing engine
+ * Slim Router — Routing engine
  *
  * Core logic: sliding window trend detection, upgrade/downgrade decisions,
  * model switching via pi.setModel().

@@ -1,5 +1,5 @@
 /**
- * Smart Router — Pi-agent Extension
+ * Slim Router — Pi-agent Extension
  *
  * Routes tasks to the optimal model based on complexity.
  * Uses sliding window trend detection to balance quality and cost

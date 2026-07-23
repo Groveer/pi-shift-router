@@ -1,4 +1,4 @@
-# Smart Router — Development Principles
+# Slim Router — Development Principles
 
 ## 代码哲学
 

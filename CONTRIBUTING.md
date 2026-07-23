@@ -1,6 +1,6 @@
-# Contributing to Smart Router
+# Contributing to Slim Router
 
-Thank you for considering contributing to Smart Router! We welcome contributions of all kinds: bug reports, feature requests, documentation improvements, and code changes.
+Thank you for considering contributing to Slim Router! We welcome contributions of all kinds: bug reports, feature requests, documentation improvements, and code changes.
 
 ## Code of Conduct
 
@@ -15,7 +15,7 @@ This project is committed to providing a welcoming, inclusive environment for ev
 
 ### Reporting Bugs
 
-1. **Check existing issues** — Search the [issue tracker](https://github.com/green-dalii/smart-router/issues) before filing a duplicate.
+1. **Check existing issues** — Search the [issue tracker](https://github.com/green-dalii/pi-slim-router/issues) before filing a duplicate.
 2. **Use a clear title** — Summarize the problem concisely.
 3. **Provide reproduction steps** — Include the exact command, expected behavior, and actual behavior.
 4. **Include environment info** — pi-agent version, OS, Node.js version.
@@ -48,8 +48,8 @@ This project is committed to providing a welcoming, inclusive environment for ev
 ### Development Setup
 
 ```bash
-git clone https://github.com/green-dalii/smart-router.git
-cd smart-router
+git clone https://github.com/green-dalii/pi-slim-router.git
+cd pi-slim-router
 npm install
 npm run typecheck
 ```

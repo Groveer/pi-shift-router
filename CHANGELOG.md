@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Initial release of Smart Router for pi-agent.
+- Initial release of Slim Router for pi-agent.
 - Three-tier routing architecture: Flagship (🧠), Medium (🦾), Lightweight (⚡).
 - Two-stage judge: LLM classification with heuristic fallback.
 - Sliding window trend detection for upgrade/downgrade decisions.

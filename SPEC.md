@@ -1,8 +1,8 @@
-# Smart Router — Pi-agent 智能路由扩展
+# Slim Router — Pi-agent 智能路由扩展
 
 ## 1. 概述
 
-**Smart Router** 是 Pi-agent 的一个 Extension，实现**多 Provider、多模型智能路由**。根据用户每次输入的任务性质，自动选择最合适的模型，在**输出质量**和**成本效率**之间取得最优平衡。
+**Slim Router** 是 Pi-agent 的一个 Extension，实现**多 Provider、多模型智能路由**。根据用户每次输入的任务性质，自动选择最合适的模型，在**输出质量**和**成本效率**之间取得最优平衡。
 
 ### 核心价值
 
@@ -19,7 +19,7 @@ Pi-agent 已支持多 Provider 和 `/model` 切换，但存在三个问题：
 2. **用户需要记住每个模型的强弱和价格**，认知负担大
 3. **一个会话绑定一个模型**，简单回答也调用旗舰模型，或复杂任务也被轻量模型限制
 
-Smart Router 解决了这三点：**自动、透明、动态适配**。
+Slim Router 解决了这三点：**自动、透明、动态适配**。
 
 ---
 
@@ -34,7 +34,7 @@ Smart Router 解决了这三点：**自动、透明、动态适配**。
 ┌──────────────────────────────────────────────────────────┐
 │  Pi-agent before_agent_start 事件                        │
 │                                                          │
-│  ┌─── Smart Router ──────────────────────────────────┐   │
+│  ┌─── Slim Router ──────────────────────────────────┐   │
 │  │                                                    │   │
 │  │  ① 读取配置（缓存）                                 │   │
 │  │  ② 检查是否有手动覆盖 (/route-force)               │   │
@@ -510,7 +510,7 @@ function heuristicClassify(prompt: string): Tier {
 ### 6.2 路由状态显示
 
 ```text
-┌─ Smart Router ───────────────────────────────┐
+┌─ Slim Router ───────────────────────────────┐
 │ Status: ✅ Active                             │
 │ Mode:   Auto                                  │
 │ Tier:   🚀 Flagship → Kimi K3 (opencode-go)   │
@@ -573,15 +573,15 @@ function heuristicClassify(prompt: string): Tier {
 设计要点：**一行内完成，不展开**
 
 ```
-🔄 Smart Router: 🚀 Kimi K3  ← 检测到复杂架构任务
+🔄 Slim Router: 🚀 Kimi K3  ← 检测到复杂架构任务
 ```
 
 ```
-🔄 Smart Router: ⚡ DeepSeek Flash
+🔄 Slim Router: ⚡ DeepSeek Flash
 ```
 
 ```
-🔄 Smart Router: 🦾 DeepSeek Pro
+🔄 Slim Router: 🦾 DeepSeek Pro
 ```
 
 格式：固定前缀 + 目标 tier 图标 + 模型名。不写原因（原因在 `/route status` 里）。
@@ -589,7 +589,7 @@ function heuristicClassify(prompt: string): Tier {
 ### 7.5 Detail View
 
 ```
-┌─ Smart Router ═══════════════════════════════┐
+┌─ Slim Router ═══════════════════════════════┐
 │ Status: ✅ Active                             │
 │ Mode:   Auto                                  │
 │ Tier:   🚀 Flagship — Kimi K3 (opencode-go)   │
@@ -679,7 +679,7 @@ function heuristicClassify(prompt: string): Tier {
 ```
 场景：用户只有一个 Provider 和一个模型
 处理：
-  1. 自动检测 → 禁用 Smart Router（无路由必要）
+  1. 自动检测 → 禁用 Slim Router（无路由必要）
   2. 显示提示："只有 1 个模型可用，路由器无必要的路由选择。"
 ```
 

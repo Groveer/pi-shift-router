@@ -1,6 +1,6 @@
-# Smart Router
+# Slim Router
 
-> Automatically routes every task to the optimal model — no more manual `/model` switching.
+> Routes every task to the right model — no more manual `/model` switching.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
@@ -16,12 +16,14 @@ There's no in-between.
 
 ## The Solution
 
-**Smart Router** hooks into pi-agent's turn cycle, classifies each task in real time, and seamlessly switches the active model — without interrupting your workflow.
+**Slim Router** hooks into pi-agent's turn cycle, classifies each task in real time, and seamlessly switches
+the active model — without interrupting your workflow.
 
 - **Three tiers** — Flagship (🧠), Medium (🦾), Lightweight (⚡). One model per tier, assigned by you.
 - **Intelligent routing** — LLM-based classifier with a heuristic fallback, watching a sliding window to prevent flapping.
 - **Zero-config until you want it** — All tiers start empty. The router does nothing until you assign models via the wizard.
 - **Interactive setup** — `/router config` launches a visual picker. No YAML editing, no hunting for model IDs.
+- **Zero runtime dependencies** — Pure TypeScript. No ONNX models, no SQLite, no native compilation.
 
 ---
 
@@ -29,7 +31,7 @@ There's no in-between.
 
 ```bash
 # Install the package
-pi install smart-router
+pi install npm:pi-slim-router
 
 # Launch the configuration wizard
 /router config
@@ -41,6 +43,24 @@ pi install smart-router
 The router auto-activates on the next turn. Run `/router status` to see what's happening.
 
 > **Heads up:** If all three tiers are assigned the same model, the router shows a hint that you're not getting any benefit from routing. You can deliberately align tiers — just be aware the "router" becomes a pass-through in that case.
+
+---
+
+## How It Compares
+
+The pi ecosystem has several routing packages. They solve **different problems** — here's how:
+
+| | Slim Router | pi-router | pi-smart-router |
+|---|---|---|---|
+| **What it does** | Routes by task complexity — simple tasks get light models, complex ones get flagship | Fails over between providers — Provider A down → Provider B | ML-optimized inference pipeline — 12-stage hybrid routing |
+| **When you reach for it** | "This question is trivial, why waste flagship tokens?" | "Anthropic is down, switch to Google without losing context" | "I want local-first inference with ONNX-powered smart routing" |
+| **Judge mechanism** | LLM-as-judge + heuristic fallback | Manual strategy config (latency/capability/cost) | ONNX embedding matcher + Aho-Corasick + turn-type classifier |
+| **Routing dimension** | Task **complexity** (is this hard?) | Provider **reliability** (is this one alive?) | Execution **engine** (local vs cloud, cost vs latency) |
+| **Dependencies** | Zero runtime deps (TS only) | Zero runtime deps (TS only) | ONNX, SQLite, HuggingFace Transformers |
+| **Local inference** | No | No | Yes (LM Studio, Ollama) |
+| **Learning curve** | Low — pick a model per tier, done | Low-Medium — configure channels and strategy | High — ONNX model download, native compilation |
+
+**In short:** These are complementary, not competitive. You could even run them together — pi-router handles provider failover, pi-smart-router optimizes the inference engine, and Slim Router ensures the right model complexity for every task.
 
 ---
 
@@ -198,8 +218,8 @@ No circular dependencies. Each module has one job.
 ## Development
 
 ```bash
-git clone https://github.com/green-dalii/smart-router.git
-cd smart-router
+git clone https://github.com/green-dalii/pi-slim-router.git
+cd pi-slim-router
 npm install
 npm run typecheck
 ```
@@ -226,4 +246,4 @@ Before opening a PR, please read [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[Apache 2.0](LICENSE) © 2025 Smart Router Contributors
+[Apache 2.0](LICENSE) © 2025 Slim Router Contributors
