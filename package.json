@@ -1,9 +1,25 @@
 {
   "name": "pi-smart-router",
   "version": "0.1.0",
-  "description": "Pi-agent extension: intelligent multi-provider model routing",
-  "keywords": ["pi-package", "smart-router", "model-routing"],
-  "license": "MIT",
+  "description": "Intelligent model router for pi-agent — automatically selects the optimal model for every task",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "smart-router",
+    "model-routing",
+    "ai-router",
+    "llm-router",
+    "model-selection"
+  ],
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/green-dalii/smart-router#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/green-dalii/smart-router.git"
+  },
+  "bugs": {
+    "url": "https://github.com/green-dalii/smart-router/issues"
+  },
   "type": "module",
   "pi": {
     "extensions": ["./src/index.ts"]
