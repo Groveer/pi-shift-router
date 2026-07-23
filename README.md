@@ -246,4 +246,4 @@ Before opening a PR, please read [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[Apache 2.0](LICENSE) © 2025 Slim Router Contributors
+[Apache 2.0](LICENSE) © 2026 Slim Router Contributors

@@ -20,10 +20,22 @@
   "bugs": {
     "url": "https://github.com/green-dalii/pi-slim-router/issues"
   },
+  "author": {
+    "name": "green-dalii",
+    "url": "https://github.com/green-dalii"
+  },
   "type": "module",
   "pi": {
     "extensions": ["./src/index.ts"]
   },
+  "files": [
+    "src",
+    "prompts",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "package.json"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf node_modules dist"

@@ -3,19 +3,34 @@
  *
  * Two-tier classification:
  *   LLM Judge (direct API call) → fallback Heuristic
+ *
+ * The judge system prompt is loaded from `prompts/judge.md` at module init.
+ * If the file is missing or unreadable, a minimal inlined fallback is used.
  */
 
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import type { JudgeResult, Tier, ProviderEndpoint } from "./types.js";
 
 // ─── Judge system prompt ──────────────────────────────────────────
 
-const JUDGE_PROMPT = `You are a task classifier. Given a user request, classify it into one tier.
+const FALLBACK_PROMPT =
+  `You are a task classifier. Classify the request into one tier. ` +
+  `Respond with ONLY ONE WORD: light, medium, or flagship.`;
 
-Respond with ONLY ONE WORD: light, medium, or flagship.
+function loadJudgePrompt(): string {
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const path = resolve(here, "../prompts/judge.md");
+    return readFileSync(path, "utf-8").trim();
+  } catch (err) {
+    console.warn("[SlimRouter] Failed to load prompts/judge.md, using fallback:", err);
+    return FALLBACK_PROMPT;
+  }
+}
 
-LIGHT — Simple Q&A, greetings, confirmations, status checks, trivial lookups.
-MEDIUM — Coding, debugging, documentation, analysis, refactoring.
-FLAGSHIP — Architecture, system design, security audit, complex multi-step reasoning.`;
+const JUDGE_PROMPT = loadJudgePrompt();
 
 // ─── LLM Judge ────────────────────────────────────────────────────
 
