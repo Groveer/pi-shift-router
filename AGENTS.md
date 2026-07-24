@@ -14,16 +14,17 @@
 
 - **TypeScript only**。严禁 `any`（除非对接 pi-agent 未公开 API）。优先 interface 而非 type。
 - **没有类**（除非真的需要状态+行为封装）。纯函数 + 数据结构。
-- **没有第三方依赖**（除了 pi-agent SDK 和 typebox）。零外部库。
+- **没有第三方依赖**（除了 pi-agent SDK、pi-tui 和 typebox）。运行时依赖仅 `@earendil-works/pi-coding-agent`（由宿主提供，类型 devDep 列 `@earendil-works/pi-tui` 用于本地构建）。零外部库。
 - **副作用隔离**。纯函数在顶层，IO 传进来。
 - **错误用返回处理，不吞异常**。`console.warn` 然后 fallback，不崩。
 
 ## 架构原则
 
-- **模块单向依赖**：`index.ts` → `router.ts` → `judge.ts|tier.ts` → `config.ts` → `types.ts`。不产生循环依赖。
+- **模块单向依赖**：`index.ts` → `router.ts` → `judge.ts|tier.ts` → `config.ts` → `types.ts`。TUI 组件单独放在 `src/tui/`，不污染核心算法。
 - **配置下沉**：魔法数字不出现，全部收敛到 `types.ts` 的 `DEFAULT_CONFIG`。
 - **接入点唯一**：pi-agent 的生命周期 hook 只通过 `index.ts` 注册。其他模块不直接接触 pi API。
 - **状态集中**：`RouterState` 是唯一 mutable 状态对象。函数接收它、修改它、返回它。
+- **TUI 组件必须自己 handleInput**：实现 `Focusable` 的组件拦截所有键盘，自己分发到子组件（Input / list）。不要依赖 TUI 自动派发——`Container` 不会自动把键盘路由到第一个 `Focusable` 子组件。
 
 ## 协作约定
 

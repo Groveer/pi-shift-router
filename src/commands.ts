@@ -7,7 +7,7 @@
  * /route-config    — Interactive configuration wizard
  */
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import type { SlimRouterConfig, RouterState, Tier, TierEntry } from "./types.js";
 import { TIERS } from "./types.js";
 import {
@@ -58,7 +58,7 @@ function formatTierList(config: SlimRouterConfig): string {
 async function routeConfigWizard(
   config: SlimRouterConfig,
   cwd: string,
-  ctx: { ui: any },
+  ctx: ExtensionCommandContext,
 ): Promise<boolean> {
   const store = await loadModelsStore();
   const allModels = flattenModels(store);
@@ -143,7 +143,7 @@ async function routeConfigWizard(
 
       // Search
       if (provPick.startsWith("🔍")) {
-        const query = await ctx.ui.textInput("Search model by name or provider…");
+        const query = await ctx.ui.input("Search model by name or provider…");
         if (!query?.trim()) continue;
         const q = query.trim().toLowerCase();
         const matches = availModels.filter((m) =>
@@ -171,8 +171,8 @@ async function routeConfigWizard(
   }
 
   /**
-   * Show a list of models from one provider and let user pick one.
-   * Returns ModelRef if picked, null if "Back".
+   * Model picker: TUI component with real-time filter + sliding viewport.
+   * Falls back to ctx.ui.select() in non-TUI modes.
    */
   async function pickModel(
     models: typeof allModels,
@@ -180,31 +180,45 @@ async function routeConfigWizard(
     selectedKey: string | null,
     tier: Tier,
   ): Promise<{ provider: string; model: string; priority: number } | null> {
-    const options = models
-      .map((m) => {
+    // TUI mode: use the new picker with input + filter + sliding list
+    if (ctx.mode === "tui") {
+      const { createModelPicker } = await import("./tui/model-picker.js");
+      return await ctx.ui.custom<{ provider: string; model: string; priority: number } | null>(
+        (_tui, _theme, _keybindings, done) => {
+          return createModelPicker({
+            items: models.map((m) => ({
+              provider: m.provider,
+              id: m.id,
+              cost: { input: m.cost?.input ?? 0 },
+            })),
+            selectedKey,
+            tierLabel: `${tier} (${header})`,
+            onSelect: (r) => done({ provider: r.provider, model: r.model, priority: 1 }),
+            onCancel: () => done(null),
+          });
+        },
+      );
+    }
+
+    // Non-TUI fallback: simple select with full key in label
+    for (;;) {
+      const labels = models.map((m) => {
         const key = `${m.provider}/${m.id}`;
         const isSelected = key === selectedKey;
         const judgeSuffix = (tier === "light" && isSelected) ? "  (Judge)" : "";
-        // Show provider prefix only when models span multiple providers
-        const label = models.some((o) => o.provider !== m.provider)
-          ? key
-          : m.id;
-        return {
-          key,
-          label: `${isSelected ? "●" : "○"} ${label.padEnd(35)} $${m.cost!.input.toFixed(3)}/M${judgeSuffix}`,
-          isSelected,
-        };
-      })
-      .sort((a, b) => (a.isSelected === b.isSelected ? 0 : a.isSelected ? -1 : 1));
+        const prefix = isSelected ? "●" : "○";
+        return `${prefix} ${key.padEnd(35)} $${m.cost!.input.toFixed(3)}/M${judgeSuffix}`;
+      });
 
-    const labels = [...options.map((o) => o.label), "---", "✅ Back"];
-
-    const pick = await ctx.ui.select(header, labels);
-    if (!pick || pick.startsWith("✅")) return null;
-    const picked = options.find((o) => pick.includes(o.key));
-    if (!picked) return null;
-    const [prov, modelId] = picked.key.split("/");
-    return { provider: prov, model: modelId, priority: 1 };
+      labels.push("---", "✅ Back");
+      const pick = await ctx.ui.select(header, labels);
+      if (!pick || pick.startsWith("✅")) return null;
+      for (const m of models) {
+        if (pick.includes(`${m.provider}/${m.id}`)) {
+          return { provider: m.provider, model: m.id, priority: 1 };
+        }
+      }
+    }
   }
 
   // Judge is no longer user-configurable — always uses light tier's model.

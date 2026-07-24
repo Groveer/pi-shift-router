@@ -22,7 +22,7 @@ the active model — without interrupting your workflow.
 - **Three tiers** — Flagship (🧠), Medium (🦾), Lightweight (⚡). One model per tier, assigned by you.
 - **Intelligent routing** — LLM-based classifier with a heuristic fallback, watching a sliding window to prevent flapping.
 - **Zero-config until you want it** — All tiers start empty. The router does nothing until you assign models via the wizard.
-- **Interactive setup** — `/router config` launches a visual picker. No YAML editing, no hunting for model IDs.
+- **Interactive setup** — `/router config` launches a TUI picker matching pi's native `/model`: real-time fuzzy search, 10-item sliding viewport, arrow keys, Enter to select, Esc to cancel. No YAML editing, no hunting for model IDs.
 - **Zero runtime dependencies** — Pure TypeScript. No ONNX models, no SQLite, no native compilation.
 
 ---

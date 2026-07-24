@@ -595,6 +595,22 @@ const FALLBACK_RESULT: JudgeResult = { tier: "medium", source: "fallback" };
 
 用户如果觉得通知太多，可以 `/router quiet` 一键切换安静模式。
 
+### 7.7 配置向导的 TUI 模型选择器
+
+`/router config` 的模型选择步骤**复用 pi 原生 `/model` 的交互范式**——一个 `Input`（搜索框）+ 一个 10 条视口的列表，所有事件由一个 `ModelPickerComponent` 容器（实现 `Focusable`）统一分发：
+
+- **键入** → 转发给 `searchInput.handleInput()` → 立刻 `fuzzyFilter()` 过滤 → 列表实时缩窄
+- **↑ / ↓** → 调整 `selectedIndex`（循环），`updateList()` 重画 10 条
+- **PageUp / PageDown** → ±10 跳
+- **Enter** → 选中当前行
+- **Esc / Ctrl+C** → 取消
+
+视口使用 `startIndex = clamp(selectedIndex - 5, 0, total - 10)`，保证选中行始终大致居中。底部显示滚动指示 `(${selectedIndex + 1}/${total})`。
+
+**实现位置**：`src/tui/model-picker.ts`，基于 `@earendil-works/pi-tui` 的 `Container` / `Input` / `fuzzyFilter` / `getKeybindings` 组件。结构与 pi 内部的 `ModelSelectorComponent` 同构。
+
+**非 TUI 模式**（`-p` 打印 / RPC / JSON）`ctx.ui.custom` 不可用，wizard 自动 fallback 到 `ctx.ui.select()` 平铺列表，label 包含完整 `${provider}/${model}` 路径以保证 Enter 键匹配。
+
 ---
 
 ## 8. 实现计划
