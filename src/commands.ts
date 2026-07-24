@@ -110,35 +110,101 @@ async function routeConfigWizard(
       ? `${cfg.models[0].provider}/${cfg.models[0].model}`
       : null;
 
-    const options = allModels
-      .filter((m) => m.cost?.input != null)
+    const availModels = allModels.filter((m) => m.cost?.input != null);
+
+    // Group models by provider
+    const byProvider = new Map<string, typeof availModels>();
+    for (const m of availModels) {
+      const group = byProvider.get(m.provider) ?? [];
+      group.push(m);
+      byProvider.set(m.provider, group);
+    }
+
+    // Step 1: pick provider (or search)
+    for (;;) {
+      const providers = [...byProvider.keys()].sort();
+      const provOpts: string[] = [];
+      if (selectedKey) provOpts.push("❌ Clear selection");
+      provOpts.push(
+        ...providers.map((p) => {
+          const count = byProvider.get(p)?.length ?? 0;
+          const mark = selectedKey?.startsWith(p + "/") ? "●" : "○";
+          return `${mark} ${p}  (${count})`;
+        }),
+      );
+      provOpts.push("---", "🔍 Search all models", "✅ Done");
+
+      const provPick = await ctx.ui.select(
+        `Select ${tierEmoji(tier)} ${cfg.label} — pick provider first`,
+        provOpts,
+      );
+      if (!provPick || provPick.startsWith("✅")) return;
+      if (provPick.startsWith("❌")) { cfg.models = []; return; }
+
+      // Search
+      if (provPick.startsWith("🔍")) {
+        const query = await ctx.ui.textInput("Search model by name or provider…");
+        if (!query?.trim()) continue;
+        const q = query.trim().toLowerCase();
+        const matches = availModels.filter((m) =>
+          m.id.toLowerCase().includes(q) || m.provider.toLowerCase().includes(q),
+        );
+        if (matches.length === 0) {
+          ctx.ui.notify("No models match your search", "error");
+          continue;
+        }
+        const picked = await pickModel(matches, `Search results for "${query.trim()}"`, selectedKey, tier);
+        if (picked) { cfg.models = [picked]; return; }
+        continue;
+      }
+
+      // Extract provider from selection text: "○ provider (N)" → "provider"
+      const provName = providers.find((p) => provPick.includes(` ${p} `) || provPick.endsWith(` ${p}`));
+      if (!provName) continue;
+
+      // Step 2: pick model from this provider
+      const provModels = byProvider.get(provName)!;
+      const picked = await pickModel(provModels, `Select model from ${provName}`, selectedKey, tier);
+      if (picked) { cfg.models = [picked]; return; }
+      // "Back" → loop back to provider list
+    }
+  }
+
+  /**
+   * Show a list of models from one provider and let user pick one.
+   * Returns ModelRef if picked, null if "Back".
+   */
+  async function pickModel(
+    models: typeof allModels,
+    header: string,
+    selectedKey: string | null,
+    tier: Tier,
+  ): Promise<{ provider: string; model: string; priority: number } | null> {
+    const options = models
       .map((m) => {
         const key = `${m.provider}/${m.id}`;
         const isSelected = key === selectedKey;
         const judgeSuffix = (tier === "light" && isSelected) ? "  (Judge)" : "";
+        // Show provider prefix only when models span multiple providers
+        const label = models.some((o) => o.provider !== m.provider)
+          ? key
+          : m.id;
         return {
           key,
-          label: `${isSelected ? "●" : "○"} ${key.padEnd(35)} $${m.cost!.input.toFixed(3)}/M${judgeSuffix}`,
+          label: `${isSelected ? "●" : "○"} ${label.padEnd(35)} $${m.cost!.input.toFixed(3)}/M${judgeSuffix}`,
           isSelected,
         };
       })
       .sort((a, b) => (a.isSelected === b.isSelected ? 0 : a.isSelected ? -1 : 1));
 
-    const header = `Select ${tierEmoji(tier)} ${cfg.label} model`;
-    const labels: string[] = [];
-    if (selectedKey) labels.push("❌ Clear selection");
-    labels.push(...options.map((o) => o.label), "---", "✅ Done");
+    const labels = [...options.map((o) => o.label), "---", "✅ Back"];
 
     const pick = await ctx.ui.select(header, labels);
-    if (!pick || pick.startsWith("✅")) return;
-
-    if (pick.startsWith("❌")) { cfg.models = []; return; }
-
+    if (!pick || pick.startsWith("✅")) return null;
     const picked = options.find((o) => pick.includes(o.key));
-    if (!picked) return;
-
+    if (!picked) return null;
     const [prov, modelId] = picked.key.split("/");
-    cfg.models = [{ provider: prov, model: modelId, priority: 1 }];
+    return { provider: prov, model: modelId, priority: 1 };
   }
 
   // Judge is no longer user-configurable — always uses light tier's model.
