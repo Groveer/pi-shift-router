@@ -9,7 +9,7 @@ import { readFile, writeFile, access, mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import {
-  type SmartRouterConfig,
+  type SlimRouterConfig,
   type ModelsStore,
   type AuthStore,
   type StoredModel,
@@ -21,7 +21,7 @@ import {
 const PI_AGENT_DIR = join(homedir(), ".pi", "agent");
 const CONFIG_FILENAME = "pi-slim-router.json";
 
-let _config: SmartRouterConfig | null = null;
+let _config: SlimRouterConfig | null = null;
 let _modelsStore: ModelsStore | null = null;
 let _authStore: AuthStore | null = null;
 let _configPath: string | null = null;
@@ -108,7 +108,7 @@ export function invalidateConfigCache(): void {
  *   1. light tier's first model (user chose this as the cheap/fast option)
  *   2. cheapest model with valid auth (fallback)
  */
-export async function resolveJudgeEndpoint(config: SmartRouterConfig): Promise<ProviderEndpoint | null> {
+export async function resolveJudgeEndpoint(config: SlimRouterConfig): Promise<ProviderEndpoint | null> {
   const store = await loadModelsStore();
   const auth = await loadAuthStore();
 
@@ -155,7 +155,7 @@ export async function resolveJudgeEndpoint(config: SmartRouterConfig): Promise<P
  * @param scope "user" → ~/.pi/agent/, "project" → <cwd>/.pi/
  */
 export async function saveConfig(
-  config: SmartRouterConfig,
+  config: SlimRouterConfig,
   cwd: string,
   scope: "user" | "project" = "project",
 ): Promise<boolean> {
@@ -179,7 +179,7 @@ export async function saveConfig(
  * Validate that referenced models exist in the store.
  * Returns warnings (non-fatal): tier without models, missing provider/model, duplicates.
  */
-export function validateConfig(config: SmartRouterConfig, store: ModelsStore): string[] {
+export function validateConfig(config: SlimRouterConfig, store: ModelsStore): string[] {
   const warnings: string[] = [];
   const seenRefs = new Map<string, string>(); // key → tier
 
@@ -220,7 +220,7 @@ export function validateConfig(config: SmartRouterConfig, store: ModelsStore): s
  *   2. Project config (<cwd>/.pi/pi-slim-router.json) — team-shared overrides
  * Project wins on conflict (deep merge with project taking precedence).
  */
-export async function loadConfig(cwd: string): Promise<SmartRouterConfig> {
+export async function loadConfig(cwd: string): Promise<SlimRouterConfig> {
   if (_config) return _config;
 
   const userPath = userConfigPath();
@@ -231,7 +231,7 @@ export async function loadConfig(cwd: string): Promise<SmartRouterConfig> {
   const projectCfg = await readJsonPartial(projectPath);
 
   // Merge: defaults ← user ← project (project wins)
-  const merged: SmartRouterConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  const merged: SlimRouterConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
   deepMerge(merged as unknown as Record<string, unknown>, userCfg);
   deepMerge(merged as unknown as Record<string, unknown>, projectCfg);
   _config = merged;

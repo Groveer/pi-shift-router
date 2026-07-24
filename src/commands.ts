@@ -8,7 +8,7 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { SmartRouterConfig, RouterState, Tier, TierEntry } from "./types.js";
+import type { SlimRouterConfig, RouterState, Tier, TierEntry } from "./types.js";
 import { TIERS } from "./types.js";
 import {
   isValidTier,
@@ -35,7 +35,7 @@ function formatWindow(window: RouterState["window"]): string {
   return "[" + window.map((e) => badge[e.tier] ?? "?").join(", ") + "]";
 }
 
-function tierEntries(config: SmartRouterConfig): TierEntry[] {
+function tierEntries(config: SlimRouterConfig): TierEntry[] {
   return TIERS.map((t) => ({
     tier: t,
     label: config.tiers[t].label,
@@ -44,7 +44,7 @@ function tierEntries(config: SmartRouterConfig): TierEntry[] {
   }));
 }
 
-function formatTierList(config: SmartRouterConfig): string {
+function formatTierList(config: SlimRouterConfig): string {
   return tierEntries(config)
     .map(
       (e) =>
@@ -56,7 +56,7 @@ function formatTierList(config: SmartRouterConfig): string {
 // ─── `/route-config` wizard ──────────────────────────────────────
 
 async function routeConfigWizard(
-  config: SmartRouterConfig,
+  config: SlimRouterConfig,
   cwd: string,
   ctx: { ui: any },
 ): Promise<boolean> {
@@ -191,7 +191,7 @@ async function routeConfigWizard(
 
 export function registerCommands(
   pi: ExtensionAPI,
-  getConfig: () => SmartRouterConfig,
+  getConfig: () => SlimRouterConfig,
   getState: () => RouterState,
   onConfigChanged: () => void,
   onManualOverrideTier: (tier: Tier) => void,

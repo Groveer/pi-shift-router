@@ -12,13 +12,13 @@ import {
   processRoute,
   type RouterState,
 } from "../src/router.js";
-import type { SmartRouterConfig, JudgeResult, Tier } from "../src/types.js";
+import type { SlimRouterConfig, JudgeResult, Tier } from "../src/types.js";
 
 function makeRegistry() {
   return { find: (provider: string, modelId: string) => ({ provider, modelId }) };
 }
 
-function makeConfig(overrides: Partial<SmartRouterConfig> = {}): SmartRouterConfig {
+function makeConfig(overrides: Partial<SlimRouterConfig> = {}): SlimRouterConfig {
   return {
     enabled: true,
     judge: { provider: "auto", model: "auto", timeout: 5000 },
@@ -38,14 +38,14 @@ function makeConfig(overrides: Partial<SmartRouterConfig> = {}): SmartRouterConf
     },
     ux: { quietMode: false, statusBar: true, inlineToast: true },
     ...overrides,
-  } as SmartRouterConfig;
+  } as SlimRouterConfig;
 }
 
 function judge(tier: Tier): JudgeResult {
   return { tier, source: "llm" };
 }
 
-function step(state: RouterState, config: SmartRouterConfig, j: JudgeResult) {
+function step(state: RouterState, config: SlimRouterConfig, j: JudgeResult) {
   return processRoute(j, state, config, makeRegistry());
 }
 

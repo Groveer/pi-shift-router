@@ -120,7 +120,7 @@ flowchart TD
 
 ## Configuration
 
-The config file lives at `.pi/smartrouter.json` and is auto-created on first save.
+The config file lives at `.pi/pi-slim-router.json` and is auto-created on first save.
 
 ```json
 {
@@ -173,7 +173,7 @@ flowchart LR
     end
 
     subgraph Persistence
-        C["config.ts<br/>Load / save .pi/smartrouter.json<br/>Judge endpoint resolution"]
+        C["config.ts<br/>Load / save .pi/pi-slim-router.json<br/>Judge endpoint resolution"]
     end
 
     subgraph UX

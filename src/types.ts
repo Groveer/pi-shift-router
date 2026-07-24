@@ -68,7 +68,7 @@ export interface RoutingConfig {
 }
 
 /** Full SLIM Router configuration */
-export interface SmartRouterConfig {
+export interface SlimRouterConfig {
   enabled: boolean;
   judge: JudgeConfig;
   tiers: {
@@ -81,7 +81,7 @@ export interface SmartRouterConfig {
 }
 
 /** Default configuration */
-export const DEFAULT_CONFIG: SmartRouterConfig = {
+export const DEFAULT_CONFIG: SlimRouterConfig = {
   enabled: true,
   judge: {
     provider: "auto",

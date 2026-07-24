@@ -7,7 +7,7 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { Tier, SmartRouterConfig, RouterState, ProviderEndpoint } from "./types.js";
+import type { Tier, SlimRouterConfig, RouterState, ProviderEndpoint } from "./types.js";
 import { loadConfig, resolveJudgeEndpoint } from "./config.js";
 import { findBestModelForTier, formatTierDisplay } from "./tier.js";
 import { classify } from "./judge.js";
@@ -21,7 +21,7 @@ import {
 import { registerCommands } from "./commands.js";
 
 /** Check if all three tiers have identical model configurations */
-function allTiersIdentical(config: SmartRouterConfig): boolean {
+function allTiersIdentical(config: SlimRouterConfig): boolean {
   const { light, medium, flagship } = config.tiers;
   const modelsJson = (tc: typeof light) =>
     tc.models.map((m) => `${m.provider}/${m.model}`).sort().join(",");
@@ -31,8 +31,8 @@ function allTiersIdentical(config: SmartRouterConfig): boolean {
   return a === b && b === c;
 }
 
-export default function smartRouterExtension(pi: ExtensionAPI) {
-  let config: SmartRouterConfig;
+export default function slimRouterExtension(pi: ExtensionAPI) {
+  let config: SlimRouterConfig;
   let state: RouterState;
   let judgeEndpoint: ProviderEndpoint | null = null;
   let initialized = false;
@@ -52,12 +52,12 @@ export default function smartRouterExtension(pi: ExtensionAPI) {
 
   // ── Status bar ──────────────────────────────────────────────
 
-  function updateBar(ui: any, cfg: SmartRouterConfig, s: RouterState) {
-    if (!cfg.ux.statusBar) { ui.setStatus("smart-router", undefined); return; }
+  function updateBar(ui: any, cfg: SlimRouterConfig, s: RouterState) {
+    if (!cfg.ux.statusBar) { ui.setStatus("slim-router", undefined); return; }
     const badge = cfg.enabled
       ? formatTierDisplay(s.currentTier, s.currentModelId)
       : "⛔";
-    ui.setStatus("smart-router", badge);
+    ui.setStatus("slim-router", badge);
   }
 
   // ── Session start ───────────────────────────────────────────
@@ -78,7 +78,7 @@ export default function smartRouterExtension(pi: ExtensionAPI) {
     // Hint when tiers are unconfigured (all identical)
     if (allTiersIdentical(config)) {
       console.warn(
-        "[SmartRouter] All tiers share the same model configuration. " +
+        "[SlimRouter] All tiers share the same model configuration. " +
         "Run '/router config' to set up tier-specific routing " +
         "for optimal model selection."
       );

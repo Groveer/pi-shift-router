@@ -14,7 +14,7 @@
 ### 文件结构
 
 ```
-smartrouter/
+pi-slim-router/
 ├── package.json            # pi-package manifest
 ├── tsconfig.json           # TypeScript config (IDE support)
 ├── src/
@@ -44,7 +44,7 @@ index.ts
 
 | 模块 | MVP 核心能力 | 后续扩展 |
 |------|-------------|---------|
-| **config.ts** | 读 `models-store.json` + 自动分配 Tier + 读/写 `smartrouter.json` | Schema 验证、远程配置 |
+| **config.ts** | 读 `models-store.json` + 自动分配 Tier + 读/写 `pi-slim-router.json` | Schema 验证、远程配置 |
 | **tier.ts** | 查找本 Tier 可用模型、priority 降级 | 动态模型发现 |
 | **judge.ts** | 启发式分类（长度 + 关键词 + 多语言） | LLM Judge（fetch 直连） |
 | **router.ts** | 滑动窗口维护 + 升级/降级决策 + 调用 `pi.setModel()` | 持久化窗口状态 |

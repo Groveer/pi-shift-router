@@ -5,7 +5,7 @@
  * model switching via pi.setModel().
  */
 
-import type { SmartRouterConfig, Tier, WindowEntry, RouterState, JudgeResult } from "./types.js";
+import type { SlimRouterConfig, Tier, WindowEntry, RouterState, JudgeResult } from "./types.js";
 import { TIERS } from "./types.js";
 import { findBestModelForTier, type ResolvedModel } from "./tier.js";
 
@@ -31,7 +31,7 @@ function shouldUpgrade(current: Tier, target: Tier): boolean {
 function analyzeDowngrade(
   window: WindowEntry[],
   currentTier: Tier,
-  config: SmartRouterConfig,
+  config: SlimRouterConfig,
 ): { shouldDowngrade: boolean; targetTier: Tier | null } {
   const dc = config.routing.downgrade;
   if (window.length === 0) return { shouldDowngrade: false, targetTier: null };
@@ -76,7 +76,7 @@ export interface RouteDecision {
 export function processRoute(
   judgeResult: JudgeResult,
   state: RouterState,
-  config: SmartRouterConfig,
+  config: SlimRouterConfig,
   modelRegistry: { find: (p: string, m: string) => unknown } | undefined,
 ): RouteDecision {
   if (state.manualOverride.active) {
@@ -132,7 +132,7 @@ export async function applyModelSwitch(
   try {
     const model = modelRegistry?.find?.(resolved.provider, resolved.modelId);
     if (!model) {
-      console.warn(`[SmartRouter] Model not found: ${resolved.provider}/${resolved.modelId}`);
+      console.warn(`[SlimRouter] Model not found: ${resolved.provider}/${resolved.modelId}`);
       return false;
     }
     const ok = await setModel(model);
@@ -143,7 +143,7 @@ export async function applyModelSwitch(
     }
     return ok;
   } catch (err) {
-    console.warn(`[SmartRouter] Model switch failed: ${err}`);
+    console.warn(`[SlimRouter] Model switch failed: ${err}`);
     return false;
   }
 }

@@ -388,7 +388,7 @@ const FALLBACK_RESULT: JudgeResult = { tier: "medium", source: "fallback" };
 
 ```jsonc
 {
-  "$schema": "./smartrouter-schema.json",  // IDE 自动补全支持
+  "$schema": "./pi-slim-router-schema.json",  // IDE 自动补全支持
 
   "enabled": true,               // 是否启用智能路由
 
@@ -456,7 +456,7 @@ const FALLBACK_RESULT: JudgeResult = { tier: "medium", source: "fallback" };
 
 **该设计已被移除。** 不同 Provider 之间价格体系不可比，按价格分配会导致模型能力误排。
 
-现在首次启动时三档均为空（`models: []`），插件不干扰 Pi 当前使用的模型。用户可通过 `smart-router config` 命令手动配置各档位的模型。
+现在首次启动时三档均为空（`models: []`），插件不干扰 Pi 当前使用的模型。用户可通过 `/router config` 命令手动配置各档位的模型。
 
 启动时若检测到三档配置完全相同（包括初始空状态），会打印提示引导用户配置。
 
@@ -542,10 +542,10 @@ const FALLBACK_RESULT: JudgeResult = { tier: "medium", source: "fallback" };
 ### 7.3 Status Bar（常驻）
 
 ```
-⚡L:DS-Flash | 🦾M:DS-Pro | 🚀F:Kimi-K3     [SmartRouter ✅]
+⚡L:DS-Flash | 🦾M:DS-Pro | 🚀F:Kimi-K3     [SlimRouter ✅]
 ```
 
-格式：`{Tier图标}{层级}:{模型缩写}`，当没有启用路由时显示 SmartRouter ⛔。
+格式：`{Tier图标}{层级}:{模型缩写}`，当没有启用路由时显示 SlimRouter ⛔。
 
 ### 7.4 Inline Toast（仅变更时出现）
 
