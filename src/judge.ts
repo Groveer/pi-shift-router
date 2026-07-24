@@ -50,7 +50,7 @@ function judgeApiUrl(baseUrl: string, apiType: string): string {
   return `${base}/chat/completions`;
 }
 
-/** Call LLM judge via direct API call. Returns null on failure. */
+/** Call LLM judge via direct API call. Logs errors for debugging. */
 async function classifyLLM(
   prompt: string,
   endpoint: ProviderEndpoint,
@@ -71,12 +71,21 @@ async function classifyLLM(
       signal,
     });
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.warn(`[SlimRouter] Judge API error ${res.status} from ${url}: ${body.slice(0, 200)}`);
+      return null;
+    }
+
     const raw = await res.json();
     const answer = parseResponse(raw, endpoint.apiType);
-    if (!answer || !["light", "medium", "flagship"].includes(answer)) return null;
+    if (!answer || !["light", "medium", "flagship"].includes(answer)) {
+      console.warn(`[SlimRouter] Judge unparseable response from ${url}: ${JSON.stringify(raw).slice(0, 300)}`);
+      return null;
+    }
     return { tier: answer as Tier, source: "llm" };
-  } catch {
+  } catch (err) {
+    console.warn(`[SlimRouter] Judge fetch failed for ${endpoint.baseUrl}: ${err}`);
     return null;
   }
 }
@@ -147,6 +156,8 @@ export async function classify(
     clearTimeout(timer);
     if (result) return result;
     console.warn("[SlimRouter] Judge LLM unavailable — holding position on current tier");
+  } else {
+    console.warn("[SlimRouter] No judge endpoint resolved — holding position on current tier");
   }
   return FALLBACK_RESULT;
 }
