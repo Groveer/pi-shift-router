@@ -70,6 +70,18 @@ async function routeConfigWizard(
 
   type MenuChoice = "light" | "medium" | "flagship" | "ux" | "done" | "cancel";
 
+  async function saveDestination(): Promise<"user" | "project" | null> {
+    const choice = await ctx.ui.select("Save configuration to…", [
+      "📁 Project — <cwd>/.pi/pi-slim-router.json (shareable with team)",
+      "👤 User — ~/.pi/agent/pi-slim-router.json (personal)",
+      "🚫 Cancel save",
+    ]);
+    if (!choice) return null;
+    if (choice.startsWith("📁")) return "project";
+    if (choice.startsWith("👤")) return "user";
+    return null;
+  }
+
   async function menu(): Promise<MenuChoice> {
     const lightSuffix = config.tiers.light.models.length > 0 ? " (also Judge)" : "";
     const choice = await ctx.ui.select("Slim Router — Configuration", [
@@ -163,9 +175,12 @@ async function routeConfigWizard(
 
   if (!saving) return false;
 
-  const saved = await saveConfig(config, cwd);
+  const scope = await saveDestination();
+  if (!scope) return false;
+
+  const saved = await saveConfig(config, cwd, scope);
   if (saved) {
-    ctx.ui.notify(`Slim Router: 💾 Configuration saved to ${getConfigPath() ?? ".pi/smartrouter.json"}`, "info");
+    ctx.ui.notify(`Slim Router: 💾 Configuration saved to ${getConfigPath() ?? scope + " config"}`, "info");
   } else {
     ctx.ui.notify("Slim Router: ⚠ Failed to save configuration", "error");
   }

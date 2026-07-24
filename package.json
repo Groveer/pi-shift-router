@@ -28,9 +28,11 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "pi": {
-    "extensions": [
-      "./dist/index.js"
-    ]
+    "extensions": ["./dist/index.js"],
+    "minPiVersion": "0.80.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "files": [
     "dist",
@@ -42,15 +44,18 @@
   "scripts": {
     "build": "tsc && node scripts/copy-assets.mjs",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "clean": "rm -rf node_modules dist",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run test && npm run build"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*",
-    "typebox": "*"
+    "@earendil-works/pi-coding-agent": ">=0.80.0",
+    "typebox": ">=0.30.0"
   },
   "devDependencies": {
-    "@types/node": "^22.20.1",
-    "typescript": "^5.8.0"
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0",
+    "vitest": "^2.1.0"
   }
 }

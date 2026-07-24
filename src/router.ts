@@ -105,6 +105,12 @@ export function processRoute(
 
   state.window.push({ tier: targetTier, timestamp: Date.now() });
 
+  // Cap window size: discard oldest entries beyond maxWindowSize (SPEC §3.2)
+  const maxSize = config.routing.downgrade.maxWindowSize;
+  if (state.window.length > maxSize) {
+    state.window = state.window.slice(-maxSize);
+  }
+
   const down = analyzeDowngrade(state.window, currentTier, config);
   if (down.shouldDowngrade && down.targetTier) {
     const m = findBestModelForTier(down.targetTier, config, modelRegistry);

@@ -5,7 +5,7 @@
  * and integration with pi's model registry.
  */
 
-import type { SmartRouterConfig, Tier, ModelRef } from "./types.js";
+import type { SmartRouterConfig, Tier } from "./types.js";
 import { TIERS } from "./types.js";
 
 /** Resolved model info with its tier */

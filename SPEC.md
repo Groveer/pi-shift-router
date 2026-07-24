@@ -4,12 +4,14 @@
 
 **Slim Router** 是 Pi-agent 的一个 Extension，实现**多 Provider、多模型智能路由**。根据用户每次输入的任务性质，自动选择最合适的模型，在**输出质量**和**成本效率**之间取得最优平衡。
 
+**项目名：** pi-slim-router（npm 包名）· 仓库 green-dalii/pi-slim-router
+
 ### 核心价值
 
 - **质量**：复杂任务自动使用旗舰模型（Kimi K3、Qwen Max 等）
 - **成本**：简单任务自动使用轻量模型（DeepSeek Flash、MiMo 等），不浪费旗舰模型的昂贵 token
 - **缓存友好**：降级策略保护 Provider 侧的 prompt caching，防止频繁切换导致缓存失效
-- **零配置**：自动扫描用户已有的 Provider 和模型，智能分配到三个 Tier
+- **零配置**：三档默认全部为空，不干扰 Pi 默认模型；用户运行 `/router config` 进入交互向导分配
 
 ### 为什么不是手动 `/model` 切换
 
@@ -274,10 +276,10 @@ Input: "security audit of the authentication flow" → flagship
 
 ### 4.3 Judge 模型的选择
 
-- **默认自动选择**：扫描用户模型库中成本最低的前 30% 模型作为 Judge
-- **要求**：速度快、成本低（Judge 本身不能成为成本大头）
-- **典型选择**：`deepseek-v4-flash`、`mimo-v2.5`
-- **用户可覆盖**：在配置中指定 `judgeModel` 和 `judgeProvider`
+- **使用 light tier 的模型**：用户为 light tier 配置的模型同时也是 Judge 模型
+- **理由**：light tier 本来就是为低成本高频任务设计的，用它做 Judge 符合这个定位
+- **回退**：如果 light tier 未配置或不可用，自动选择全局成本最低且有 auth 的模型
+- **未来可扩展**：如需独立配置 Judge，可在 v0.2.0 增加 `judge.provider` / `judge.model` 字段
 
 ### 4.4 Judge API 调用（直连管道，不经过 Pi Agent Loop）
 
@@ -351,48 +353,21 @@ async function judgeTask(prompt: string, config: Config): Promise<Tier> {
 
 ### 4.6 Judge 失败时的降级回退
 
-如果 Judge 调用失败（网络错误、超时、解析失败），使用启发式方法：
+如果 Judge 调用失败（网络错误、超时、解析失败），**不做任何猜测，直接保持当前位置**。
 
 ```typescript
-function heuristicClassify(prompt: string): Tier {
-  const len = prompt.length;
-
-  // 极短 → light
-  if (len < 15) return "light";
-
-  let score = 0;
-
-  // 长度信号
-  if (len > 500) score += 3;
-  else if (len > 200) score += 2;
-  else if (len > 80) score += 1;
-
-  // Flagship 信号词
-  const flagshipPatterns = [
-    /\b(架构|设计|重构|规划|策略|安全|审计|性能|优化|方案|评审|方向)\b/,
-    /\b(architect|design|refactor|strategy|security|audit|performance|optimize)\b/i,
-    /多步|multi.?step|复杂|complex|system.?design/i,
-  ];
-
-  for (const p of flagshipPatterns) {
-    if (p.test(prompt)) score += 2;
-  }
-
-  // Medium 信号词
-  const mediumPatterns = [
-    /\b(实现|编写|写|创建|调试|测试|修复|分析|解释|实现|implement|write|create|debug|fix)\b/i,
-    /refactor|analyze|explain|build/i,
-  ];
-
-  for (const p of mediumPatterns) {
-    if (p.test(prompt)) score += 1;
-  }
-
-  if (score >= 4) return "flagship";
-  if (score >= 2) return "medium";
-  return "light";
-}
+// SPEC §4.6 fallback: hold position, do NOT guess
+const FALLBACK_RESULT: JudgeResult = { tier: "medium", source: "fallback" };
 ```
+
+**为什么不用启发式正则：**
+
+- LLM Judge 的全部价值在于语义理解与可扩展
+- 一旦添加启发式正则黑名单，就是重新引入“需要维护的关键词列表”
+- 启发式的“最劣猜测”可能会随机切到错误档位，破坏缓存
+- Judge 挂掉时，保持当前 tier 远比跳到错误 tier 安全
+
+记录一条警告日志供用户调试，不影响路由决策。
 
 ---
 
@@ -400,10 +375,14 @@ function heuristicClassify(prompt: string): Tier {
 
 ### 5.1 配置文件位置
 
-用户级全局配置：`~/.pi/agent/smartrouter.json`
-项目级覆盖：`.pi/smartrouter.json`（可以团队共享）
+两层配置（按优先级叠加，project 胜出）：
 
-> 超参数（如 `threshold`, `minObservations` 等）的调优不属于第一阶段。Phase 1 使用文档约定的默认值，后续根据真实使用数据迭代。
+| 层 | 路径 | 用途 | 是否提交 git |
+|----|------|------|-------------|
+| **User** | `~/.pi/agent/pi-slim-router.json` | 个人偏好（在不同项目中复用） | 否 |
+| **Project** | `<cwd>/.pi/pi-slim-router.json` | 团队共享（项目约定） | 是 |
+
+合并顺序：`defaults → user → project`（project 胜出）。
 
 ### 5.2 配置结构
 
@@ -423,24 +402,21 @@ function heuristicClassify(prompt: string): Tier {
     "light": {
       "label": "Lightweight",
       "models": [
-        { "provider": "deepseek", "model": "deepseek-v4-flash", "priority": 1 },
-        { "provider": "opencode-go", "model": "mimo-v2.5", "priority": 2 }
+        { "provider": "deepseek", "model": "deepseek-v4-flash", "priority": 1 }
       ],
-      "description": "简单问答、确认、状态查询、重复性任务"
+      "description": "简单问答、确认、状态查询、重复性任务（同时作为 Judge 模型）"
     },
     "medium": {
       "label": "Balanced",
       "models": [
-        { "provider": "deepseek", "model": "deepseek-v4-pro", "priority": 1 },
-        { "provider": "opencode-go", "model": "qwen3.7-plus", "priority": 2 }
+        { "provider": "deepseek", "model": "deepseek-v4-pro", "priority": 1 }
       ],
       "description": "日常编码、调试、文档、常规分析"
     },
     "flagship": {
       "label": "Flagship",
       "models": [
-        { "provider": "opencode-go", "model": "kimi-k3", "priority": 1 },
-        { "provider": "opencode-go", "model": "qwen3.7-max", "priority": 2 }
+        { "provider": "opencode-go", "model": "kimi-k3", "priority": 1 }
       ],
       "description": "架构设计、大型重构、安全审计、多步推理"
     }
@@ -486,11 +462,11 @@ function heuristicClassify(prompt: string): Tier {
 
 ### 5.4 配置验证
 
-启动时验证配置合法性：
+启动时验证配置合法性（非致命，作为警告记录）：
 - 每个模型的 `provider` 必须在已注册 Provider 中
 - 每个模型的 `model` 必须存在
-- 每个 Tier 至少有一个模型
-- 不同 Tier 不能包含完全相同的模型（可配置 `allowOverlap: false`）
+- 同一模型出现在多个 Tier 时警告（路由退化为 pass-through）
+- 空 tier 是允许的（三档默认全空，不报错）
 
 ---
 
@@ -502,10 +478,13 @@ function heuristicClassify(prompt: string): Tier {
 |------|------|------|
 | `/router` | 显示当前路由状态 | `/router` |
 | `/router on\|off` | 启用/禁用路由 | `/router on` |
+| `/router config` | 交互式配置引导 | `/router config` |
+| `/router status` | 显示详细状态（窗口、层级、延迟等） | `/router status` |
+| `/router quiet` | 切换静默模式 | `/router quiet` |
 | `/route-force <tier\|model>` | 强制本轮使用指定模型/层级 | `/route-force flagship` |
 | `/route-force auto` | 清除手动覆盖，恢复自动 | `/route-force auto` |
-| `/route-config` | 交互式配置引导 | `/route-config` |
-| `/route status` | 显示详细状态（窗口、层级、延迟等） | `/route status` |
+
+**注：** 原独立命令 `/route-config` 已合并为 `/router config` 子命令；`/route-force` 保留为顶级命令（用户对其语义有认知惯性）。
 
 ### 6.2 路由状态显示
 
@@ -740,39 +719,60 @@ function heuristicClassify(prompt: string): Tier {
 ## 11. 项目结构
 
 ```
-smartrouter/
+pi-slim-router/
 ├── SPEC.md                     # 本文件
-├── package.json                # npm 包描述（pi-package）
+├── package.json                # npm 包描述（pi-package，含 pi 清单）
 ├── tsconfig.json               # TypeScript 配置
 ├── README.md                   # 用户文档
+├── CONTRIBUTING.md             # 贡献指南
+├── CHANGELOG.md                # 变更日志
+├── LICENSE                     # Apache 2.0
 │
 ├── src/
 │   ├── index.ts                # Extension 入口
-│   ├── config.ts               # 配置加载/验证/缓存
+│   ├── config.ts               # 配置加载/验证/缓存（用户级 + 项目级双层）
 │   ├── router.ts               # 路由引擎（趋势检测、切换决策）
-│   ├── judge.ts                # LLM Judge 调用 + 启发式降级
-│   ├── tier.ts                 # Tier 管理（模型查找、优先级）
+│   ├── judge.ts                # LLM Judge 调用（无 fallback regex）
+│   ├── tier.ts                 # Tier 管理（模型查找）
 │   ├── commands.ts             # 命令注册（/router, /route-force 等）
-│   └── types.ts                # TypeScript 类型定义
+│   ├── types.ts                # TypeScript 类型定义
+│   └── prompts/
+│       └── judge.md            # Judge 系统 Prompt（唯一真相源）
 │
-├── prompts/
-│   └── judge.md                # Judge 系统 Prompt
+├── tests/                      # vitest 测试套件
+│   └── router.test.ts          # 路由算法 + judge fallback 测试
 │
-└── .pi/
-    ├── smartrouter.json         # 用户配置示例
-    └── extensions/
-        └── smart-router.ts      # 构建产物/入口（dev 时期直接映射 src/index.ts）
+├── scripts/
+│   └── copy-assets.mjs         # 构建后拷贝非 TS 资源到 dist/
+│
+└── dist/                       # 构建产物（发布到 npm）
 ```
 
-以后发布为 npm pi-package 时，通过 `package.json` 的 `pi` manifest 注册资源：
+发布时通过 `package.json` 的 `pi` 清单注册：
 
 ```json
 {
-  "name": "pi-smart-router",
-  "version": "1.0.0",
-  "keywords": ["pi-package"],
+  "name": "pi-slim-router",
+  "version": "0.1.0",
+  "keywords": ["pi-package", "pi-extension"],
   "pi": {
-    "extensions": ["./src/index.ts"]
+    "extensions": ["./dist/index.js"],
+    "minPiVersion": "0.80.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.80.0",
+    "typebox": ">=0.30.0"
   }
 }
 ```
+
+## 12. Pi-agent 扩展规范遵循
+
+作为正式发布的 pi-package，本项目遵循以下规范：
+
+- **`pi.extensions` 指向编译产物 `dist/index.js`**（非 `src/`），与 pi-shazam / pi-smart-router 等成熟扩展保持一致
+- **`pi.minPiVersion` 显式声明兼容版本**，避免在过低版本的 pi 上加载时崩溃
+- **peerDependencies 仅声明 pi-coding-agent 与 typebox**，不引入运行时依赖
+- **配置双层（用户级 + 项目级）**，符合 pi-agent 生态约定
+- **错误永不抛出到 pi 主循环**，所有 catch 路径只 console.warn
+- **测试覆盖核心算法**（vitest，§3 路由规则 + §4.6 fallback）

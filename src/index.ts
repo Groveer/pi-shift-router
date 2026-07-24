@@ -101,7 +101,6 @@ export default function smartRouterExtension(pi: ExtensionAPI) {
         (m) => pi.setModel(m as any),
       );
       if (ok && !config.ux.quietMode && config.ux.inlineToast) {
-        const name = state.currentModelId?.split("/").pop() ?? "";
         ctx.ui.notify(`${formatTierDisplay(state.currentTier, state.currentModelId)}`, "info");
       }
     } else if (!state.currentModelId && state.currentTier) {
