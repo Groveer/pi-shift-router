@@ -67,11 +67,15 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
 
     if (!config.enabled) { updateBar(ctx.ui, config, state); return; }
 
+    // Resolve the medium-tier model and ACTUALLY apply it to pi.
+    // Status bar reflects pi's real model — never a stale claim.
     const m = findBestModelForTier("medium", config, ctx.modelRegistry as any);
     if (m) {
-      state.currentTier = "medium";
-      state.currentModelId = m.modelId;
-      state.currentProvider = m.provider;
+      await applyModelSwitch(
+        m, state,
+        ctx.modelRegistry as any,
+        (model) => pi.setModel(model as any),
+      );
     }
     updateBar(ctx.ui, config, state);
 
