@@ -114,13 +114,13 @@ export async function resolveJudgeEndpoint(config: SlimRouterConfig): Promise<Pr
 
   async function resolve(provider: string, modelId: string): Promise<ProviderEndpoint | null> {
     const provEntry = store[provider];
-    if (!provEntry) return null;
+    if (!provEntry) { console.warn(`[SlimRouter] Judge: provider "${provider}" not found in store`); return null; }
     const modelInfo = provEntry.models.find((m) => m.id === modelId);
-    if (!modelInfo) return null;
+    if (!modelInfo) { console.warn(`[SlimRouter] Judge: model "${modelId}" not found in provider "${provider}"`); return null; }
     const apiKey = auth[provider]?.key;
-    if (!apiKey) return null;
+    if (!apiKey) { console.warn(`[SlimRouter] Judge: no API key for provider "${provider}"`); return null; }
     return {
-      baseUrl: modelInfo.baseUrl ?? "",
+      baseUrl: (modelInfo.baseUrl ?? "").replace(/\/+$/, ""),
       apiType: modelInfo.api ?? "openai-completions",
       apiKey,
       modelId,
@@ -131,7 +131,7 @@ export async function resolveJudgeEndpoint(config: SlimRouterConfig): Promise<Pr
   const lightFirst = config.tiers.light.models[0];
   if (lightFirst) {
     const ep = await resolve(lightFirst.provider, lightFirst.model);
-    if (ep) return ep;
+    if (ep) { console.log(`[SlimRouter] Judge endpoint: ${lightFirst.provider}/${lightFirst.model}`); return ep; }
   }
 
   // 2. Fallback: cheapest model with auth
@@ -144,7 +144,11 @@ export async function resolveJudgeEndpoint(config: SlimRouterConfig): Promise<Pr
     }
   }
   candidates.sort((a, b) => a.cost - b.cost);
-  if (candidates.length === 0) return null;
+  if (candidates.length === 0) {
+    console.warn("[SlimRouter] Judge: no provider with valid API key found — cannot resolve judge endpoint");
+    return null;
+  }
+  console.warn(`[SlimRouter] Judge: light tier unavailable, falling back to cheapest: ${candidates[0].provider}/${candidates[0].modelId}`);
   return resolve(candidates[0].provider, candidates[0].modelId);
 }
 

@@ -41,6 +41,15 @@ const JUDGE_PROMPT = loadJudgePrompt();
 
 // ─── LLM Judge ────────────────────────────────────────────────────
 
+/** Build the correct API endpoint URL based on apiType.
+ *  models-store.json stores baseUrl WITHOUT the API path suffix
+ *  (e.g. "https://api.deepseek.com" not "https://api.deepseek.com/chat/completions"). */
+function judgeApiUrl(baseUrl: string, apiType: string): string {
+  const base = baseUrl.replace(/\/+$/, ""); // strip trailing slash
+  if (apiType.startsWith("anthropic")) return `${base}/v1/messages`;
+  return `${base}/chat/completions`;
+}
+
 /** Call LLM judge via direct API call. Returns null on failure. */
 async function classifyLLM(
   prompt: string,
@@ -49,7 +58,8 @@ async function classifyLLM(
 ): Promise<JudgeResult | null> {
   try {
     const body = buildRequestBody(endpoint, prompt);
-    const res = await fetch(endpoint.baseUrl, {
+    const url = judgeApiUrl(endpoint.baseUrl, endpoint.apiType);
+    const res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
