@@ -37,6 +37,8 @@ export interface UXConfig {
   quietMode: boolean;
   statusBar: boolean;
   inlineToast: boolean;
+  /** Verbose logging: print router decisions, judge calls, window state to console */
+  routerLogVerbose: boolean;
 }
 
 /** Routing behaviour config */
@@ -83,6 +85,7 @@ export const DEFAULT_CONFIG: SlimRouterConfig = {
     quietMode: false,
     statusBar: true,
     inlineToast: true,
+    routerLogVerbose: false,
   },
 };
 

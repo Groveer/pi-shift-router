@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] — 2026-08-12
+
+### Added
+
+- **`routerLogVerbose` UX flag** — prints router decisions, judge calls, window state
+  to console for advanced users. Toggle via `/router verbose`, `/router config` → UX
+  settings, or directly in JSON.
+- **Transient `⚖ judging…` status badge** — shown during the Judge API call so the
+  user sees the router is working instead of a silent delay between message send and
+  first response token. Restored via `try/finally`.
+
+### Changed
+
+- **Judge prompt asks for JSON**: `{"tier":"fast"}` or `{"tier":"smart"}`.
+- **API-level JSON constraints** (hard, not just prompt):
+  - OpenAI-compatible (DeepSeek, OpenAI): `response_format: { type: "json_object" }`.
+  - Anthropic: assistant prefill `{"` to force JSON-start output.
+- **`max_tokens: 200 → 4000`** to leave room for CoT reasoning on DeepSeek Reasoner-class
+  models (whose `reasoning_content` is bounded by `max_tokens`).
+- **`parseResponse` three-layer fallback**: JSON parse → loose JSON → bare keyword.
+  Falls back from `content` to `reasoning_content` for CoT models.
+
+### Fixed
+
+- DeepSeek V4 Flash responses were returning `content:""` with `finish_reason:"length"`
+  because `max_tokens:10` was too small for chain-of-thought. Now reliably returns
+  valid JSON.
+
 ## [0.3.0] — 2026-08-09
 
 ### Changed (Breaking)

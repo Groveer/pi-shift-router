@@ -82,8 +82,46 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
     if (!initialized) await init(ctx);
     if (!config?.enabled || !event.prompt?.trim()) return;
 
-    const judgeResult = await classify(event.prompt, fastEndpoint, config.routing.judgeTimeout);
+    const verbose = config.ux.routerLogVerbose;
+    const promptPreview = event.prompt.slice(0, 80).replace(/\n/g, " ");
+    if (verbose) {
+      console.log(`\n[SlimRouter] ─── Turn start ───`);
+      console.log(`[SlimRouter] prompt: "${promptPreview}${event.prompt.length > 80 ? "…" : ""}"`);
+      console.log(`[SlimRouter] current: ${formatTierDisplay(state.currentTier, state.currentModelId)}`);
+    }
+
+    // Show transient "judging..." badge in status bar so the user sees
+    // the router is working during the Judge API call.
+    if (config.ux.statusBar) ctx.ui.setStatus("slim-router", "⚖ judging…");
+
+    let judgeResult;
+    try {
+      judgeResult = await classify(
+        event.prompt,
+        fastEndpoint,
+        config.routing.judgeTimeout,
+        verbose,
+      );
+    } finally {
+      // Restore the proper status badge immediately, regardless of judge outcome.
+      updateBar(ctx.ui, config, state);
+    }
+
+    if (verbose) {
+      const ratio = state.window.length === 0
+        ? "0/0"
+        : `${state.window.filter((e) => e.tier === "fast").length}/${state.window.length}`;
+      console.log(
+        `[SlimRouter] judge: ${judgeResult.tier} (${judgeResult.source}), ` +
+        `window=[${state.window.map((e) => e.tier[0]).join("")}] (${ratio} fast)`,
+      );
+    }
+
     const result = processRoute(judgeResult, state, config, ctx.modelRegistry as any);
+
+    if (verbose) {
+      console.log(`[SlimRouter] decision: ${result.action}${result.switchTo ? ` → ${result.switchTo.provider}/${result.switchTo.modelId}` : ""}`);
+    }
 
     if (result.switchTo) {
       const ok = await applyModelSwitch(
@@ -91,6 +129,7 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
         ctx.modelRegistry as any,
         (m) => pi.setModel(m as any),
       );
+      if (verbose) console.log(`[SlimRouter] model switch ${ok ? "ok" : "FAILED"}`);
       if (ok && !config.ux.quietMode && config.ux.inlineToast) {
         ctx.ui.notify(`${formatTierDisplay(state.currentTier, state.currentModelId)}`, "info");
       }

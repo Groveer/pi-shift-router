@@ -222,6 +222,7 @@ async function routeConfigWizard(
       `${ux.quietMode ? "☑" : "☐"} Quiet mode — no inline toast notifications`,
       `${ux.statusBar ? "☑" : "☐"} Status bar — show current tier/model in footer`,
       `${ux.inlineToast ? "☑" : "☐"} Inline toast — notify on tier change`,
+      `${ux.routerLogVerbose ? "☑" : "☐"} Verbose log — print router decisions to console (debug)`,
       "---",
       "✅ Done",
     ];
@@ -231,6 +232,7 @@ async function routeConfigWizard(
     if (pick.includes("Quiet")) ux.quietMode = !ux.quietMode;
     if (pick.includes("Status bar")) ux.statusBar = !ux.statusBar;
     if (pick.includes("Inline toast")) ux.inlineToast = !ux.inlineToast;
+    if (pick.includes("Verbose log")) ux.routerLogVerbose = !ux.routerLogVerbose;
   }
 
   // Main loop
@@ -274,7 +276,7 @@ export function registerCommands(
   pi.registerCommand("router", {
     description: "Slim Router: show status, enable/disable",
     getArgumentCompletions: (prefix: string) => {
-      const cmds = ["on", "off", "status", "quiet", "config"].filter((c) => c.startsWith(prefix));
+      const cmds = ["on", "off", "status", "quiet", "verbose", "config"].filter((c) => c.startsWith(prefix));
       return cmds.length > 0 ? cmds.map((c) => ({ value: c, label: c })) : null;
     },
     handler: async (args, ctx) => {
@@ -305,6 +307,14 @@ export function registerCommands(
       if (arg === "quiet") {
         config.ux.quietMode = !config.ux.quietMode;
         ctx.ui.notify(`Slim Router: ${config.ux.quietMode ? "🔇 Quiet" : "🔊 Notifications"}`, "info");
+        return;
+      }
+      if (arg === "verbose" || arg === "log") {
+        config.ux.routerLogVerbose = !config.ux.routerLogVerbose;
+        ctx.ui.notify(
+          `Slim Router: ${config.ux.routerLogVerbose ? "📝 Verbose logging ON" : "📝 Verbose logging OFF"}`,
+          "info",
+        );
         return;
       }
       if (arg === "status") {
