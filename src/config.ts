@@ -100,15 +100,15 @@ export function invalidateConfigCache(): void {
   // pi-agent's own state, which we don't own.
 }
 
-// ─── Judge endpoint resolution ────────────────────────────────────
+// ─── Fast endpoint resolution ────────────────────────────────────
 
 /**
- * Resolve endpoint info for the judge model.
+ * Resolve endpoint info for the LLM Judge (uses fast tier's model).
  * Order:
- *   1. light tier's first model (user chose this as the cheap/fast option)
+ *   1. fast tier's first model (user chose this as the cheap workhorse)
  *   2. cheapest model with valid auth (fallback)
  */
-export async function resolveJudgeEndpoint(config: SlimRouterConfig): Promise<ProviderEndpoint | null> {
+export async function resolveFastEndpoint(config: SlimRouterConfig): Promise<ProviderEndpoint | null> {
   const store = await loadModelsStore();
   const auth = await loadAuthStore();
 
@@ -127,11 +127,11 @@ export async function resolveJudgeEndpoint(config: SlimRouterConfig): Promise<Pr
     };
   }
 
-  // 1. Use light tier's first model as judge
-  const lightFirst = config.tiers.light.models[0];
-  if (lightFirst) {
-    const ep = await resolve(lightFirst.provider, lightFirst.model);
-    if (ep) { console.log(`[SlimRouter] Judge endpoint: ${lightFirst.provider}/${lightFirst.model}`); return ep; }
+  // 1. Use fast tier's first model as judge
+  const fastFirst = config.tiers.fast.models[0];
+  if (fastFirst) {
+    const ep = await resolve(fastFirst.provider, fastFirst.model);
+    if (ep) { console.log(`[SlimRouter] Judge endpoint: ${fastFirst.provider}/${fastFirst.model}`); return ep; }
   }
 
   // 2. Fallback: cheapest model with auth
@@ -148,7 +148,7 @@ export async function resolveJudgeEndpoint(config: SlimRouterConfig): Promise<Pr
     console.warn("[SlimRouter] Judge: no provider with valid API key found — cannot resolve judge endpoint");
     return null;
   }
-  console.warn(`[SlimRouter] Judge: light tier unavailable, falling back to cheapest: ${candidates[0].provider}/${candidates[0].modelId}`);
+  console.warn(`[SlimRouter] Judge: fast tier unavailable, falling back to cheapest: ${candidates[0].provider}/${candidates[0].modelId}`);
   return resolve(candidates[0].provider, candidates[0].modelId);
 }
 

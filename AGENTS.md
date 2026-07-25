@@ -20,6 +20,9 @@
 
 ## 架构原则
 
+- **两挡 > 三挡**。执行（fast）vs 判断（smart）是唯一有意义的分类轴。去掉 light 挡（在 Pi 语境中几乎不会用到）。
+- **LLM Judge > 正则规则**。不维护 keyword 列表。LLM 是唯一的分类器。失败时 hold 当前挡位。
+- **session_start 只读不写**。尊重用户的默认模型选择，不在用户不知情时覆盖。
 - **模块单向依赖**：`index.ts` → `router.ts` → `judge.ts|tier.ts` → `config.ts` → `types.ts`。TUI 组件单独放在 `src/tui/`，不污染核心算法。
 - **配置下沉**：魔法数字不出现，全部收敛到 `types.ts` 的 `DEFAULT_CONFIG`。
 - **接入点唯一**：pi-agent 的生命周期 hook 只通过 `index.ts` 注册。其他模块不直接接触 pi API。

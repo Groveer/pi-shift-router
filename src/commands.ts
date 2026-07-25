@@ -31,7 +31,7 @@ import {
 
 function formatWindow(window: RouterState["window"]): string {
   if (window.length === 0) return "(empty)";
-  const badge: Record<string,string> = { light: "l", medium: "m", flagship: "f" };
+  const badge: Record<string, string> = { fast: "f", smart: "s" };
   return "[" + window.map((e) => badge[e.tier] ?? "?").join(", ") + "]";
 }
 
@@ -68,7 +68,7 @@ async function routeConfigWizard(
     return false;
   }
 
-  type MenuChoice = "light" | "medium" | "flagship" | "ux" | "done" | "cancel";
+  type MenuChoice = "fast" | "smart" | "ux" | "done" | "cancel";
 
   async function saveDestination(): Promise<"user" | "project" | null> {
     const choice = await ctx.ui.select("Save configuration to…", [
@@ -83,11 +83,9 @@ async function routeConfigWizard(
   }
 
   async function menu(): Promise<MenuChoice> {
-    const lightSuffix = config.tiers.light.models.length > 0 ? " (also Judge)" : "";
     const choice = await ctx.ui.select("Slim Router — Configuration", [
-      `⚡ Light — ${config.tiers.light.models.length} model(s)${lightSuffix}`,
-      `🦾 Medium — ${config.tiers.medium.models.length} model(s)`,
-      `🧠 Flagship — ${config.tiers.flagship.models.length} model(s)`,
+      `🦾 Fast — ${config.tiers.fast.models.length} model(s)  (programmer: execution, daily coding)`,
+      `🧠 Smart — ${config.tiers.smart.models.length} model(s)  (CTO: architecture, review, planning)`,
       "---",
       "🎨 UX settings",
       "---",
@@ -96,9 +94,8 @@ async function routeConfigWizard(
     ]);
 
     if (!choice) return "cancel";
-    if (choice.startsWith("⚡")) return "light";
-    if (choice.startsWith("🦾")) return "medium";
-    if (choice.startsWith("🧠")) return "flagship";
+    if (choice.startsWith("🦾")) return "fast";
+    if (choice.startsWith("🧠")) return "smart";
     if (choice.startsWith("🎨")) return "ux";
     if (choice.startsWith("💾")) return "done";
     return "cancel";
@@ -158,7 +155,7 @@ async function routeConfigWizard(
         continue;
       }
 
-      // Extract provider from selection text: "○ provider (N)" → "provider"
+      // Extract provider from selection text
       const provName = providers.find((p) => provPick.includes(` ${p} `) || provPick.endsWith(` ${p}`));
       if (!provName) continue;
 
@@ -166,7 +163,6 @@ async function routeConfigWizard(
       const provModels = byProvider.get(provName)!;
       const picked = await pickModel(provModels, `Select model from ${provName}`, selectedKey, tier);
       if (picked) { cfg.models = [picked]; return; }
-      // "Back" → loop back to provider list
     }
   }
 
@@ -205,9 +201,8 @@ async function routeConfigWizard(
       const labels = models.map((m) => {
         const key = `${m.provider}/${m.id}`;
         const isSelected = key === selectedKey;
-        const judgeSuffix = (tier === "light" && isSelected) ? "  (Judge)" : "";
         const prefix = isSelected ? "●" : "○";
-        return `${prefix} ${key.padEnd(35)} $${m.cost!.input.toFixed(3)}/M${judgeSuffix}`;
+        return `${prefix} ${key.padEnd(35)} $${m.cost!.input.toFixed(3)}/M`;
       });
 
       labels.push("---", "✅ Back");
@@ -220,8 +215,6 @@ async function routeConfigWizard(
       }
     }
   }
-
-  // Judge is no longer user-configurable — always uses light tier's model.
 
   async function editUX(): Promise<void> {
     const ux = config.ux;
@@ -246,7 +239,7 @@ async function routeConfigWizard(
     const choice = await menu();
     if (choice === "cancel") return false;
     if (choice === "done") { saving = true; break; }
-    if (choice === "light" || choice === "medium" || choice === "flagship") {
+    if (choice === "fast" || choice === "smart") {
       await editTier(choice);
     } else if (choice === "ux") {
       await editUX();
@@ -315,7 +308,7 @@ export function registerCommands(
         return;
       }
       if (arg === "status") {
-        const counts: Record<string, number> = { light: 0, medium: 0, flagship: 0 };
+        const counts: Record<string, number> = { fast: 0, smart: 0 };
         for (const e of state.window) counts[e.tier]++;
 
         ctx.ui.notify(
@@ -324,7 +317,7 @@ export function registerCommands(
             ``,
             `Current: ${formatTierDisplay(state.currentTier, state.currentModelId)}`,
             `Window: ${formatWindow(state.window)}  (${state.window.length} entries)`,
-            `Counts: F=${counts.flagship} M=${counts.medium} L=${counts.light}`,
+            `Counts: S=${counts.smart} F=${counts.fast}`,
             `Manual: ${state.manualOverride.active ? `✅ ${state.manualOverride.tier ?? state.manualOverride.modelId ?? "active"}` : "✗ None"}`,
             ``,
             `Config: ${getConfigPath() ?? "N/A"}`,
@@ -348,7 +341,7 @@ export function registerCommands(
   pi.registerCommand("route-force", {
     description: "Force a specific tier or model for the next turn: /route-force <tier|provider/model>",
     getArgumentCompletions: (prefix: string) => {
-      const opts = ["light", "medium", "flagship", "auto"].filter((c) => c.startsWith(prefix));
+      const opts = ["fast", "smart", "auto"].filter((c) => c.startsWith(prefix));
       return opts.length > 0 ? opts.map((c) => ({ value: c, label: c })) : null;
     },
     handler: async (args, ctx) => {
@@ -373,8 +366,7 @@ export function registerCommands(
         return;
       }
 
-      ctx.ui.notify('Usage: light, medium, flagship, auto, or provider/model-id', "error");
+      ctx.ui.notify('Usage: fast, smart, auto, or provider/model-id', "error");
     },
   });
-
 }

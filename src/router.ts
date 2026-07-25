@@ -1,8 +1,9 @@
 /**
  * Slim Router — Routing engine
  *
- * Core logic: sliding window trend detection, upgrade/downgrade decisions,
- * model switching via pi.setModel().
+ * Two-tier sliding window trend detection:
+ *   - Upgrade (fast → smart): immediate
+ *   - Downgrade (smart → fast): requires window majority
  */
 
 import type { SlimRouterConfig, Tier, WindowEntry, RouterState, JudgeResult } from "./types.js";
@@ -12,7 +13,7 @@ import { findBestModelForTier, type ResolvedModel } from "./tier.js";
 /** Create an initial RouterState */
 export function createRouterState(): RouterState {
   return {
-    currentTier: "medium",
+    currentTier: "fast",
     currentModelId: null,
     currentProvider: null,
     window: [],
@@ -33,45 +34,29 @@ function analyzeDowngrade(
   currentTier: Tier,
   config: SlimRouterConfig,
 ): { shouldDowngrade: boolean; targetTier: Tier | null } {
-  const dc = config.routing.downgrade;
+  // Can't downgrade further from fast
+  if (currentTier !== "smart") return { shouldDowngrade: false, targetTier: null };
+
+  const { size, threshold } = config.routing.window;
   if (window.length === 0) return { shouldDowngrade: false, targetTier: null };
 
-  const counts: Record<Tier, number> = { light: 0, medium: 0, flagship: 0 };
-  const relevant = window.slice(-Math.min(window.length, dc.maxWindowSize));
-  for (const e of relevant) counts[e.tier]++;
+  const relevant = window.slice(-Math.min(window.length, size));
+  const fastCount = relevant.filter((e) => e.tier === "fast").length;
+  const ratio = fastCount / relevant.length;
 
-  if (currentTier === "flagship") {
-    const cfg = dc.flagship;
-    if (relevant.length >= cfg.minObservations) {
-      const mr = counts.medium / relevant.length;
-      if (mr >= cfg.threshold) return { shouldDowngrade: true, targetTier: "medium" };
-      const lr = counts.light / relevant.length;
-      if (lr >= cfg.threshold) return { shouldDowngrade: true, targetTier: "light" };
-    }
-  } else if (currentTier === "medium") {
-    const cfg = dc.medium;
-    if (relevant.length >= cfg.minObservations) {
-      const lr = counts.light / relevant.length;
-      if (lr >= cfg.threshold) return { shouldDowngrade: true, targetTier: "light" };
-    }
+  if (ratio >= threshold) {
+    return { shouldDowngrade: true, targetTier: "fast" };
   }
+
   return { shouldDowngrade: false, targetTier: null };
 }
 
-function cleanWindowOnUpgrade(window: WindowEntry[], newTier: Tier): WindowEntry[] {
-  const idx = tierIndex(newTier);
-  return window.filter((e) => tierIndex(e.tier) >= idx);
-}
-
-export type RouteAction = "upgrade" | "downgrade" | "stay" | "manual";
-
-export interface RouteDecision {
-  switchTo: ResolvedModel | null;
-  action: RouteAction;
-}
-
 /**
- * Apply a new judge result and determine the next action.
+ * Core routing decision:
+ * 1. Manual override → use forced model
+ * 2. Judge says "smart" and current is "fast" → immediate upgrade
+ * 3. Otherwise → analyze window for possible downgrade
+ * 4. Push judge result to window (capped)
  */
 export function processRoute(
   judgeResult: JudgeResult,
@@ -79,10 +64,17 @@ export function processRoute(
   config: SlimRouterConfig,
   modelRegistry: { find: (p: string, m: string) => unknown } | undefined,
 ): RouteDecision {
+  const { tier: targetTier } = judgeResult;
+
+  // 1. Manual override
   if (state.manualOverride.active) {
     if (state.manualOverride.modelId && state.manualOverride.provider) {
       return {
-        switchTo: { provider: state.manualOverride.provider, modelId: state.manualOverride.modelId, tier: state.manualOverride.tier ?? judgeResult.tier },
+        switchTo: {
+          provider: state.manualOverride.provider,
+          modelId: state.manualOverride.modelId,
+          tier: state.manualOverride.tier ?? targetTier,
+        },
         action: "manual",
       };
     }
@@ -92,32 +84,38 @@ export function processRoute(
     }
   }
 
-  const currentTier = state.currentTier;
-  const targetTier = judgeResult.tier;
-
-  if (config.routing.upgrade.immediate && shouldUpgrade(currentTier, targetTier)) {
+  // 2. Immediate upgrade: fast → smart
+  if (shouldUpgrade(state.currentTier, targetTier)) {
     const m = findBestModelForTier(targetTier, config, modelRegistry);
     if (m) {
-      state.window = cleanWindowOnUpgrade(state.window, targetTier);
+      // Clear window on upgrade (fresh start for the new tier)
+      state.window = [];
       return { switchTo: m, action: "upgrade" };
     }
   }
 
+  // 3. Push current judgment to window
   state.window.push({ tier: targetTier, timestamp: Date.now() });
 
-  // Cap window size: discard oldest entries beyond maxWindowSize (SPEC §3.2)
-  const maxSize = config.routing.downgrade.maxWindowSize;
+  // Cap window
+  const maxSize = config.routing.window.size;
   if (state.window.length > maxSize) {
     state.window = state.window.slice(-maxSize);
   }
 
-  const down = analyzeDowngrade(state.window, currentTier, config);
+  // 4. Check downgrade
+  const down = analyzeDowngrade(state.window, state.currentTier, config);
   if (down.shouldDowngrade && down.targetTier) {
     const m = findBestModelForTier(down.targetTier, config, modelRegistry);
     if (m) return { switchTo: m, action: "downgrade" };
   }
 
   return { switchTo: null, action: "stay" };
+}
+
+export interface RouteDecision {
+  switchTo: ResolvedModel | null;
+  action: "upgrade" | "downgrade" | "stay" | "manual";
 }
 
 /**

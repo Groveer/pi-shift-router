@@ -1,17 +1,21 @@
 /**
  * Slim Router — Type definitions
+ *
+ * Two-tier routing: Fast (programmer) ↔ Smart (CTO).
+ * Fast: execution-heavy tasks, daily coding, following patterns.
+ * Smart: judgment-heavy tasks, architecture, planning, code review.
  */
 
-/** The three routing tiers */
-export type Tier = "light" | "medium" | "flagship";
+/** The two routing tiers */
+export type Tier = "fast" | "smart";
 
 /** All tier labels */
-export const TIERS: readonly Tier[] = ["light", "medium", "flagship"] as const;
+export const TIERS: readonly Tier[] = ["fast", "smart"] as const;
 
 /** Judge result (tier classification) */
 export interface JudgeResult {
   tier: Tier;
-  source: "heuristic" | "llm" | "fallback";
+  source: "llm" | "fallback";
 }
 
 /** A reference to a specific model in a specific provider */
@@ -28,31 +32,6 @@ export interface TierConfig {
   description: string;
 }
 
-/** Upgrade policy */
-export interface UpgradeConfig {
-  immediate: boolean;
-}
-
-/** Downgrade policy for a single tier */
-export interface DowngradeTierConfig {
-  minObservations: number;
-  threshold: number;
-}
-
-/** Total downgrade policy */
-export interface DowngradeConfig {
-  flagship: DowngradeTierConfig;
-  medium: DowngradeTierConfig;
-  maxWindowSize: number;
-}
-
-/** Judge configuration */
-export interface JudgeConfig {
-  provider: string;
-  model: string;
-  timeout: number;
-}
-
 /** UX configuration */
 export interface UXConfig {
   quietMode: boolean;
@@ -63,18 +42,18 @@ export interface UXConfig {
 /** Routing behaviour config */
 export interface RoutingConfig {
   mode: "auto" | "manual" | "off";
-  upgrade: UpgradeConfig;
-  downgrade: DowngradeConfig;
+  /** LLM Judge timeout in ms */
+  judgeTimeout: number;
+  /** Sliding window: downgrade only when ≥threshold fraction of last `size` entries are the lower tier */
+  window: { size: number; threshold: number };
 }
 
 /** Full SLIM Router configuration */
 export interface SlimRouterConfig {
   enabled: boolean;
-  judge: JudgeConfig;
   tiers: {
-    light: TierConfig;
-    medium: TierConfig;
-    flagship: TierConfig;
+    fast: TierConfig;
+    smart: TierConfig;
   };
   routing: RoutingConfig;
   ux: UXConfig;
@@ -83,36 +62,22 @@ export interface SlimRouterConfig {
 /** Default configuration */
 export const DEFAULT_CONFIG: SlimRouterConfig = {
   enabled: true,
-  judge: {
-    provider: "auto",
-    model: "auto",
-    timeout: 5000,
-  },
   tiers: {
-    light: {
-      label: "Lightweight",
+    fast: {
+      label: "Fast",
       models: [],
-      description: "Simple Q&A, confirmations, repetitive tasks",
+      description: "Daily coding, debugging, following patterns — execution mode",
     },
-    medium: {
-      label: "Balanced",
+    smart: {
+      label: "Smart",
       models: [],
-      description: "Daily coding, debugging, documentation, analysis",
-    },
-    flagship: {
-      label: "Flagship",
-      models: [],
-      description: "Architecture, large refactoring, security audit, multi-step reasoning",
+      description: "Architecture, planning, code review, trade-off analysis — judgment mode",
     },
   },
   routing: {
     mode: "auto",
-    upgrade: { immediate: true },
-    downgrade: {
-      flagship: { minObservations: 4, threshold: 0.75 },
-      medium: { minObservations: 3, threshold: 0.75 },
-      maxWindowSize: 10,
-    },
+    judgeTimeout: 5000,
+    window: { size: 5, threshold: 0.6 },
   },
   ux: {
     quietMode: false,

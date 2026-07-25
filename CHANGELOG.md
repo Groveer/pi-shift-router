@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-08-09
+
+### Changed (Breaking)
+
+- **Three tiers → Two tiers**: `light`/`medium`/`flagship` → `fast` (🦾 programmer) / `smart` (🧠 CTO).
+  Classification dimension changed from **task topic** (QA vs coding vs design) to **mental mode**
+  (execution vs judgment). See SPEC §2.2 for the new framing.
+
+- **`session_start` no longer calls `pi.setModel()`** — the router is now read-only at session start.
+  It respects whatever model the user has configured in pi. Model switching only happens during
+  `before_agent_start` when the routing decision demands it.
+
+- **Config format flattened**: removed `judge.provider`/`judge.model`/`judge.timeout` (Judge always
+  uses Fast tier's model). Removed `routing.upgrade` / `routing.downgrade.flagship` / `routing.downgrade.medium`
+  / `routing.downgrade.maxWindowSize`. Replaced with `routing.window: { size, threshold }` and
+  `routing.judgeTimeout`.
+
+- `resolveJudgeEndpoint()` → `resolveFastEndpoint()`. Judge model = Fast tier's model.
+
+### Added
+
+- Proper CTO/Programmer framing throughout documentation — README, SPEC, AGENTS.
+
+### Removed
+
+- `classifyHeuristic()` — no more regex/keyword fallback. LLM Judge is the sole classifier.
+  On failure, simply holds position (fast tier, no switch).
+- `UpgradeConfig`, `DowngradeConfig`, `DowngradeTierConfig`, `JudgeConfig` interfaces.
+- Light/Medium/Flagship tier references from all source files, config files, and tests.
+
+### Tests
+
+- Rewrote all 12 tests for two-tier: upgrade (fast→smart), downgrade (smart→fast with window),
+  stay, window cap, manual override, judge fallback.
+- Removed three-tier-specific tests (multi-step downgrades, cross-tier upgrade window cleanup).
+
 ## [0.2.0] — 2026-08-01
 
 ### Added

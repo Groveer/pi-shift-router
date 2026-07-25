@@ -1,18 +1,9 @@
 /**
  * Slim Router — Task classifier (Judge)
  *
- * Two-tier classification:
- *   LLM Judge (direct API call) → fallback "hold current tier"
- *
- * The judge system prompt is loaded from `prompts/judge.md` at module init.
- * If the file is missing or unreadable, a minimal inlined fallback is used.
- *
- * Design principle (SPEC §4.1, §4.6):
- *   The LLM Judge holds all classification logic. There is NO keyword
- *   rule list, NO regex patterns, NO scoring heuristics — because the
- *   whole point of using an LLM as judge is to avoid maintaining such
- *   lists. When the LLM Judge is unavailable, we simply hold position
- *   (medium tier) and log a warning. We do NOT guess.
+ * Single-stage classification via LLM (uses the fast tier's model).
+ * On failure: hold position (return "fast"), log a warning.
+ * No heuristic rules, no regex — the LLM is the sole classifier.
  */
 
 import { readFileSync } from "node:fs";
@@ -23,8 +14,8 @@ import type { JudgeResult, Tier, ProviderEndpoint } from "./types.js";
 // ─── Judge system prompt ──────────────────────────────────────────
 
 const FALLBACK_PROMPT =
-  `You are a task classifier. Classify the request into one tier. ` +
-  `Respond with ONLY ONE WORD: light, medium, or flagship.`;
+  `You are a task classifier. Classify the request into one of two tiers. ` +
+  `Respond with ONLY ONE WORD: fast or smart.`;
 
 function loadJudgePrompt(): string {
   try {
@@ -41,16 +32,12 @@ const JUDGE_PROMPT = loadJudgePrompt();
 
 // ─── LLM Judge ────────────────────────────────────────────────────
 
-/** Build the correct API endpoint URL based on apiType.
- *  models-store.json stores baseUrl WITHOUT the API path suffix
- *  (e.g. "https://api.deepseek.com" not "https://api.deepseek.com/chat/completions"). */
 function judgeApiUrl(baseUrl: string, apiType: string): string {
-  const base = baseUrl.replace(/\/+$/, ""); // strip trailing slash
+  const base = baseUrl.replace(/\/+$/, "");
   if (apiType.startsWith("anthropic")) return `${base}/v1/messages`;
   return `${base}/chat/completions`;
 }
 
-/** Call LLM judge via direct API call. Logs errors for debugging. */
 async function classifyLLM(
   prompt: string,
   endpoint: ProviderEndpoint,
@@ -79,7 +66,7 @@ async function classifyLLM(
 
     const raw = await res.json();
     const answer = parseResponse(raw, endpoint.apiType);
-    if (!answer || !["light", "medium", "flagship"].includes(answer)) {
+    if (!answer || !["fast", "smart"].includes(answer)) {
       console.warn(`[SlimRouter] Judge unparseable response from ${url}: ${JSON.stringify(raw).slice(0, 300)}`);
       return null;
     }
@@ -99,8 +86,6 @@ function buildRequestBody(endpoint: ProviderEndpoint, prompt: string): Record<st
       messages: [{ role: "user", content: prompt }],
     };
   }
-
-  // OpenAI-compatible (default)
   return {
     model: endpoint.modelId,
     max_tokens: 10,
@@ -118,7 +103,6 @@ function parseResponse(raw: Record<string, unknown>, apiType: string): string | 
       const content = (raw as any).content;
       if (Array.isArray(content)) return content[0]?.text?.trim().toLowerCase() ?? null;
     }
-    // OpenAI-compatible
     const choice = (raw as any).choices?.[0];
     return choice?.message?.content?.trim().toLowerCase() ?? null;
   } catch {
@@ -126,38 +110,25 @@ function parseResponse(raw: Record<string, unknown>, apiType: string): string | 
   }
 }
 
-// ─── Fallback (no rules) ──────────────────────────────────────────
-//
-// SPEC §4.6: when LLM Judge fails, hold position. Don't guess.
-// The router stays on whatever tier it's currently on; no model switch.
-
-const FALLBACK_RESULT: JudgeResult = { tier: "medium", source: "fallback" };
-
-/** Trivial no-op classifier used only when LLM Judge is unavailable. */
-export function classifyHeuristic(_prompt: string): JudgeResult {
-  return FALLBACK_RESULT;
-}
-
 // ─── Public API ───────────────────────────────────────────────────
 
 /**
  * Unified task classifier.
  * 1. If LLM endpoint is provided, try LLM judge (with timeout).
- * 2. On failure: log a warning and hold position (medium).
+ * 2. On failure: log a warning and hold position (fast).
  */
 export async function classify(
   prompt: string,
-  llmEndpoint?: ProviderEndpoint | null,
+  fastEndpoint: ProviderEndpoint | null | undefined,
+  timeout = 5000,
 ): Promise<JudgeResult> {
-  if (llmEndpoint) {
+  if (fastEndpoint) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
-    const result = await classifyLLM(prompt, llmEndpoint, controller.signal);
+    const timer = setTimeout(() => controller.abort(), timeout);
+    const result = await classifyLLM(prompt, fastEndpoint, controller.signal);
     clearTimeout(timer);
     if (result) return result;
     console.warn("[SlimRouter] Judge LLM unavailable — holding position on current tier");
-  } else {
-    console.warn("[SlimRouter] No judge endpoint resolved — holding position on current tier");
   }
-  return FALLBACK_RESULT;
+  return { tier: "fast", source: "fallback" };
 }

@@ -56,16 +56,14 @@ export function tierLabel(tier: Tier, config: SlimRouterConfig): string {
 /** Get emoji for a tier */
 export function tierEmoji(tier: Tier): string {
   switch (tier) {
-    case "flagship":
+    case "smart":
       return "🧠";
-    case "medium":
+    case "fast":
       return "🦾";
-    case "light":
-      return "⚡";
   }
 }
 
-/** Format tier for status bar: "[🚀 kimi-k3]" */
+/** Format tier for status bar: "[🧠 kimi-k3]" */
 export function formatTierDisplay(
   tier: Tier | null,
   modelId: string | null,

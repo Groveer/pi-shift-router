@@ -1,9 +1,11 @@
 /**
  * Slim Router — Routing engine tests
  *
- * The routing algorithm is the contract from SPEC §3. These tests prove
- * we honour the upgrade/downgrade rules, regardless of SPEC's worked
- * examples (which contain minor inconsistencies in the window math).
+ * Two-tier (fast/smart) routing algorithm tests:
+ *   - Upgrade (fast → smart): immediate
+ *   - Downgrade (smart → fast): requires window majority
+ *   - Manual override bypasses all routing
+ *   - Fallback when judge unavailable
  */
 
 import { describe, it, expect } from "vitest";
@@ -21,20 +23,14 @@ function makeRegistry() {
 function makeConfig(overrides: Partial<SlimRouterConfig> = {}): SlimRouterConfig {
   return {
     enabled: true,
-    judge: { provider: "auto", model: "auto", timeout: 5000 },
     tiers: {
-      light:    { label: "Light",    models: [{ provider: "p", model: "l", priority: 1 }], description: "" },
-      medium:   { label: "Medium",   models: [{ provider: "p", model: "m", priority: 1 }], description: "" },
-      flagship: { label: "Flagship", models: [{ provider: "p", model: "f", priority: 1 }], description: "" },
+      fast:  { label: "Fast",  models: [{ provider: "p", model: "fast-model",  priority: 1 }], description: "" },
+      smart: { label: "Smart", models: [{ provider: "p", model: "smart-model", priority: 1 }], description: "" },
     },
     routing: {
       mode: "auto",
-      upgrade: { immediate: true },
-      downgrade: {
-        flagship: { minObservations: 4, threshold: 0.75 },
-        medium:   { minObservations: 3, threshold: 0.75 },
-        maxWindowSize: 10,
-      },
+      judgeTimeout: 5000,
+      window: { size: 5, threshold: 0.6 },
     },
     ux: { quietMode: false, statusBar: true, inlineToast: true },
     ...overrides,
@@ -49,135 +45,84 @@ function step(state: RouterState, config: SlimRouterConfig, j: JudgeResult) {
   return processRoute(j, state, config, makeRegistry());
 }
 
-// ─── Upgrade (SPEC §3.3) ──────────────────────────────────────────
+// ─── Upgrade (immediate) ──────────────────────────────────────────
 describe("Upgrade is immediate", () => {
-  it("light → medium on any medium judge", () => {
+  it("fast → smart on any smart judge", () => {
     const state = createRouterState();
-    state.currentTier = "light";
+    state.currentTier = "fast";
     const config = makeConfig();
 
-    const d = step(state, config, judge("medium"));
+    const d = step(state, config, judge("smart"));
     expect(d.action).toBe("upgrade");
-    expect(d.switchTo?.tier).toBe("medium");
+    expect(d.switchTo?.tier).toBe("smart");
+    // Window cleared on upgrade
+    expect(state.window.length).toBe(0);
   });
 
-  it("medium → flagship on any flagship judge", () => {
+  it("fast stays fast on fast judge (no upgrade needed)", () => {
     const state = createRouterState();
-    state.currentTier = "medium";
+    state.currentTier = "fast";
     const config = makeConfig();
 
-    const d = step(state, config, judge("flagship"));
-    expect(d.action).toBe("upgrade");
-    expect(d.switchTo?.tier).toBe("flagship");
-  });
-
-  it("light → flagship on any flagship judge", () => {
-    const state = createRouterState();
-    state.currentTier = "light";
-    const config = makeConfig();
-
-    const d = step(state, config, judge("flagship"));
-    expect(d.action).toBe("upgrade");
-    expect(d.switchTo?.tier).toBe("flagship");
+    const d = step(state, config, judge("fast"));
+    expect(d.action).toBe("stay");
+    expect(d.switchTo).toBeNull();
   });
 });
 
-// ─── Upgrade window cleanup (SPEC §3.4) ───────────────────────────
-describe("Upgrade cleans lower-tier entries from window", () => {
-  it("drops entries with tier below the new tier", () => {
+// ─── Downgrade gating ─────────────────────────────────────────────
+describe("Downgrade from smart requires window majority", () => {
+  it("smart stays when window has only smart entries", () => {
     const state = createRouterState();
-    state.currentTier = "light";
+    state.currentTier = "smart";
     state.window = [
-      { tier: "light",   timestamp: 0 },
-      { tier: "light",   timestamp: 0 },
-      { tier: "medium",  timestamp: 0 },
-      { tier: "light",   timestamp: 0 },
+      { tier: "smart", timestamp: 0 },
+      { tier: "smart", timestamp: 0 },
+      { tier: "smart", timestamp: 0 },
     ];
     const config = makeConfig();
 
-    step(state, config, judge("flagship"));
-    // After upgrade to flagship, only flagship entries remain (none here, so empty).
-    // Then the new flagship entry is pushed? Check implementation behaviour:
-    expect(state.window.every((e) => e.tier !== "light" && e.tier !== "medium")).toBe(true);
-  });
-
-  it("medium upgrade preserves medium entries, drops light entries", () => {
-    const state = createRouterState();
-    state.currentTier = "light";
-    state.window = [
-      { tier: "light",  timestamp: 0 },
-      { tier: "light",  timestamp: 0 },
-      { tier: "medium", timestamp: 0 },
-    ];
-    const config = makeConfig();
-
-    step(state, config, judge("medium"));
-    // Light entries dropped, medium entry preserved.
-    expect(state.window.some((e) => e.tier === "light")).toBe(false);
-    expect(state.window.some((e) => e.tier === "medium")).toBe(true);
-  });
-});
-
-// ─── Downgrade gating (SPEC §3.2) ─────────────────────────────────
-describe("Downgrade requires sufficient observations AND threshold", () => {
-  it("flagship stays when window length < minObservations", () => {
-    const state = createRouterState();
-    state.currentTier = "flagship";
-    // Window has 2 entries; after push becomes 3, which is < minObservations=4
-    state.window = [
-      { tier: "light", timestamp: 0 },
-      { tier: "light", timestamp: 0 },
-    ];
-    const config = makeConfig(); // flagship.minObservations = 4
-
-    const d = step(state, config, judge("light"));
+    const d = step(state, config, judge("smart"));
     expect(d.action).toBe("stay");
   });
 
-  it("flagship downgrades when window ≥ minObservations and ≥75% are light", () => {
+  it("smart stays when fast ratio < threshold (40% < 60%)", () => {
     const state = createRouterState();
-    state.currentTier = "flagship";
+    state.currentTier = "smart";
     state.window = [
-      { tier: "light", timestamp: 0 },
-      { tier: "light", timestamp: 0 },
-      { tier: "light", timestamp: 0 },
-      { tier: "light", timestamp: 0 },
+      { tier: "fast",  timestamp: 0 },
+      { tier: "smart", timestamp: 0 },
+      { tier: "smart", timestamp: 0 },
+      { tier: "smart", timestamp: 0 },
     ];
     const config = makeConfig();
 
-    const d = step(state, config, judge("light"));
-    expect(d.action).toBe("downgrade");
-    expect(d.switchTo?.tier).toBe("light");
+    const d = step(state, config, judge("smart"));
+    expect(d.action).toBe("stay");
   });
 
-  it("flagship downgrades to medium (not light) when medium ratio ≥75%", () => {
+  it("smart downgrades when fast ratio ≥ 60%", () => {
     const state = createRouterState();
-    state.currentTier = "flagship";
+    state.currentTier = "smart";
     state.window = [
-      { tier: "medium", timestamp: 0 },
-      { tier: "medium", timestamp: 0 },
-      { tier: "medium", timestamp: 0 },
-      { tier: "light",  timestamp: 0 },
+      { tier: "fast",  timestamp: 0 },
+      { tier: "fast",  timestamp: 0 },
+      { tier: "fast",  timestamp: 0 },
+      { tier: "fast",  timestamp: 0 },
     ];
     const config = makeConfig();
 
-    const d = step(state, config, judge("medium"));
+    const d = step(state, config, judge("fast"));
     expect(d.action).toBe("downgrade");
-    expect(d.switchTo?.tier).toBe("medium");
+    expect(d.switchTo?.tier).toBe("fast");
   });
 
-  it("flagship stays when no single tier reaches 75%", () => {
+  it("fast never downgrades further (already bottom)", () => {
     const state = createRouterState();
-    state.currentTier = "flagship";
-    state.window = [
-      { tier: "medium", timestamp: 0 },
-      { tier: "flagship", timestamp: 0 },
-      { tier: "light",  timestamp: 0 },
-      { tier: "medium", timestamp: 0 },
-    ];
+    state.currentTier = "fast";
     const config = makeConfig();
 
-    const d = step(state, config, judge("medium"));
+    const d = step(state, config, judge("fast"));
     expect(d.action).toBe("stay");
   });
 });
@@ -186,75 +131,74 @@ describe("Downgrade requires sufficient observations AND threshold", () => {
 describe("Stay action", () => {
   it("returns no switchTo on stay", () => {
     const state = createRouterState();
-    state.currentTier = "medium";
+    state.currentTier = "fast";
     const config = makeConfig();
 
-    const d = step(state, config, judge("medium"));
+    const d = step(state, config, judge("fast"));
     expect(d.action).toBe("stay");
     expect(d.switchTo).toBeNull();
   });
 
-  it("light tier stays on light judge", () => {
+  it("smart stays on smart judge (no window push for same tier)", () => {
     const state = createRouterState();
-    state.currentTier = "light";
+    state.currentTier = "smart";
     const config = makeConfig();
 
-    const d = step(state, config, judge("light"));
+    const d = step(state, config, judge("smart"));
     expect(d.action).toBe("stay");
+    // Window entry still pushed for tracking
+    expect(state.window.length).toBeGreaterThan(0);
   });
 });
 
-// ─── Window size cap (SPEC §3.2) ──────────────────────────────────
+// ─── Window size cap ──────────────────────────────────────────────
 describe("Window size cap", () => {
-  it("discards oldest entries beyond maxWindowSize", () => {
+  it("discards oldest entries beyond window size", () => {
     const state = createRouterState();
-    state.currentTier = "flagship";
-    state.window = Array.from({ length: 12 }, (_, i) => ({ tier: "light" as Tier, timestamp: i }));
-    const config = makeConfig(); // maxWindowSize = 10
+    state.currentTier = "fast";
+    state.window = Array.from({ length: 8 }, (_, i) => ({ tier: "fast" as Tier, timestamp: i }));
+    const config = makeConfig(); // window.size = 5
 
-    // Add one more, verify oldest 3 dropped
-    step(state, config, judge("light"));
-    expect(state.window.length).toBeLessThanOrEqual(10);
+    step(state, config, judge("fast"));
+    expect(state.window.length).toBeLessThanOrEqual(5);
   });
 });
 
-// ─── Judge fallback (SPEC §4.6) ───────────────────────────────────
+// ─── Judge fallback ──────────────────────────────────────────────
 describe("Judge fallback", () => {
-  it("returns medium when no LLM endpoint provided", async () => {
+  it("returns fast when no LLM endpoint provided", async () => {
     const { classify } = await import("../src/judge.js");
     const r = await classify("anything", null);
-    expect(r.tier).toBe("medium");
+    expect(r.tier).toBe("fast");
     expect(r.source).toBe("fallback");
-  });
-
-  it("heuristic classifier is the no-op fallback", async () => {
-    const { classifyHeuristic } = await import("../src/judge.js");
-    expect(classifyHeuristic("ok").tier).toBe("medium");
-    expect(classifyHeuristic("really long prompt " + "x".repeat(1000)).tier).toBe("medium");
-    expect(classifyHeuristic("architect something").tier).toBe("medium");
   });
 });
 
 // ─── Manual override ──────────────────────────────────────────────
-describe("Manual override (SPEC §6.3)", () => {
+describe("Manual override", () => {
   it("bypasses routing entirely when active (by tier)", () => {
     const state = createRouterState();
-    state.currentTier = "light";
-    state.manualOverride = { active: true, tier: "flagship" };
+    state.currentTier = "fast";
+    state.manualOverride = { active: true, tier: "smart" };
     const config = makeConfig();
 
-    const d = step(state, config, judge("light")); // judge says stay
+    const d = step(state, config, judge("fast")); // judge says stay
     expect(d.action).toBe("manual");
-    expect(d.switchTo?.tier).toBe("flagship");
+    expect(d.switchTo?.tier).toBe("smart");
+    expect(d.switchTo?.modelId).toBe("smart-model");
   });
 
   it("bypasses routing when active (by exact model)", () => {
     const state = createRouterState();
-    state.currentTier = "light";
-    state.manualOverride = { active: true, provider: "anthropic", modelId: "claude-opus-4" };
+    state.currentTier = "fast";
+    state.manualOverride = {
+      active: true,
+      provider: "anthropic",
+      modelId: "claude-opus-4",
+    };
     const config = makeConfig();
 
-    const d = step(state, config, judge("light"));
+    const d = step(state, config, judge("fast"));
     expect(d.action).toBe("manual");
     expect(d.switchTo?.provider).toBe("anthropic");
     expect(d.switchTo?.modelId).toBe("claude-opus-4");
