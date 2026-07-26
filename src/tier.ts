@@ -1,11 +1,11 @@
 /**
- * Slim Router — Tier management
+ * pi-shift-router — Tier management
  *
  * Handles model lookup across tiers, priority-based fallback,
  * and integration with pi's model registry.
  */
 
-import type { SlimRouterConfig, Tier } from "./types.js";
+import type { ShiftRouterConfig, Tier } from "./types.js";
 import { TIERS } from "./types.js";
 
 /** Resolved model info with its tier */
@@ -21,7 +21,7 @@ export interface ResolvedModel {
  */
 export function findBestModelForTier(
   tier: Tier,
-  config: SlimRouterConfig,
+  config: ShiftRouterConfig,
   modelRegistry: { find: (provider: string, modelId: string) => unknown } | undefined,
 ): ResolvedModel | null {
   const tierConfig = config.tiers[tier];
@@ -48,7 +48,7 @@ export function isValidTier(s: string): s is Tier {
 }
 
 /** Get display label for a tier */
-export function tierLabel(tier: Tier, config: SlimRouterConfig): string {
+export function tierLabel(tier: Tier, config: ShiftRouterConfig): string {
   const cfg = config.tiers[tier];
   return cfg?.label ?? tier.charAt(0).toUpperCase() + tier.slice(1);
 }

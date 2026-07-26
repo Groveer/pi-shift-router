@@ -1,5 +1,5 @@
 /**
- * Slim Router — Slash commands
+ * pi-shift-router — Slash commands
  *
  * /router          — Show status, enable/disable
  * /route-force     — Manual override for current turn
@@ -8,7 +8,7 @@
  */
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import type { SlimRouterConfig, RouterState, Tier, TierEntry } from "./types.js";
+import type { ShiftRouterConfig, RouterState, Tier, TierEntry } from "./types.js";
 import { TIERS } from "./types.js";
 import {
   isValidTier,
@@ -35,7 +35,7 @@ function formatWindow(window: RouterState["window"]): string {
   return "[" + window.map((e) => badge[e.tier] ?? "?").join(", ") + "]";
 }
 
-function tierEntries(config: SlimRouterConfig): TierEntry[] {
+function tierEntries(config: ShiftRouterConfig): TierEntry[] {
   return TIERS.map((t) => ({
     tier: t,
     label: config.tiers[t].label,
@@ -44,7 +44,7 @@ function tierEntries(config: SlimRouterConfig): TierEntry[] {
   }));
 }
 
-function formatTierList(config: SlimRouterConfig): string {
+function formatTierList(config: ShiftRouterConfig): string {
   return tierEntries(config)
     .map(
       (e) =>
@@ -56,7 +56,7 @@ function formatTierList(config: SlimRouterConfig): string {
 // ─── `/route-config` wizard ──────────────────────────────────────
 
 async function routeConfigWizard(
-  config: SlimRouterConfig,
+  config: ShiftRouterConfig,
   cwd: string,
   ctx: ExtensionCommandContext,
 ): Promise<boolean> {
@@ -72,8 +72,8 @@ async function routeConfigWizard(
 
   async function saveDestination(): Promise<"user" | "project" | null> {
     const choice = await ctx.ui.select("Save configuration to…", [
-      "📁 Project — <cwd>/.pi/pi-slim-router.json (shareable with team)",
-      "👤 User — ~/.pi/agent/pi-slim-router.json (personal)",
+      "📁 Project — <cwd>/.pi/pi-shift-router.json (shareable with team)",
+      "👤 User — ~/.pi/agent/pi-shift-router.json (personal)",
       "🚫 Cancel save",
     ]);
     if (!choice) return null;
@@ -83,7 +83,7 @@ async function routeConfigWizard(
   }
 
   async function menu(): Promise<MenuChoice> {
-    const choice = await ctx.ui.select("Slim Router — Configuration", [
+    const choice = await ctx.ui.select("pi-shift-router — Configuration", [
       `🦾 Fast — ${config.tiers.fast.models.length} model(s)  (programmer: execution, daily coding)`,
       `🧠 Smart — ${config.tiers.smart.models.length} model(s)  (CTO: architecture, review, planning)`,
       "---",
@@ -255,9 +255,9 @@ async function routeConfigWizard(
 
   const saved = await saveConfig(config, cwd, scope);
   if (saved) {
-    ctx.ui.notify(`Slim Router: 💾 Configuration saved to ${getConfigPath() ?? scope + " config"}`, "info");
+    ctx.ui.notify(`pi-shift-router: 💾 Configuration saved to ${getConfigPath() ?? scope + " config"}`, "info");
   } else {
-    ctx.ui.notify("Slim Router: ⚠ Failed to save configuration", "error");
+    ctx.ui.notify("pi-shift-router: ⚠ Failed to save configuration", "error");
   }
   return saved;
 }
@@ -266,7 +266,7 @@ async function routeConfigWizard(
 
 export function registerCommands(
   pi: ExtensionAPI,
-  getConfig: () => SlimRouterConfig,
+  getConfig: () => ShiftRouterConfig,
   getState: () => RouterState,
   onConfigChanged: () => void,
   onManualOverrideTier: (tier: Tier) => void,
@@ -274,7 +274,7 @@ export function registerCommands(
 ): void {
   // ── /router ──────────────────────────────────────────────────
   pi.registerCommand("router", {
-    description: "Slim Router: show status, enable/disable",
+    description: "pi-shift-router: show status, enable/disable",
     getArgumentCompletions: (prefix: string) => {
       const cmds = ["on", "off", "status", "quiet", "verbose", "config"].filter((c) => c.startsWith(prefix));
       return cmds.length > 0 ? cmds.map((c) => ({ value: c, label: c })) : null;
@@ -288,14 +288,14 @@ export function registerCommands(
         config.enabled = true;
         onConfigChanged();
         updateStatus(ctx.ui);
-        ctx.ui.notify("Slim Router: ✅ Enabled", "info");
+        ctx.ui.notify("pi-shift-router: ✅ Enabled", "info");
         return;
       }
       if (arg === "off") {
         config.enabled = false;
         onConfigChanged();
         updateStatus(ctx.ui);
-        ctx.ui.notify("Slim Router: ⛔ Disabled", "info");
+        ctx.ui.notify("pi-shift-router: ⛔ Disabled", "info");
         return;
       }
       if (arg === "config") {
@@ -306,13 +306,13 @@ export function registerCommands(
       }
       if (arg === "quiet") {
         config.ux.quietMode = !config.ux.quietMode;
-        ctx.ui.notify(`Slim Router: ${config.ux.quietMode ? "🔇 Quiet" : "🔊 Notifications"}`, "info");
+        ctx.ui.notify(`pi-shift-router: ${config.ux.quietMode ? "🔇 Quiet" : "🔊 Notifications"}`, "info");
         return;
       }
       if (arg === "verbose" || arg === "log") {
         config.ux.routerLogVerbose = !config.ux.routerLogVerbose;
         ctx.ui.notify(
-          `Slim Router: ${config.ux.routerLogVerbose ? "📝 Verbose logging ON" : "📝 Verbose logging OFF"}`,
+          `pi-shift-router: ${config.ux.routerLogVerbose ? "📝 Verbose logging ON" : "📝 Verbose logging OFF"}`,
           "info",
         );
         return;
@@ -358,13 +358,13 @@ export function registerCommands(
       const arg = args.trim().toLowerCase();
       if (!arg || arg === "auto") {
         clearManualOverride(getState());
-        ctx.ui.notify("Slim Router: Manual override cleared", "info");
+        ctx.ui.notify("pi-shift-router: Manual override cleared", "info");
         return;
       }
 
       if (isValidTier(arg)) {
         onManualOverrideTier(arg);
-        ctx.ui.notify(`Slim Router: ${tierEmoji(arg)} Forcing "${tierLabel(arg, getConfig())}" tier`, "info");
+        ctx.ui.notify(`pi-shift-router: ${tierEmoji(arg)} Forcing "${tierLabel(arg, getConfig())}" tier`, "info");
         return;
       }
 
@@ -372,7 +372,7 @@ export function registerCommands(
       const parts = arg.split("/");
       if (parts.length === 2) {
         setManualOverrideModel(getState(), parts[0], parts[1]);
-        ctx.ui.notify(`Slim Router: 🎯 Forcing ${parts[0]}/${parts[1]}`, "info");
+        ctx.ui.notify(`pi-shift-router: 🎯 Forcing ${parts[0]}/${parts[1]}`, "info");
         return;
       }
 

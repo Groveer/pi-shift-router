@@ -1,5 +1,5 @@
 /**
- * Slim Router — Task classifier (Judge)
+ * pi-shift-router — Task classifier (Judge)
  *
  * Single-stage classification via LLM (uses the fast tier's model).
  * On failure: hold position (return "fast"), log a warning.
@@ -28,7 +28,7 @@ function loadJudgePrompt(): string {
     const path = resolve(here, "./prompts/judge.md");
     return readFileSync(path, "utf-8").trim();
   } catch (err) {
-    console.warn("[SlimRouter] Failed to load prompts/judge.md, using fallback:", err);
+    console.warn("[ShiftRouter] Failed to load prompts/judge.md, using fallback:", err);
     return FALLBACK_PROMPT;
   }
 }
@@ -77,8 +77,8 @@ async function classifyLLM(
     const url = judgeApiUrl(endpoint.baseUrl, endpoint.apiType);
 
     if (verbose) {
-      console.log(`[SlimRouter] Judge → ${endpoint.modelId} (${endpoint.apiType})`);
-      console.log(`[SlimRouter] Judge URL: ${url}`);
+      console.log(`[ShiftRouter] Judge → ${endpoint.modelId} (${endpoint.apiType})`);
+      console.log(`[ShiftRouter] Judge URL: ${url}`);
     }
 
     const res = await fetch(url, {
@@ -95,7 +95,7 @@ async function classifyLLM(
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      console.warn(`[SlimRouter] Judge API error ${res.status} from ${url}: ${body.slice(0, 200)}`);
+      console.warn(`[ShiftRouter] Judge API error ${res.status} from ${url}: ${body.slice(0, 200)}`);
       return null;
     }
 
@@ -104,7 +104,7 @@ async function classifyLLM(
     if (verbose) {
       const choice = (raw as any).choices?.[0];
       console.log(
-        `[SlimRouter] Judge raw: content=${JSON.stringify(choice?.message?.content)}, ` +
+        `[ShiftRouter] Judge raw: content=${JSON.stringify(choice?.message?.content)}, ` +
         `reasoning=${JSON.stringify(choice?.message?.reasoning_content)?.slice(0, 150)}, ` +
         `finish=${choice?.finish_reason}`,
       );
@@ -117,15 +117,15 @@ async function classifyLLM(
       const reasoning = JSON.stringify(choice?.message?.reasoning_content);
       const finish = choice?.finish_reason ?? "?";
       console.warn(
-        `[SlimRouter] Judge unparseable from ${url}: ` +
+        `[ShiftRouter] Judge unparseable from ${url}: ` +
         `content=${content.slice(0, 100)}, reasoning=${reasoning.slice(0, 100)}, finish=${finish}`,
       );
       return null;
     }
-    if (verbose) console.log(`[SlimRouter] Judge → ${answer}`);
+    if (verbose) console.log(`[ShiftRouter] Judge → ${answer}`);
     return { tier: answer, source: "llm" };
   } catch (err) {
-    console.warn(`[SlimRouter] Judge fetch failed for ${endpoint.baseUrl}: ${err}`);
+    console.warn(`[ShiftRouter] Judge fetch failed for ${endpoint.baseUrl}: ${err}`);
     return null;
   }
 }
@@ -207,7 +207,7 @@ export async function classify(
     const result = await classifyLLM(prompt, fastEndpoint, controller.signal, verbose);
     clearTimeout(timer);
     if (result) return result;
-    console.warn("[SlimRouter] Judge LLM unavailable — holding position on current tier");
+    console.warn("[ShiftRouter] Judge LLM unavailable — holding position on current tier");
   }
   return { tier: "fast", source: "fallback" };
 }

@@ -1,5 +1,5 @@
 /**
- * Slim Router — Routing engine tests
+ * pi-shift-router — Routing engine tests
  *
  * Two-tier (fast/smart) routing algorithm tests:
  *   - Upgrade (fast → smart): immediate
@@ -14,13 +14,13 @@ import {
   processRoute,
   type RouterState,
 } from "../src/router.js";
-import type { SlimRouterConfig, JudgeResult, Tier } from "../src/types.js";
+import type { ShiftRouterConfig, JudgeResult, Tier } from "../src/types.js";
 
 function makeRegistry() {
   return { find: (provider: string, modelId: string) => ({ provider, modelId }) };
 }
 
-function makeConfig(overrides: Partial<SlimRouterConfig> = {}): SlimRouterConfig {
+function makeConfig(overrides: Partial<ShiftRouterConfig> = {}): ShiftRouterConfig {
   return {
     enabled: true,
     tiers: {
@@ -34,14 +34,14 @@ function makeConfig(overrides: Partial<SlimRouterConfig> = {}): SlimRouterConfig
     },
     ux: { quietMode: false, statusBar: true, inlineToast: true },
     ...overrides,
-  } as SlimRouterConfig;
+  } as ShiftRouterConfig;
 }
 
 function judge(tier: Tier): JudgeResult {
   return { tier, source: "llm" };
 }
 
-function step(state: RouterState, config: SlimRouterConfig, j: JudgeResult) {
+function step(state: RouterState, config: ShiftRouterConfig, j: JudgeResult) {
   return processRoute(j, state, config, makeRegistry());
 }
 

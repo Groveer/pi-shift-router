@@ -1,4 +1,4 @@
-# Slim Router
+# pi-shift-router
 
 > 让每一轮任务都跑在最合适的模型上 —— 不再需要手动 `/model` 切换。
 
@@ -20,7 +20,7 @@ Pi-agent 支持多个 Provider，但每个会话锁死在单一模型上。
 
 ## 解决方案
 
-**Slim Router** 接入 pi-agent 的会话周期，按 **心智模式**（执行 vs 判断）分类每轮任务，无缝切换当前激活的模型。
+**pi-shift-router** 接入 pi-agent 的会话周期，按 **心智模式**（执行 vs 判断）分类每轮任务，无缝切换当前激活的模型。
 
 - **两层路由** — Smart（🧠 CTO）与 Fast（🦾 程序员）。每层一个模型。
 - **LLM Judge** — 用 Fast 模型的 API 调用来分类任务是"执行"还是"判断"。成本是几千 token 级别，相对于节省的开销可以忽略不计。
@@ -42,7 +42,7 @@ Pi-agent 支持多个 Provider，但每个会话锁死在单一模型上。
 
 ```bash
 # 安装（写入 pi-agent 的 settings.json）
-pi install npm:pi-slim-router
+pi install npm:pi-shift-router
 ```
 
 该命令把包注册到 pi-agent 的 `~/.pi/agent/settings.json` 并下载到 `~/.pi/agent/`。下次启动 pi-agent 时会自动加载扩展。详见 [pi 包管理文档](https://github.com/earendil-works/pi-coding-agent/blob/main/docs/packages.md)。
@@ -100,7 +100,7 @@ flowchart TD
 
 ## 对比一览
 
-| | Slim Router | pi-router | pi-smart-router |
+| | pi-shift-router | pi-router | pi-smart-router |
 |---|---|---|---|
 | **做什么** | 按任务复杂度路由 —— 简单任务用轻量模型，复杂任务用顶级模型 | 在 Provider 之间故障转移 —— Provider A 挂了切 Provider B | ML 优化的推理管线 —— 12 阶段混合路由 |
 | **何时用它** | "这个问题很简单，为什么要用旗舰 token？" | "Anthropic 不可用，切 Google 还能保留上下文" | "我要本地推理 + ONNX 智能路由" |
@@ -110,7 +110,7 @@ flowchart TD
 | **本地推理** | 否 | 否 | 是（LM Studio、Ollama） |
 | **学习曲线** | 低 —— 选两个模型搞定 | 中低 —— 配置通道和策略 | 高 —— 下载 ONNX 模型，本地编译 |
 
-**一句话**：这三个是互补关系，不是竞争关系。甚至可以同时跑 —— pi-router 处理 Provider 故障转移，pi-smart-router 优化推理引擎，Slim Router 保证每个任务用对复杂度。
+**一句话**：这三个是互补关系，不是竞争关系。甚至可以同时跑 —— pi-router 处理 Provider 故障转移，pi-smart-router 优化推理引擎，pi-shift-router 保证每个任务用对复杂度。
 
 ---
 
@@ -241,8 +241,8 @@ src/
 ## 开发
 
 ```bash
-git clone https://github.com/green-dalii/pi-slim-router.git
-cd pi-slim-router
+git clone https://github.com/green-dalii/pi-shift-router.git
+cd pi-shift-router
 npm install
 npm run build
 npm test
@@ -262,7 +262,7 @@ npm test
 
 ## 作者
 
-**Slim Router** 由 [green-dalii](https://github.com/green-dalii) 开发并维护。
+**pi-shift-router** 由 [green-dalii](https://github.com/green-dalii) 开发并维护。
 
 欢迎贡献 —— 见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
@@ -270,4 +270,4 @@ npm test
 
 ## 许可
 
-[Apache 2.0](LICENSE) © 2026 green-dalii 及 Slim Router 贡献者。
+[Apache 2.0](LICENSE) © 2026 green-dalii 及 pi-shift-router 贡献者。

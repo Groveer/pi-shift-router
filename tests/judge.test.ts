@@ -1,5 +1,5 @@
 /**
- * Slim Router — Judge tests
+ * pi-shift-router — Judge tests
  *
  * Tests for the JSON parser (extractTier) and URL builder (judgeApiUrl).
  * The full classify() function makes a network call and is not unit-tested;

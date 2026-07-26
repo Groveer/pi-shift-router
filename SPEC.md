@@ -1,10 +1,10 @@
-# Slim Router — Pi-agent Intelligent Model Router
+# pi-shift-router — Pi-agent Intelligent Model Router
 
 ## 1. Overview
 
-**Slim Router** is a [pi-agent](https://github.com/earendil-works/pi-coding-agent) extension that performs **cross-provider, cross-model intelligent routing**. On every turn it classifies the task's **mental mode** (execution vs judgment) and selects the best-fit model automatically.
+**pi-shift-router** is a [pi-agent](https://github.com/earendil-works/pi-coding-agent) extension that performs **cross-provider, cross-model intelligent routing**. On every turn it classifies the task's **mental mode** (execution vs judgment) and selects the best-fit model automatically.
 
-**Project:** `pi-slim-router` (npm) · Repository: [green-dalii/pi-slim-router](https://github.com/green-dalii/pi-slim-router)
+**Project:** `pi-shift-router` (npm) · Repository: [green-dalii/pi-shift-router](https://github.com/green-dalii/pi-shift-router)
 
 ### Core Value
 
@@ -33,7 +33,7 @@ User sends message
 ┌────────────────────────────────────────────────────────────┐
 │  Pi-agent before_agent_start event                          │
 │                                                              │
-│  ┌─── Slim Router ──────────────────────────────────┐       │
+│  ┌─── pi-shift-router ──────────────────────────────────┐       │
 │  │                                                    │       │
 │  │  ① Status bar: "⚖ judging…" (transient)           │       │
 │  │      ↓                                              │       │
@@ -200,15 +200,15 @@ There is **no heuristic rule** as a fallback. When the LLM Judge is unavailable 
 | Layer | Path | Priority | Use |
 |-------|------|----------|-----|
 | Default | `DEFAULT_CONFIG` in `types.ts` | Lowest | Code-embedded defaults |
-| User | `~/.pi/agent/pi-slim-router.json` | Medium | Personal preferences, not git-tracked |
-| Project | `<cwd>/.pi/pi-slim-router.json` | **Highest** | Team-shared, git-tracked |
+| User | `~/.pi/agent/pi-shift-router.json` | Medium | Personal preferences, not git-tracked |
+| Project | `<cwd>/.pi/pi-shift-router.json` | **Highest** | Team-shared, git-tracked |
 
 **Load order:** defaults ← user ← project (project wins on conflict).
 
 ### 5.2 Config Structure
 
 ```typescript
-interface SlimRouterConfig {
+interface ShiftRouterConfig {
   enabled: boolean;
   tiers: {
     fast:  TierConfig;   // execution model
@@ -265,7 +265,7 @@ Window: [s, f, f, f]  (4 entries)
 Counts: S=1 F=3
 Manual: ✗ None
 
-Config: /project/.pi/pi-slim-router.json
+Config: /project/.pi/pi-shift-router.json
 
   🦾 Fast         deepseek/deepseek-v4-flash
   🧠 Smart        kimi/kimi-k3

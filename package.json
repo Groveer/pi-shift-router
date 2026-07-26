@@ -1,24 +1,24 @@
 {
-  "name": "pi-slim-router",
+  "name": "pi-shift-router",
   "version": "0.4.0",
   "description": "Two-tier model router for pi-agent — automatic execution/judgment routing with LLM Judge. Pairs a fast everyday model with a strong model for planning and review.",
   "keywords": [
     "pi-package",
     "pi-extension",
-    "slim-router",
+    "shift-router",
     "model-routing",
     "ai-router",
     "llm-router",
     "model-selection"
   ],
   "license": "Apache-2.0",
-  "homepage": "https://github.com/green-dalii/pi-slim-router#readme",
+  "homepage": "https://github.com/green-dalii/pi-shift-router#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/green-dalii/pi-slim-router.git"
+    "url": "git+https://github.com/green-dalii/pi-shift-router.git"
   },
   "bugs": {
-    "url": "https://github.com/green-dalii/pi-slim-router/issues"
+    "url": "https://github.com/green-dalii/pi-shift-router/issues"
   },
   "author": {
     "name": "green-dalii",

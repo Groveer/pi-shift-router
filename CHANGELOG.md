@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+> **Renamed from `pi-slim-router` to `pi-shift-router` in v0.4.0.** Earlier versions
+> (0.1.0 – 0.3.1) were developed under the `pi-slim-router` working name and never
+> published to npm. The plugin was first published to npm as `pi-shift-router` at v0.4.0.
+
 ## [0.4.0] — 2026-08-15
 
 ### Added
@@ -22,7 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Documentation overhaul**: AGENTS.md, PLAN.md, SPEC.md, README.md all rewritten
   in idiomatic English (was previously mixed Chinese/English). Adds TOC, Prerequisites,
   Install, Demo, Roadmap, Acknowledgements.
-- **Install instructions** updated to `pi install npm:pi-slim-router` (the actual
+- **Project rename**: `pi-slim-router` → `pi-shift-router` (npm name, GitHub repo,
+  internal identifiers, all references). The rename reflects the project's core
+  "shift gears between execution and judgment" mental model.
+- **Install instructions** updated to `pi install npm:pi-shift-router` (the actual
   pi package manager command), with link to pi's packages docs.
 - **Pricing claims removed**: README no longer cites specific per-call cost numbers
   (varies by provider/time). Now uses qualitative "a few thousand tokens at your

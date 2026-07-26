@@ -1,5 +1,5 @@
 /**
- * Slim Router — Pi-agent Extension
+ * pi-shift-router — Pi-agent Extension
  *
  * Routes tasks to the optimal model based on complexity.
  * Two tiers: Fast (execution) ↔ Smart (judgment).
@@ -7,7 +7,7 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { Tier, SlimRouterConfig, RouterState, ProviderEndpoint } from "./types.js";
+import type { Tier, ShiftRouterConfig, RouterState, ProviderEndpoint } from "./types.js";
 import { loadConfig, resolveFastEndpoint } from "./config.js";
 import { findBestModelForTier, formatTierDisplay } from "./tier.js";
 import { classify } from "./judge.js";
@@ -21,7 +21,7 @@ import {
 import { registerCommands } from "./commands.js";
 
 /** Check if both tiers share the same model configuration */
-function allTiersIdentical(config: SlimRouterConfig): boolean {
+function allTiersIdentical(config: ShiftRouterConfig): boolean {
   const { fast, smart } = config.tiers;
   const modelsJson = (tc: typeof fast) =>
     tc.models.map((m) => `${m.provider}/${m.model}`).sort().join(",");
@@ -29,7 +29,7 @@ function allTiersIdentical(config: SlimRouterConfig): boolean {
 }
 
 export default function slimRouterExtension(pi: ExtensionAPI) {
-  let config: SlimRouterConfig;
+  let config: ShiftRouterConfig;
   let state: RouterState;
   let fastEndpoint: ProviderEndpoint | null = null;
   let initialized = false;
@@ -49,12 +49,12 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
 
   // ── Status bar ──────────────────────────────────────────────
 
-  function updateBar(ui: any, cfg: SlimRouterConfig, s: RouterState) {
-    if (!cfg.ux.statusBar) { ui.setStatus("slim-router", undefined); return; }
+  function updateBar(ui: any, cfg: ShiftRouterConfig, s: RouterState) {
+    if (!cfg.ux.statusBar) { ui.setStatus("shift-router", undefined); return; }
     const badge = cfg.enabled
       ? formatTierDisplay(s.currentTier, s.currentModelId)
       : "⛔";
-    ui.setStatus("slim-router", badge);
+    ui.setStatus("shift-router", badge);
   }
 
   // ── Session start ───────────────────────────────────────────
@@ -70,7 +70,7 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
     // Hint when tiers are identically configured
     if (config.enabled && allTiersIdentical(config)) {
       console.warn(
-        "[SlimRouter] Both tiers share the same model. " +
+        "[ShiftRouter] Both tiers share the same model. " +
         "Run '/router config' to set up tier-specific routing."
       );
     }
@@ -85,14 +85,14 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
     const verbose = config.ux.routerLogVerbose;
     const promptPreview = event.prompt.slice(0, 80).replace(/\n/g, " ");
     if (verbose) {
-      console.log(`\n[SlimRouter] ─── Turn start ───`);
-      console.log(`[SlimRouter] prompt: "${promptPreview}${event.prompt.length > 80 ? "…" : ""}"`);
-      console.log(`[SlimRouter] current: ${formatTierDisplay(state.currentTier, state.currentModelId)}`);
+      console.log(`\n[ShiftRouter] ─── Turn start ───`);
+      console.log(`[ShiftRouter] prompt: "${promptPreview}${event.prompt.length > 80 ? "…" : ""}"`);
+      console.log(`[ShiftRouter] current: ${formatTierDisplay(state.currentTier, state.currentModelId)}`);
     }
 
     // Show transient "judging..." badge in status bar so the user sees
     // the router is working during the Judge API call.
-    if (config.ux.statusBar) ctx.ui.setStatus("slim-router", "⚖ judging…");
+    if (config.ux.statusBar) ctx.ui.setStatus("shift-router", "⚖ judging…");
 
     let judgeResult;
     try {
@@ -112,7 +112,7 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
         ? "0/0"
         : `${state.window.filter((e) => e.tier === "fast").length}/${state.window.length}`;
       console.log(
-        `[SlimRouter] judge: ${judgeResult.tier} (${judgeResult.source}), ` +
+        `[ShiftRouter] judge: ${judgeResult.tier} (${judgeResult.source}), ` +
         `window=[${state.window.map((e) => e.tier[0]).join("")}] (${ratio} fast)`,
       );
     }
@@ -120,7 +120,7 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
     const result = processRoute(judgeResult, state, config, ctx.modelRegistry as any);
 
     if (verbose) {
-      console.log(`[SlimRouter] decision: ${result.action}${result.switchTo ? ` → ${result.switchTo.provider}/${result.switchTo.modelId}` : ""}`);
+      console.log(`[ShiftRouter] decision: ${result.action}${result.switchTo ? ` → ${result.switchTo.provider}/${result.switchTo.modelId}` : ""}`);
     }
 
     if (result.switchTo) {
@@ -129,7 +129,7 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
         ctx.modelRegistry as any,
         (m) => pi.setModel(m as any),
       );
-      if (verbose) console.log(`[SlimRouter] model switch ${ok ? "ok" : "FAILED"}`);
+      if (verbose) console.log(`[ShiftRouter] model switch ${ok ? "ok" : "FAILED"}`);
       if (ok && !config.ux.quietMode && config.ux.inlineToast) {
         ctx.ui.notify(`${formatTierDisplay(state.currentTier, state.currentModelId)}`, "info");
       }

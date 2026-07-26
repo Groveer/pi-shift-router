@@ -1,15 +1,15 @@
 /**
- * Slim Router — Configuration loader
+ * pi-shift-router — Configuration loader
  *
  * Reads pi-agent's models-store.json and auth.json, resolves Judge endpoint,
- * and manages the pi-slim-router.json config file (user-level + project-level).
+ * and manages the pi-shift-router.json config file (user-level + project-level).
  */
 
 import { readFile, writeFile, access, mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import {
-  type SlimRouterConfig,
+  type ShiftRouterConfig,
   type ModelsStore,
   type AuthStore,
   type StoredModel,
@@ -19,21 +19,21 @@ import {
 } from "./types.js";
 
 const PI_AGENT_DIR = join(homedir(), ".pi", "agent");
-const CONFIG_FILENAME = "pi-slim-router.json";
+const CONFIG_FILENAME = "pi-shift-router.json";
 
-let _config: SlimRouterConfig | null = null;
+let _config: ShiftRouterConfig | null = null;
 let _modelsStore: ModelsStore | null = null;
 let _authStore: AuthStore | null = null;
 let _configPath: string | null = null;
 
 // ─── Paths ────────────────────────────────────────────────────────
 
-/** User-level config: ~/.pi/agent/pi-slim-router.json (personal preferences) */
+/** User-level config: ~/.pi/agent/pi-shift-router.json (personal preferences) */
 export function userConfigPath(): string {
   return join(PI_AGENT_DIR, CONFIG_FILENAME);
 }
 
-/** Project-level config: <cwd>/.pi/pi-slim-router.json (team-shared, git-tracked) */
+/** Project-level config: <cwd>/.pi/pi-shift-router.json (team-shared, git-tracked) */
 export function projectConfigPath(cwd: string): string {
   return resolve(cwd, ".pi", CONFIG_FILENAME);
 }
@@ -108,17 +108,17 @@ export function invalidateConfigCache(): void {
  *   1. fast tier's first model (user chose this as the cheap workhorse)
  *   2. cheapest model with valid auth (fallback)
  */
-export async function resolveFastEndpoint(config: SlimRouterConfig): Promise<ProviderEndpoint | null> {
+export async function resolveFastEndpoint(config: ShiftRouterConfig): Promise<ProviderEndpoint | null> {
   const store = await loadModelsStore();
   const auth = await loadAuthStore();
 
   async function resolve(provider: string, modelId: string): Promise<ProviderEndpoint | null> {
     const provEntry = store[provider];
-    if (!provEntry) { console.warn(`[SlimRouter] Judge: provider "${provider}" not found in store`); return null; }
+    if (!provEntry) { console.warn(`[ShiftRouter] Judge: provider "${provider}" not found in store`); return null; }
     const modelInfo = provEntry.models.find((m) => m.id === modelId);
-    if (!modelInfo) { console.warn(`[SlimRouter] Judge: model "${modelId}" not found in provider "${provider}"`); return null; }
+    if (!modelInfo) { console.warn(`[ShiftRouter] Judge: model "${modelId}" not found in provider "${provider}"`); return null; }
     const apiKey = auth[provider]?.key;
-    if (!apiKey) { console.warn(`[SlimRouter] Judge: no API key for provider "${provider}"`); return null; }
+    if (!apiKey) { console.warn(`[ShiftRouter] Judge: no API key for provider "${provider}"`); return null; }
     return {
       baseUrl: (modelInfo.baseUrl ?? "").replace(/\/+$/, ""),
       apiType: modelInfo.api ?? "openai-completions",
@@ -131,7 +131,7 @@ export async function resolveFastEndpoint(config: SlimRouterConfig): Promise<Pro
   const fastFirst = config.tiers.fast.models[0];
   if (fastFirst) {
     const ep = await resolve(fastFirst.provider, fastFirst.model);
-    if (ep) { console.log(`[SlimRouter] Judge endpoint: ${fastFirst.provider}/${fastFirst.model}`); return ep; }
+    if (ep) { console.log(`[ShiftRouter] Judge endpoint: ${fastFirst.provider}/${fastFirst.model}`); return ep; }
   }
 
   // 2. Fallback: cheapest model with auth
@@ -145,10 +145,10 @@ export async function resolveFastEndpoint(config: SlimRouterConfig): Promise<Pro
   }
   candidates.sort((a, b) => a.cost - b.cost);
   if (candidates.length === 0) {
-    console.warn("[SlimRouter] Judge: no provider with valid API key found — cannot resolve judge endpoint");
+    console.warn("[ShiftRouter] Judge: no provider with valid API key found — cannot resolve judge endpoint");
     return null;
   }
-  console.warn(`[SlimRouter] Judge: fast tier unavailable, falling back to cheapest: ${candidates[0].provider}/${candidates[0].modelId}`);
+  console.warn(`[ShiftRouter] Judge: fast tier unavailable, falling back to cheapest: ${candidates[0].provider}/${candidates[0].modelId}`);
   return resolve(candidates[0].provider, candidates[0].modelId);
 }
 
@@ -159,7 +159,7 @@ export async function resolveFastEndpoint(config: SlimRouterConfig): Promise<Pro
  * @param scope "user" → ~/.pi/agent/, "project" → <cwd>/.pi/
  */
 export async function saveConfig(
-  config: SlimRouterConfig,
+  config: ShiftRouterConfig,
   cwd: string,
   scope: "user" | "project" = "project",
 ): Promise<boolean> {
@@ -172,7 +172,7 @@ export async function saveConfig(
     _configPath = configPath;
     return true;
   } catch (err) {
-    console.warn(`[SlimRouter] Failed to save config: ${err}`);
+    console.warn(`[ShiftRouter] Failed to save config: ${err}`);
     return false;
   }
 }
@@ -183,7 +183,7 @@ export async function saveConfig(
  * Validate that referenced models exist in the store.
  * Returns warnings (non-fatal): tier without models, missing provider/model, duplicates.
  */
-export function validateConfig(config: SlimRouterConfig, store: ModelsStore): string[] {
+export function validateConfig(config: ShiftRouterConfig, store: ModelsStore): string[] {
   const warnings: string[] = [];
   const seenRefs = new Map<string, string>(); // key → tier
 
@@ -220,11 +220,11 @@ export function validateConfig(config: SlimRouterConfig, store: ModelsStore): st
 /**
  * Load configuration with caching.
  * Layering:
- *   1. User config (~/.pi/agent/pi-slim-router.json) — personal defaults
- *   2. Project config (<cwd>/.pi/pi-slim-router.json) — team-shared overrides
+ *   1. User config (~/.pi/agent/pi-shift-router.json) — personal defaults
+ *   2. Project config (<cwd>/.pi/pi-shift-router.json) — team-shared overrides
  * Project wins on conflict (deep merge with project taking precedence).
  */
-export async function loadConfig(cwd: string): Promise<SlimRouterConfig> {
+export async function loadConfig(cwd: string): Promise<ShiftRouterConfig> {
   if (_config) return _config;
 
   const userPath = userConfigPath();
@@ -235,7 +235,7 @@ export async function loadConfig(cwd: string): Promise<SlimRouterConfig> {
   const projectCfg = await readJsonPartial(projectPath);
 
   // Merge: defaults ← user ← project (project wins)
-  const merged: SlimRouterConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  const merged: ShiftRouterConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
   deepMerge(merged as unknown as Record<string, unknown>, userCfg);
   deepMerge(merged as unknown as Record<string, unknown>, projectCfg);
   _config = merged;
@@ -250,7 +250,7 @@ export async function loadConfig(cwd: string): Promise<SlimRouterConfig> {
     const store = await loadModelsStore();
     const warnings = validateConfig(merged, store);
     if (warnings.length > 0) {
-      console.warn(`[SlimRouter] Config warnings:\n  ${warnings.join("\n  ")}`);
+      console.warn(`[ShiftRouter] Config warnings:\n  ${warnings.join("\n  ")}`);
     }
   } catch {
     // Validation failure should never block startup

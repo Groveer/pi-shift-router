@@ -1,5 +1,5 @@
 /**
- * Slim Router — Type definitions
+ * pi-shift-router — Type definitions
  *
  * Two-tier routing: Fast (programmer) ↔ Smart (CTO).
  * Fast: execution-heavy tasks, daily coding, following patterns.
@@ -51,7 +51,7 @@ export interface RoutingConfig {
 }
 
 /** Full SLIM Router configuration */
-export interface SlimRouterConfig {
+export interface ShiftRouterConfig {
   enabled: boolean;
   tiers: {
     fast: TierConfig;
@@ -62,7 +62,7 @@ export interface SlimRouterConfig {
 }
 
 /** Default configuration */
-export const DEFAULT_CONFIG: SlimRouterConfig = {
+export const DEFAULT_CONFIG: ShiftRouterConfig = {
   enabled: true,
   tiers: {
     fast: {

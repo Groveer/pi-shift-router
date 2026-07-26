@@ -1,12 +1,12 @@
 /**
- * Slim Router — Routing engine
+ * pi-shift-router — Routing engine
  *
  * Two-tier sliding window trend detection:
  *   - Upgrade (fast → smart): immediate
  *   - Downgrade (smart → fast): requires window majority
  */
 
-import type { SlimRouterConfig, Tier, WindowEntry, RouterState, JudgeResult } from "./types.js";
+import type { ShiftRouterConfig, Tier, WindowEntry, RouterState, JudgeResult } from "./types.js";
 import { TIERS } from "./types.js";
 import { findBestModelForTier, type ResolvedModel } from "./tier.js";
 
@@ -32,7 +32,7 @@ function shouldUpgrade(current: Tier, target: Tier): boolean {
 function analyzeDowngrade(
   window: WindowEntry[],
   currentTier: Tier,
-  config: SlimRouterConfig,
+  config: ShiftRouterConfig,
 ): { shouldDowngrade: boolean; targetTier: Tier | null } {
   // Can't downgrade further from fast
   if (currentTier !== "smart") return { shouldDowngrade: false, targetTier: null };
@@ -61,7 +61,7 @@ function analyzeDowngrade(
 export function processRoute(
   judgeResult: JudgeResult,
   state: RouterState,
-  config: SlimRouterConfig,
+  config: ShiftRouterConfig,
   modelRegistry: { find: (p: string, m: string) => unknown } | undefined,
 ): RouteDecision {
   const { tier: targetTier } = judgeResult;
@@ -130,7 +130,7 @@ export async function applyModelSwitch(
   try {
     const model = modelRegistry?.find?.(resolved.provider, resolved.modelId);
     if (!model) {
-      console.warn(`[SlimRouter] Model not found: ${resolved.provider}/${resolved.modelId}`);
+      console.warn(`[ShiftRouter] Model not found: ${resolved.provider}/${resolved.modelId}`);
       return false;
     }
     const ok = await setModel(model);
@@ -141,7 +141,7 @@ export async function applyModelSwitch(
     }
     return ok;
   } catch (err) {
-    console.warn(`[SlimRouter] Model switch failed: ${err}`);
+    console.warn(`[ShiftRouter] Model switch failed: ${err}`);
     return false;
   }
 }

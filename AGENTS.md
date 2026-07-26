@@ -1,6 +1,6 @@
-# Slim Router — Development Principles
+# pi-shift-router — Development Principles
 
-This document is the developer handbook for Slim Router. It defines the philosophy, code standards, architecture principles, and collaboration conventions that every contribution must follow.
+This document is the developer handbook for pi-shift-router. It defines the philosophy, code standards, architecture principles, and collaboration conventions that every contribution must follow.
 
 ## Philosophy
 

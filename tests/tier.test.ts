@@ -1,5 +1,5 @@
 /**
- * Slim Router — Tier management tests
+ * pi-shift-router — Tier management tests
  *
  * Covers tier.ts pure functions: model lookup, priority sort,
  * display formatting, validation. These are pure (no IO) so
@@ -14,7 +14,7 @@ import {
   tierLabel,
   formatTierDisplay,
 } from "../src/tier.js";
-import { DEFAULT_CONFIG, type SlimRouterConfig } from "../src/types.js";
+import { DEFAULT_CONFIG, type ShiftRouterConfig } from "../src/types.js";
 
 function makeRegistry(modelIds: Record<string, string[]>) {
   // modelIds: { provider: [model, model, ...] }
@@ -28,7 +28,7 @@ function makeRegistry(modelIds: Record<string, string[]>) {
 
 // ─── findBestModelForTier ──────────────────────────────────────────
 describe("findBestModelForTier", () => {
-  const cfg = (models: { provider: string; model: string; priority: number }[]): SlimRouterConfig => ({
+  const cfg = (models: { provider: string; model: string; priority: number }[]): ShiftRouterConfig => ({
     ...DEFAULT_CONFIG,
     tiers: {
       ...DEFAULT_CONFIG.tiers,

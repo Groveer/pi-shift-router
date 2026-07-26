@@ -1,5 +1,5 @@
 /**
- * Slim Router — Configuration tests
+ * pi-shift-router — Configuration tests
  *
  * Pure-function tests for validateConfig() and flattenModels().
  * File-IO functions (loadConfig, saveConfig) are not tested here —
@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from "vitest";
 import { validateConfig, flattenModels } from "../src/config.js";
-import { DEFAULT_CONFIG, type ModelsStore, type SlimRouterConfig, type StoredModel } from "../src/types.js";
+import { DEFAULT_CONFIG, type ModelsStore, type ShiftRouterConfig, type StoredModel } from "../src/types.js";
 
 function makeStore(): ModelsStore {
   return {
@@ -59,7 +59,7 @@ describe("flattenModels", () => {
 // ─── validateConfig ─────────────────────────────────────────────────
 describe("validateConfig", () => {
   it("returns no warnings when all referenced models exist", () => {
-    const cfg: SlimRouterConfig = {
+    const cfg: ShiftRouterConfig = {
       ...DEFAULT_CONFIG,
       tiers: {
         fast: {
@@ -80,7 +80,7 @@ describe("validateConfig", () => {
   });
 
   it("warns when a provider is not in the store", () => {
-    const cfg: SlimRouterConfig = {
+    const cfg: ShiftRouterConfig = {
       ...DEFAULT_CONFIG,
       tiers: {
         fast: {
@@ -97,7 +97,7 @@ describe("validateConfig", () => {
   });
 
   it("warns when a model is not in the provider", () => {
-    const cfg: SlimRouterConfig = {
+    const cfg: ShiftRouterConfig = {
       ...DEFAULT_CONFIG,
       tiers: {
         fast: {
@@ -114,7 +114,7 @@ describe("validateConfig", () => {
   });
 
   it("warns when same model appears in both tiers (routing becomes no-op)", () => {
-    const cfg: SlimRouterConfig = {
+    const cfg: ShiftRouterConfig = {
       ...DEFAULT_CONFIG,
       tiers: {
         fast: {
@@ -132,7 +132,7 @@ describe("validateConfig", () => {
   });
 
   it("accumulates multiple warnings, not just the first", () => {
-    const cfg: SlimRouterConfig = {
+    const cfg: ShiftRouterConfig = {
       ...DEFAULT_CONFIG,
       tiers: {
         fast: {

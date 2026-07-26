@@ -1,4 +1,4 @@
-# Slim Router
+# pi-shift-router
 
 > Routes every task to the right model — no more manual `/model` switching.
 
@@ -33,7 +33,7 @@
 
 ## What it does
 
-Slim Router classifies every turn by **mental mode** and routes between two models:
+pi-shift-router classifies every turn by **mental mode** and routes between two models:
 
 | | Tier | Emoji | When |
 |---|------|-------|------|
@@ -54,7 +54,7 @@ Pi-agent supports multiple providers, but every conversation is locked to a sing
 
 ## The Solution
 
-Slim Router hooks into pi-agent's turn cycle. Before every turn it asks an LLM Judge to classify the task, then switches the active model accordingly.
+pi-shift-router hooks into pi-agent's turn cycle. Before every turn it asks an LLM Judge to classify the task, then switches the active model accordingly.
 
 - **Two tiers** — Smart (🧠 CTO) and Fast (🦾 Programmer). One model per tier.
 - **LLM Judge** — Uses the Fast model to classify "execution" vs "judgment". Cost per call is a few thousand tokens at your Fast-tier pricing — a small fraction of a cent.
@@ -84,7 +84,7 @@ Not every task needs a CTO. But projects without CTO oversight don't sustain qua
 ### Install
 
 ```bash
-pi install npm:pi-slim-router
+pi install npm:pi-shift-router
 ```
 
 This registers the package in pi-agent's `settings.json` and downloads it into `~/.pi/agent/`. On the next pi-agent launch, the extension auto-loads. See [pi's packages docs](https://github.com/earendil-works/pi-coding-agent/blob/main/docs/packages.md) for the full install surface (npm, git, local path).
@@ -126,15 +126,15 @@ Toggle verbose logging to see the routing decisions:
 Output for every turn:
 
 ```
-[SlimRouter] ─── Turn start ───
-[SlimRouter] prompt: "design the auth architecture for..."
-[SlimRouter] current: [🦾 deepseek-v4-flash]
-[SlimRouter] Judge → deepseek-v4-flash (openai-completions)
-[SlimRouter] Judge raw: content='{"tier":"smart"}', reasoning="...", finish=stop
-[SlimRouter] Judge → smart
-[SlimRouter] judge: smart (llm), window=[] (0/0 fast)
-[SlimRouter] decision: upgrade → kimi/kimi-k3
-[SlimRouter] model switch ok
+[ShiftRouter] ─── Turn start ───
+[ShiftRouter] prompt: "design the auth architecture for..."
+[ShiftRouter] current: [🦾 deepseek-v4-flash]
+[ShiftRouter] Judge → deepseek-v4-flash (openai-completions)
+[ShiftRouter] Judge raw: content='{"tier":"smart"}', reasoning="...", finish=stop
+[ShiftRouter] Judge → smart
+[ShiftRouter] judge: smart (llm), window=[] (0/0 fast)
+[ShiftRouter] decision: upgrade → kimi/kimi-k3
+[ShiftRouter] model switch ok
 ```
 
 ---
@@ -177,7 +177,7 @@ flowchart TD
 
 ## The Judge
 
-Slim Router uses an LLM as the classifier. On every turn, before the agent starts, the router asks the **Fast tier's model** a single question:
+pi-shift-router uses an LLM as the classifier. On every turn, before the agent starts, the router asks the **Fast tier's model** a single question:
 
 > "Is this turn execution (`fast`) or judgment (`smart`)?"
 
@@ -205,7 +205,7 @@ Output shows the prompt preview, judge call details (URL, raw response), decisio
 
 ## How It Compares
 
-| | Slim Router | pi-router | pi-smart-router |
+| | pi-shift-router | pi-router | pi-smart-router |
 |---|---|---|---|
 | **What it does** | Routes by task complexity — execution vs judgment | Fails over between providers | ML-optimized inference pipeline |
 | **Judge** | LLM-as-judge (uses Fast tier's model, ~$0.0006/call) | Manual strategy config | ONNX + Aho-Corasick classifier |
@@ -215,7 +215,7 @@ Output shows the prompt preview, judge call details (URL, raw response), decisio
 | **Local inference** | No | No | Yes (LM Studio, Ollama) |
 | **Learning curve** | Low — pick 2 models, done | Low-Medium | High |
 
-**In short:** These are complementary, not competitive. Slim Router picks the right model **when both are working**; pi-router handles **provider failover**; pi-smart-router optimizes the **inference engine**. Different layers of the stack.
+**In short:** These are complementary, not competitive. pi-shift-router picks the right model **when both are working**; pi-router handles **provider failover**; pi-smart-router optimizes the **inference engine**. Different layers of the stack.
 
 ---
 
@@ -237,7 +237,7 @@ Output shows the prompt preview, judge call details (URL, raw response), decisio
 
 ## Configuration
 
-Two-layer config: user (`~/.pi/agent/pi-slim-router.json`) + project (`<cwd>/.pi/pi-slim-router.json`). Project wins on conflict.
+Two-layer config: user (`~/.pi/agent/pi-shift-router.json`) + project (`<cwd>/.pi/pi-shift-router.json`). Project wins on conflict.
 
 ```json
 {
@@ -330,8 +330,8 @@ One-way, no cycles. See [`SPEC.md`](SPEC.md) for the full design.
 ## Development
 
 ```bash
-git clone https://github.com/green-dalii/pi-slim-router.git
-cd pi-slim-router
+git clone https://github.com/green-dalii/pi-shift-router.git
+cd pi-shift-router
 npm install
 npm run build
 npm test
@@ -352,8 +352,8 @@ npm test
 ```bash
 # In pi-agent home:
 mkdir -p ~/.pi/agent/extensions
-ln -s /path/to/pi-slim-router/.pi/extensions/slim-router.ts \
-      ~/.pi/agent/extensions/slim-router.ts
+ln -s /path/to/pi-shift-router/.pi/extensions/shift-router.ts \
+      ~/.pi/agent/extensions/shift-router.ts
 ```
 
 ### Principles
@@ -435,7 +435,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) first. The development principles are in
 
 ## Author
 
-**Slim Router** is authored and maintained by [green-dalii](https://github.com/green-dalii).
+**pi-shift-router** is authored and maintained by [green-dalii](https://github.com/green-dalii).
 
 Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -443,4 +443,4 @@ Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[Apache 2.0](LICENSE) © 2026 green-dalii and Slim Router contributors.
+[Apache 2.0](LICENSE) © 2026 green-dalii and pi-shift-router contributors.

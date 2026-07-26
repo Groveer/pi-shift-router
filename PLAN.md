@@ -1,6 +1,6 @@
-# Slim Router — Development Phases
+# pi-shift-router — Development Phases
 
-This document records the development phases of Slim Router as a historical record. It complements `CHANGELOG.md` (per-release notes) and `SPEC.md` (current design contract).
+This document records the development phases of pi-shift-router as a historical record. It complements `CHANGELOG.md` (per-release notes) and `SPEC.md` (current design contract).
 
 ## Phase Status
 
@@ -17,7 +17,7 @@ This document records the development phases of Slim Router as a historical reco
 ## Current File Structure
 
 ```
-pi-slim-router/
+pi-shift-router/
 ├── package.json            # pi-package manifest
 ├── tsconfig.json           # TypeScript config (strict mode)
 ├── src/
@@ -54,7 +54,7 @@ One-way, no cycles. `tui/model-picker.ts` is only imported by `commands.ts` dyna
 | Module | Responsibility |
 |--------|---------------|
 | `index.ts` | Pi-agent lifecycle hooks: `session_start` (read-only init), `before_agent_start` (classify + route + apply). Status bar updates. |
-| `config.ts` | Read/write `pi-slim-router.json` (user + project layers, project wins). Resolve Fast tier endpoint. Validate models exist. |
+| `config.ts` | Read/write `pi-shift-router.json` (user + project layers, project wins). Resolve Fast tier endpoint. Validate models exist. |
 | `tier.ts` | Model lookup with priority. Display formatting. |
 | `judge.ts` | LLM classifier with JSON-mode constraints + 3-layer parse fallback. On failure, returns `{ tier: "fast", source: "fallback" }` (no keyword/heuristic fallback). |
 | `router.ts` | `processRoute()` — manual override check → immediate upgrade → window push → downgrade threshold check. `applyModelSwitch()` — call `pi.setModel()`. |
