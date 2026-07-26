@@ -1,71 +1,104 @@
-# Slim Router — Development Plan
+# Slim Router — Development Phases
+
+This document records the development phases of Slim Router as a historical record. It complements `CHANGELOG.md` (per-release notes) and `SPEC.md` (current design contract).
 
 ## Phase Status
 
 | Phase | Status |
 |-------|--------|
-| Phase 1 — Core Engine + Heuristic + Basic UI | ✅ Done |
-| Phase 2 — LLM Judge | ✅ Done |
-| Phase 3 — Interactive Config Wizard | ✅ Done |
-| Phase 4 — Polish & Publish | ⏳ Next |
+| Phase 1 — Core engine + heuristic judge + commands | ✅ Delivered (v0.1.0) |
+| Phase 2 — LLM Judge (direct API call) | ✅ Delivered (v0.1.0) |
+| Phase 3 — Open-source release prep (renamed, docs, license) | ✅ Delivered (v0.1.0) |
+| Phase 4 — UX polish: TUI model picker, wizard | ✅ Delivered (v0.2.0) |
+| Phase 5 — Two-tier redesign (CTO / Programmer model) | ✅ Delivered (v0.3.0) |
+| Phase 6 — Judge robustness (JSON mode, transient indicator, verbose log) | ✅ Delivered (v0.3.1) |
+| Phase 7 — Publish to npm | ⏳ Next |
 
-## File Structure
-
-### 文件结构
+## Current File Structure
 
 ```
 pi-slim-router/
 ├── package.json            # pi-package manifest
-├── tsconfig.json           # TypeScript config (IDE support)
+├── tsconfig.json           # TypeScript config (strict mode)
 ├── src/
-│   ├── index.ts            # Extension entry: events + command/tool registration
-│   ├── types.ts            # All TypeScript types
-│   ├── config.ts           # Config loader (read+parse+validate+cache)
-│   ├── tier.ts             # Tier manager (model lookup, auto-assign, priority)
-│   ├── judge.ts            # Task classifier (heuristic, Phase 2: +LLM)
-│   ├── router.ts           # Route engine: sliding window, upgrade/downgrade logic
-│   └── commands.ts         # /router, /route-force, /route status
-└── prompts/
-    └── judge.md            # Judge system prompt (Phase 2)
+│   ├── index.ts            # Entry: lifecycle hooks + command registration
+│   ├── types.ts            # All TypeScript types + DEFAULT_CONFIG
+│   ├── config.ts           # Config loader (read/parse/validate/cache, user+project layers)
+│   ├── tier.ts             # Model lookup, priority-based fallback, display
+│   ├── judge.ts            # LLM classifier (JSON mode) + fallback "hold position"
+│   ├── router.ts           # Routing engine: processRoute + sliding window
+│   ├── commands.ts         # /router, /route-force, /route status, wizard
+│   ├── tui/
+│   │   └── model-picker.ts # TUI component (mirrors pi's /model UX)
+│   └── prompts/
+│       └── judge.md        # Judge system prompt (loaded at module init)
+└── tests/
+    └── router.test.ts      # Routing engine unit tests (vitest)
 ```
 
-### 依赖关系
+## Module Dependency
 
 ```
 index.ts
-  ├── config.ts   →  types.ts
-  ├── router.ts   →  types.ts, config.ts, tier.ts, judge.ts
-  ├── tier.ts     →  types.ts, config.ts
-  ├── judge.ts    →  types.ts
-  └── commands.ts →  types.ts, config.ts, router.ts
+  ├── config.ts    →  types.ts
+  ├── router.ts    →  types.ts, tier.ts, judge.ts
+  ├── tier.ts      →  types.ts
+  ├── judge.ts     →  types.ts
+  └── commands.ts  →  types.ts, config.ts, tier.ts, router.ts
 ```
 
-### 各模块职责
+One-way, no cycles. `tui/model-picker.ts` is only imported by `commands.ts` dynamically (lazy load for the wizard).
 
-| 模块 | MVP 核心能力 | 后续扩展 |
-|------|-------------|---------|
-| **config.ts** | 读 `models-store.json` + 自动分配 Tier + 读/写 `pi-slim-router.json` | Schema 验证、远程配置 |
-| **tier.ts** | 查找本 Tier 可用模型、priority 降级 | 动态模型发现 |
-| **judge.ts** | 启发式分类（长度 + 关键词 + 多语言） | LLM Judge（fetch 直连） |
-| **router.ts** | 滑动窗口维护 + 升级/降级决策 + 调用 `pi.setModel()` | 持久化窗口状态 |
-| **commands.ts** | `/router`, `/route-force`, `/route status` | `/route-config` 交互向导 |
-| **index.ts** | `session_start` 初始化 + `before_agent_start` 注入路由 | 更丰富的生命周期管理 |
+## Module Responsibilities
 
-### 实现顺序
+| Module | Responsibility |
+|--------|---------------|
+| `index.ts` | Pi-agent lifecycle hooks: `session_start` (read-only init), `before_agent_start` (classify + route + apply). Status bar updates. |
+| `config.ts` | Read/write `pi-slim-router.json` (user + project layers, project wins). Resolve Fast tier endpoint. Validate models exist. |
+| `tier.ts` | Model lookup with priority. Display formatting. |
+| `judge.ts` | LLM classifier with JSON-mode constraints + 3-layer parse fallback. On failure, returns `{ tier: "fast", source: "fallback" }` (no keyword/heuristic fallback). |
+| `router.ts` | `processRoute()` — manual override check → immediate upgrade → window push → downgrade threshold check. `applyModelSwitch()` — call `pi.setModel()`. |
+| `commands.ts` | Slash commands and the configuration wizard. TUI model picker is loaded lazily for TUI mode. |
+| `tui/model-picker.ts` | Pure TUI component. Mirrors pi's `/model` UX: real-time filter + 10-item sliding viewport. |
+| `types.ts` | All interfaces + `DEFAULT_CONFIG`. Zero dependencies. |
 
-1. `types.ts` — 类型定义（无依赖）
-2. `config.ts` — 配置加载（只依赖 types.ts）
-3. `tier.ts` — Tier 管理（依赖 types.ts, config.ts）
-4. `judge.ts` — 启发式分类器（依赖 types.ts）
-5. `router.ts` — 路由引擎（依赖所有以上模块）
-6. `commands.ts` — 命令（依赖 types.ts, config.ts, router.ts）
-7. `index.ts` — 入口组装（依赖所有模块）
+## State Management
 
-### 状态管理
+`RouterState` lives in `types.ts` and is the only mutable state object:
 
-MVP 暂不持久化窗口状态到 session。每次 `session_start` 重置窗口。
-后续通过 `pi.appendEntry()` 实现持久化。
+```typescript
+interface RouterState {
+  currentTier: Tier;             // "fast" | "smart"
+  currentModelId: string | null;
+  currentProvider: string | null;
+  window: WindowEntry[];         // sliding window of recent judge results
+  manualOverride: {
+    active: boolean;
+    tier?: Tier;
+    modelId?: string;
+    provider?: string;
+  };
+}
+```
 
-### 测试策略
+Window state is **per-session**, not persisted. `session_start` resets the window. We deliberately avoid persisting window state across sessions because:
 
-MVP 阶段通过手动在 Pi 中加载使用来验证。后续添加单元测试。
+- Cross-session continuity is conceptually unclear (is the user's new request related to the old session's trend?)
+- Most conversations are short (1–10 turns), so window accumulation is fast
+- Persisting would couple window state to session file format and complicate extension lifecycle
+
+## Test Strategy
+
+- Core routing algorithm: covered by `tests/router.test.ts` (12 tests via vitest).
+- Judge: not unit-tested because it requires network. Smoke-tested manually via verbose logging.
+- TUI picker: not unit-tested because it requires pi's TUI runtime. Visually tested during wizard development.
+- Type checking: `npm run typecheck` runs `tsc --noEmit` in strict mode.
+
+## Future Direction
+
+Phase 7 (npm publish) is the next concrete milestone. Beyond that:
+
+- **Cache-aware routing**: when both tiers share a Provider, automatically raise the downgrade threshold to avoid cache thrashing.
+- **Multilingual Judge prompts**: validate `judge.md` works in Chinese, Japanese, Spanish, etc.
+- **Per-tier cost statistics**: show users how much they've saved per session.
+- **Streaming tool result classification**: classify tool calls (e.g., a long shell command output may indicate the user is debugging, not asking a question).

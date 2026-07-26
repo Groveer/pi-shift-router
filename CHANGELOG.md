@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-08-15
+
+### Added
+
+- **Comprehensive unit test suite** (47 new tests): tier management, config validation,
+  judge JSON parser. Total 59 tests covering the core algorithm and edge cases.
+- **GitHub Actions CI** on Node 24 (matrix extensible). Runs typecheck, test, build,
+  and a smoke check that `dist/` and `dist/prompts/judge.md` exist.
+- **Chinese README** (`README.zh-CN.md`) with bilingual language navigation.
+- **Troubleshooting section** in README: common Judge parse errors, missing models,
+  aggressive downgrade threshold.
+
+### Changed
+
+- **Documentation overhaul**: AGENTS.md, PLAN.md, SPEC.md, README.md all rewritten
+  in idiomatic English (was previously mixed Chinese/English). Adds TOC, Prerequisites,
+  Install, Demo, Roadmap, Acknowledgements.
+- **Install instructions** updated to `pi install npm:pi-slim-router` (the actual
+  pi package manager command), with link to pi's packages docs.
+- **Pricing claims removed**: README no longer cites specific per-call cost numbers
+  (varies by provider/time). Now uses qualitative "a few thousand tokens at your
+  Fast-tier pricing".
+- **Author attribution**: explicit credit to green-dalii in README.
+- **`@earendil-works/pi-tui` moved from devDependencies to dependencies** because
+  it is a runtime import (`src/tui/model-picker.ts`).
+
+### Removed
+
+- `typebox` from peerDependencies (was never used).
+- Outdated references to three-tier architecture and heuristic Judge from docs.
+
 ## [0.3.1] — 2026-08-12
 
 ### Added

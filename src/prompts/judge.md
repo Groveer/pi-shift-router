@@ -52,4 +52,4 @@ or setting direction before any execution happens.
 | "Review this PR for security issues" | `{"tier": "smart"}` |
 | "Should we use REST or GraphQL for this?" | `{"tier": "smart"}` |
 | "Add error handling to the API routes" | `{"tier": "fast"}` |
-| "ok" / "thanks" / "继续" | `{"tier": "fast"}` |
+| "ok" / "thanks" / "continue" / "继续" | `{"tier": "fast"}` |

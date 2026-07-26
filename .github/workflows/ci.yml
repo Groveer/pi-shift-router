@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test, typecheck, build
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node: [24]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  lint:
+    name: Lint (placeholder)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install
+        run: npm ci
+      # When a linter is added (prettier/eslint), wire it here.
+      - name: Smoke check (dist exists after build)
+        run: |
+          npm run build
+          test -f dist/index.js || (echo "dist/index.js missing" && exit 1)
+          test -d dist/prompts || (echo "dist/prompts missing" && exit 1)
+          test -f dist/prompts/judge.md || (echo "judge.md not copied" && exit 1)

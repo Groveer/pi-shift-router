@@ -43,8 +43,8 @@ function judgeApiUrl(baseUrl: string, apiType: string): string {
   return `${base}/chat/completions`;
 }
 
-/** Try to extract a tier answer from text (JSON or keyword). */
-function extractTier(text: string): Tier | null {
+/** Try to extract a tier answer from text (JSON or keyword). Exported for unit tests. */
+export function extractTier(text: string): Tier | null {
   if (!text) return null;
   const trimmed = text.trim();
 

@@ -51,7 +51,6 @@ This project is committed to providing a welcoming, inclusive environment for ev
 git clone https://github.com/green-dalii/pi-slim-router.git
 cd pi-slim-router
 npm install
-npm run typecheck
 ```
 
 ### Type Checking
@@ -62,16 +61,26 @@ npm run typecheck
 
 This project is pure TypeScript with strict mode enabled. Ensure your changes pass type checking before submitting.
 
+### Tests
+
+```bash
+npm test          # one-shot
+npm run test:watch  # watch mode
+```
+
+The routing engine has unit tests in `tests/router.test.ts`. Add tests when changing the core algorithm in `src/router.ts`.
+
 ## Architecture Notes
 
 ```
 src/
 ├── index.ts       # Entry point: pi-agent lifecycle hooks
-├── router.ts      # Core routing engine
-├── judge.ts       # Two-stage classifier (LLM + heuristic)
+├── router.ts      # Core routing engine (sliding window + processRoute)
+├── judge.ts       # LLM classifier (JSON mode) with "hold position" fallback
 ├── tier.ts        # Tier validation and model lookup
-├── config.ts      # Configuration persistence
-├── commands.ts    # Slash command handlers
+├── config.ts      # Configuration persistence (user + project layers)
+├── commands.ts    # Slash command handlers and the config wizard
+├── tui/           # TUI components (model picker)
 └── types.ts       # All type definitions and DEFAULT_CONFIG
 ```
 

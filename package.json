@@ -1,7 +1,7 @@
 {
   "name": "pi-slim-router",
-  "version": "0.3.1",
-  "description": "Task-complexity router for pi-agent — automatically matches the right model to every task",
+  "version": "0.4.0",
+  "description": "Two-tier model router for pi-agent — automatic execution/judgment routing with LLM Judge. Pairs a fast everyday model with a strong model for planning and review.",
   "keywords": [
     "pi-package",
     "pi-extension",
@@ -34,11 +34,12 @@
     "minPiVersion": "0.80.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=24.0.0"
   },
   "files": [
     "dist",
     "README.md",
+    "README.zh-CN.md",
     "LICENSE",
     "CHANGELOG.md",
     "package.json"
@@ -52,11 +53,12 @@
     "prepublishOnly": "npm run test && npm run build"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": ">=0.80.0",
-    "typebox": ">=0.30.0"
+    "@earendil-works/pi-coding-agent": ">=0.80.0"
+  },
+  "dependencies": {
+    "@earendil-works/pi-tui": "^0.81.1"
   },
   "devDependencies": {
-    "@earendil-works/pi-tui": "^0.81.1",
     "@types/node": "^22.0.0",
     "typescript": "^5.8.0",
     "vitest": "^2.1.0"
