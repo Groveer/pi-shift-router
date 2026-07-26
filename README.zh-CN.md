@@ -2,9 +2,11 @@
 
 > 让每一轮任务都跑在最合适的模型上 —— 不再需要手动 `/model` 切换。
 
+[![npm](https://img.shields.io/npm/v/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
 [![Pi Agent](https://img.shields.io/badge/pi--agent-extension-purple)](https://github.com/earendil-works/pi-coding-agent)
+[![CI](https://github.com/green-dalii/pi-shift-router/actions/workflows/ci.yml/badge.svg)](https://github.com/green-dalii/pi-shift-router/actions)
 
 [English](README.md) | [简体中文]
 
@@ -46,8 +48,6 @@ pi install npm:pi-shift-router
 ```
 
 该命令把包注册到 pi-agent 的 `~/.pi/agent/settings.json` 并下载到 `~/.pi/agent/`。下次启动 pi-agent 时会自动加载扩展。详见 [pi 包管理文档](https://github.com/earendil-works/pi-coding-agent/blob/main/docs/packages.md)。
-
-> **状态**：v0.4.0 发布到 npm 后该命令才可用。在那之前，请通过本地克隆安装（见 [开发](#开发)）。
 
 ```bash
 # 启动配置向导（在 pi-agent 中）

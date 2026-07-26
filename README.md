@@ -2,10 +2,12 @@
 
 > Routes every task to the right model — no more manual `/model` switching.
 
+[![npm](https://img.shields.io/npm/v/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
 [![Node](https://img.shields.io/badge/node-%E2%89%A524-green)](https://nodejs.org)
 [![Pi Agent](https://img.shields.io/badge/pi--agent-extension-purple)](https://github.com/earendil-works/pi-coding-agent)
+[![CI](https://github.com/green-dalii/pi-shift-router/actions/workflows/ci.yml/badge.svg)](https://github.com/green-dalii/pi-shift-router/actions)
 
 [English] | [简体中文](README.zh-CN.md)
 
@@ -88,8 +90,6 @@ pi install npm:pi-shift-router
 ```
 
 This registers the package in pi-agent's `settings.json` and downloads it into `~/.pi/agent/`. On the next pi-agent launch, the extension auto-loads. See [pi's packages docs](https://github.com/earendil-works/pi-coding-agent/blob/main/docs/packages.md) for the full install surface (npm, git, local path).
-
-> **Status:** this command works once v0.4.0 is published to npm. Until then, install from a local clone (see [Development](#development)).
 
 ### Configure
 
