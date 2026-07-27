@@ -180,8 +180,9 @@ async function routeConfigWizard(
     if (ctx.mode === "tui") {
       const { createModelPicker } = await import("./tui/model-picker.js");
       return await ctx.ui.custom<{ provider: string; model: string; priority: number } | null>(
-        (_tui, _theme, _keybindings, done) => {
+        (_tui, theme, _keybindings, done) => {
           return createModelPicker({
+            theme,
             items: models.map((m) => ({
               provider: m.provider,
               id: m.id,

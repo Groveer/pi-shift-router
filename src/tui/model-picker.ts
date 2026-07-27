@@ -1,15 +1,21 @@
 /**
- * Model picker: TUI component matching pi's native `/model` UX.
+ * pi-shift-router — Model picker TUI component.
  *
- * Pattern follows pi's ModelSelectorComponent:
+ * Mirrors pi's native `/model` selector UX:
  *   - Input takes focus, receives all non-navigation keys
  *   - Component intercepts up/down/pageUp/pageDown/enter/esc in handleInput
  *   - listContainer holds exactly maxVisible Text rows; updateList() redraws
  *   - fuzzyFilter from pi-tui for real-time incremental filtering
+ *
+ * Note: We do NOT import `getSelectListTheme` from pi-coding-agent because the
+ * runtime install path (`pi install npm:...`) places this package in an isolated
+ * npm subtree where peer-only packages are not auto-installed. Instead, the
+ * theme is passed in by the caller — pi's `ctx.ui.custom()` factory injects it
+ * as the second argument.
  */
 import { Container, Input, Text, Spacer, fuzzyFilter, getKeybindings } from "@earendil-works/pi-tui";
 import type { Focusable } from "@earendil-works/pi-tui";
-import { getSelectListTheme } from "@earendil-works/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 
 export interface PickerModelItem {
 	provider: string;
@@ -22,14 +28,34 @@ export interface PickerResult {
 	model: string;
 }
 
-const MAX_VISIBLE = 10;
-
 export interface PickerOptions {
 	items: PickerModelItem[];
 	selectedKey: string | null;
 	tierLabel: string;
+	theme: Theme;
 	onSelect: (result: PickerResult) => void;
 	onCancel: () => void;
+}
+
+const MAX_VISIBLE = 10;
+
+/** Local replica of pi's SelectListTheme — derived from the Theme passed in. */
+interface SelectListTheme {
+	selectedPrefix: (text: string) => string;
+	selectedText: (text: string) => string;
+	description: (text: string) => string;
+	scrollInfo: (text: string) => string;
+	noMatch: (text: string) => string;
+}
+
+function getSelectListTheme(theme: Theme): SelectListTheme {
+	return {
+		selectedPrefix: (text) => theme.fg("accent", text),
+		selectedText: (text) => theme.fg("accent", text),
+		description: (text) => theme.fg("muted", text),
+		scrollInfo: (text) => theme.fg("muted", text),
+		noMatch: (text) => theme.fg("muted", text),
+	};
 }
 
 function searchText(item: PickerModelItem): string {
@@ -44,6 +70,7 @@ export class ModelPickerComponent extends Container implements Focusable {
 	private selectedIndex = 0;
 	private onSelect: (r: PickerResult) => void;
 	private onCancel: () => void;
+	private theme: SelectListTheme;
 
 	// Focusable: route focus to searchInput
 	private _focused = false;
@@ -56,11 +83,10 @@ export class ModelPickerComponent extends Container implements Focusable {
 		this.allItems = opts.items;
 		this.onSelect = opts.onSelect;
 		this.onCancel = opts.onCancel;
-
-		const theme = getSelectListTheme();
+		this.theme = getSelectListTheme(opts.theme);
 
 		// Header
-		this.addChild(new Text(theme.selectedText(`Select model for ${opts.tierLabel}`), 0, 0));
+		this.addChild(new Text(this.theme.selectedText(`Select model for ${opts.tierLabel}`), 0, 0));
 		this.addChild(new Spacer(1));
 
 		// Search input
@@ -68,13 +94,13 @@ export class ModelPickerComponent extends Container implements Focusable {
 		this.addChild(this.searchInput);
 		this.addChild(new Spacer(1));
 
-		// List container (will be populated by updateList)
+		// List container (populated by updateList)
 		this.listContainer = new Container();
 		this.addChild(this.listContainer);
 
 		// Footer hint
 		this.addChild(new Spacer(1));
-		this.addChild(new Text(theme.description("Type to filter · ↑↓ navigate · Enter select · Esc cancel"), 0, 0));
+		this.addChild(new Text(this.theme.description("Type to filter · ↑↓ navigate · Enter select · Esc cancel"), 0, 0));
 
 		// Initial population
 		this.filterModels("");
@@ -101,11 +127,10 @@ export class ModelPickerComponent extends Container implements Focusable {
 
 	private updateList(): void {
 		this.listContainer.clear();
-		const theme = getSelectListTheme();
 
 		const total = this.filteredItems.length;
 		if (total === 0) {
-			this.listContainer.addChild(new Text(theme.noMatch("  No matching models"), 0, 0));
+			this.listContainer.addChild(new Text(this.theme.noMatch("  No matching models"), 0, 0));
 			return;
 		}
 
@@ -116,15 +141,15 @@ export class ModelPickerComponent extends Container implements Focusable {
 		for (let i = startIndex; i < endIndex; i++) {
 			const m = this.filteredItems[i]!;
 			const isSelected = i === this.selectedIndex;
-			const arrow = isSelected ? theme.selectedPrefix("→ ") : "  ";
-			const name = isSelected ? theme.selectedText(m.id) : m.id;
-			const badge = theme.description(`[${m.provider}] $${m.cost.input.toFixed(3)}/M`);
+			const arrow = isSelected ? this.theme.selectedPrefix("→ ") : "  ";
+			const name = isSelected ? this.theme.selectedText(m.id) : m.id;
+			const badge = this.theme.description(`[${m.provider}] $${m.cost.input.toFixed(3)}/M`);
 			this.listContainer.addChild(new Text(`${arrow}${name} ${badge}`, 0, 0));
 		}
 
 		// Scroll indicator
 		if (startIndex > 0 || endIndex < total) {
-			this.listContainer.addChild(new Text(theme.scrollInfo(`  (${this.selectedIndex + 1}/${total})`), 0, 0));
+			this.listContainer.addChild(new Text(this.theme.scrollInfo(`  (${this.selectedIndex + 1}/${total})`), 0, 0));
 		}
 	}
 

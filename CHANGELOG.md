@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > (0.1.0 – 0.3.1) were developed under the `pi-slim-router` working name and never
 > published to npm. The plugin was first published to npm as `pi-shift-router` at v0.4.0.
 
+## [0.4.1] — 2026-08-16
+
+### Fixed
+
+- **`/router config` failed with `Cannot find package '@earendil-works/pi-coding-agent'`**
+  when installed via `pi install npm:pi-shift-router` (the canonical install path).
+  Three coupled mistakes caused the runtime failure:
+  1. `@earendil-works/pi-coding-agent` was declared as `peerDependencies` (npm does
+     not auto-install peer deps in pi's isolated extensions subtree).
+  2. `src/tui/model-picker.ts` used a value-import for `getSelectListTheme`, so
+     TypeScript compiled it into the runtime JS.
+  3. Local development masked the bug because the `.pi/extensions/` bridge loads
+     extensions through pi-agent's own loader, which has access to its host deps.
+  Fix:
+  - Move `@earendil-works/pi-coding-agent` from `peerDependencies` to `devDependencies`
+    (runtime does not need it; only types do via `import type`).
+  - Switch all pi-coding-agent imports to `import type`.
+  - Reimplement `getSelectListTheme` locally using the `Theme` instance that
+    `ctx.ui.custom()` injects as a factory parameter.
+
+### Added
+
+- **`pack:check` script** (`scripts/pack-check.mjs`) — a publish-state validator
+  that catches the same class of bug above automatically. Checks: host packages
+  are not in `dependencies`, compiled output contains no runtime value-imports of
+  host packages, required files (README / LICENSE / CHANGELOG / dist/index.js /
+  dist/prompts/judge.md) exist and are matched by `files`, `pi.extensions` paths
+  resolve on disk, `engines.node` is declared. Wired into `prepublishOnly` and CI.
+
 ## [0.4.0] — 2026-08-15
 
 ### Added

@@ -36,6 +36,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Pack-check (publish-state validation)
+        run: npm run pack:check
+
   lint:
     name: Lint (placeholder)
     runs-on: ubuntu-latest
