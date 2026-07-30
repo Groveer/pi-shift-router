@@ -68,9 +68,6 @@ const DIST = join(ROOT, "dist");
 const valueImportPatterns = [
 	/^import\s+\{[^}]+\}\s+from\s+["']@earendil-works\/pi-coding-agent["']/m,
 ];
-const typeImportPatterns = [
-	/^import\s+type\s+\{[^}]+\}\s+from\s+["']@earendil-works\/pi-coding-agent["']/m,
-];
 
 function* walk(dir) {
 	for (const e of readdirSync(dir, { withFileTypes: true })) {

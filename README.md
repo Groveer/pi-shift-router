@@ -349,11 +349,42 @@ npm test
 
 ### Local install (for testing in pi)
 
+After v0.4.0 the canonical install is the npm package. For local dev iteration against your checkout, use pi's path install:
+
 ```bash
-# In pi-agent home:
-mkdir -p ~/.pi/agent/extensions
-ln -s /path/to/pi-shift-router/.pi/extensions/shift-router.ts \
-      ~/.pi/agent/extensions/shift-router.ts
+# Remove any globally-installed version first (avoid duplicate plugins)
+pi remove pi-shift-router
+
+# Install from local path — pi runs npm install against this folder
+pi install /Users/greener/project/slimrouter
+```
+
+After changing `src/`, rebuild and restart pi-agent:
+
+```bash
+npm run build
+# restart pi-agent
+```
+
+### Releasing a new version
+
+```bash
+# 1. Bump version
+npm version patch  # or minor / major
+
+# 2. Validate before publish (test + build + pack:check)
+npm run prepublishOnly
+
+# 3. Publish (bypass 2FA token configured in ~/.npmrc)
+npm publish --registry=https://registry.npmjs.org/
+
+# 4. Update your local install
+pi remove pi-shift-router
+pi install npm:pi-shift-router
+
+# 5. Tag the release
+git tag -a v$(node -p "require('./package.json').version") -m "..."
+git push origin --tags
 ```
 
 ### Principles
