@@ -8,7 +8,7 @@
  */
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import type { ShiftRouterConfig, RouterState, Tier, TierEntry } from "./types.js";
+import type { ShiftRouterConfig, RouterState, Tier, TierEntry, ModelRef } from "./types.js";
 import { TIERS } from "./types.js";
 import {
   isValidTier,
@@ -103,6 +103,28 @@ async function routeConfigWizard(
 
   async function editTier(tier: Tier): Promise<void> {
     const cfg = config.tiers[tier];
+
+    // TUI mode: use the chain editor with add/remove/reorder
+    if (ctx.mode === "tui") {
+      const { createChainEditor } = await import("./tui/fallback-chain-editor.js");
+      const updated = await ctx.ui.custom<ModelRef[] | null>(
+        (_tui, theme, _keybindings, done) => {
+          return createChainEditor({
+            items: cfg.models,
+            allModels,
+            tier,
+            tierLabel: cfg.label,
+            theme,
+            onDone: (items) => done(items),
+            onCancel: () => done(null),
+          });
+        },
+      );
+      if (updated) cfg.models = updated;
+      return;
+    }
+
+    // Non-TUI fallback: single-model pick via provider grouping
     const selectedKey = cfg.models[0]
       ? `${cfg.models[0].provider}/${cfg.models[0].model}`
       : null;
