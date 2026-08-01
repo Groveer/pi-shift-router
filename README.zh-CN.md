@@ -197,13 +197,15 @@ Edit Fast models
   #2  kimi/kimi-flash
   #3  openai/gpt-4o-mini
 
-↑↓ select · a add · x remove · K/J move · d done · Esc cancel
+Press: ↑↓ select · A add · X remove · J/K move · D done · Esc cancel
 ```
 
-- `a` 打开 type-to-filter picker（与 pi 原生 `/model` 一致）
-- `x` 删除当前行
-- `K` / `J` 与上一行 / 下一行交换（vim 风格）
-- `d` 保存退出，`Esc` 取消
+- `A` 打开 type-to-filter picker（与 pi 原生 `/model` 一致）
+- `X` 删除当前行
+- `J` / `K` 与下一行 / 上一行交换（vim 风格）
+- `D` 保存退出，`Esc` 取消
+
+字母键不区分大小写——图例里用大写是 TUI 惯例，但 `j` 和 `J` 都生效。`J`/`K` 是普通按键（不需要 Shift），保证跨终端可用。
 
 非 TUI 模式仍然沿用之前按 Provider 分组的单模型选择器。
 

@@ -54,6 +54,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stakes/reversibility, ambiguity) with explicit conflict-resolution
   priority. This is implemented at the prompt level (LLM-as-classifier),
   not via regex/keyword matching, to keep the LLM as the sole classifier.
+- **Chain editor reorder hotkey silently failed on many terminals.**
+  The first attempt matched `data === "K"` (uppercase Shift+k), which only
+  worked when the terminal emitted Shift+k as a literal `"K"`. The second
+  attempt used the ANSI Shift+↑/↓ escape sequences (`\x1b[1;2A` /
+  `\x1b[1;2B`), but macOS Terminal.app and several other terminals send
+  the *same* sequence for Shift+↑ and plain ↑, so reorder still did not
+  fire. Root cause: any modifier+arrow chord (Shift/Alt/Ctrl+arrow) is
+  not portable across terminals. **Final fix: reorder now uses plain
+  `J` / `K` keys** (vim-style: `k` = up, `j` = down) — no Shift needed,
+  identical on every terminal, case-insensitive (`j`/`J`/`k`/`K` all
+  work). Shift+↑↓ escape sequences are still accepted as a best-effort
+  fallback where the terminal supports them. The J/K check runs before
+  navigation (pi-tui's vim-mode may also bind j/k to select-up/down).
+  Single-letter keys display uppercase (TUI convention) while remaining
+  case-insensitive at the input layer.
 - README's **Local install** section rewritten to avoid the
   `.pi/extensions/<name>.ts` symlink pattern — the original guidance caused
   duplicate plugin instances (`router:1` + `router:2`) when developing from a

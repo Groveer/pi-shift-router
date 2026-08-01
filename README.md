@@ -290,13 +290,15 @@ Edit Fast models
   #2  kimi/kimi-flash
   #3  openai/gpt-4o-mini
 
-↑↓ select · a add · x remove · K/J move · d done · Esc cancel
+Press: ↑↓ select · A add · X remove · J/K move · D done · Esc cancel
 ```
 
-- `a` opens a type-to-filter picker (same UX as pi's native `/model`)
-- `x` removes the current row
-- `K` / `J` swap the current row with the one above / below (vim-style)
-- `d` saves and exits, `Esc` cancels
+- `A` opens a type-to-filter picker (same UX as pi's native `/model`)
+- `X` removes the current row
+- `J` / `K` swap the current row with the one below / above (vim-style)
+- `D` saves and exits, `Esc` cancels
+
+Letter keys are case-insensitive — the legend shows them uppercase (TUI convention) but `j` and `J` both work. `J`/`K` are plain keys (no Shift needed) for terminal portability.
 
 Non-TUI mode falls back to the previous provider-grouped single-model picker.
 

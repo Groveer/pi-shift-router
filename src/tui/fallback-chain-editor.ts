@@ -15,7 +15,36 @@ import type { ModelRef, StoredModel, Tier } from "../types.js";
 
 const MAX_VISIBLE = 10;
 
-// ─── Helpers (pure, exported for testing) ──────────────────────────
+// ─── Key matching helpers (pure, exported for testing) ─────────────
+
+/** Case-insensitive single-character key match. Accepts `a` or `A` for key `"a"`. */
+export function isSingleKey(data: string, key: string): boolean {
+	return data.length === 1 && data.toLowerCase() === key.toLowerCase();
+}
+
+/** Shift+Up — ANSI: ESC [ 1 ; 2 A (best-effort, some terminals don't send it). */
+export function isReorderUpKey(data: string): boolean {
+	return data === "\x1b[1;2A";
+}
+
+/** Shift+Down — ANSI: ESC [ 1 ; 2 B (best-effort, some terminals don't send it). */
+export function isReorderDownKey(data: string): boolean {
+	return data === "\x1b[1;2B";
+}
+
+/**
+ * Decide reorder direction from a key press.
+ * Primary: plain `k` (up) / `j` (down) — portable across all terminals.
+ * Best-effort: Shift+↑ / Shift+↓ ANSI escape sequences where supported.
+ * Returns null when the key is not a reorder key.
+ */
+export function reorderDirection(data: string): "up" | "down" | null {
+	if (isSingleKey(data, "k") || isReorderUpKey(data)) return "up";
+	if (isSingleKey(data, "j") || isReorderDownKey(data)) return "down";
+	return null;
+}
+
+// ─── Pure state transitions (exported for testing) ─────────────────
 
 export function chainEditorAdd(items: ModelRef[], ref: ModelRef): ModelRef[] {
 	return [...items, ref];
@@ -159,7 +188,7 @@ export class ChainEditorComponent extends Container implements Focusable {
 
 		this.addChild(new Spacer(1));
 		this.addChild(new Text(
-			this.theme.description("↑↓ select · a add · x remove · K/J move · d done · Esc cancel"),
+			this.theme.description("Press: ↑↓ select · A add · X remove · J/K move · D done · Esc cancel"),
 			0, 0,
 		));
 	}
@@ -249,6 +278,13 @@ export class ChainEditorComponent extends Container implements Focusable {
 	private handleListInput(data: string): void {
 		const kb = getKeybindings();
 
+		// Reorder (J/K plain keys FIRST — before navigation, because pi-tui's
+		// tui.select.up/down may also bind j/k in vim keybinding mode).
+		// `k` = move up, `j` = move down (vim-style, case-insensitive).
+		const reorder = reorderDirection(data);
+		if (reorder === "up") { this.moveCurrentUp(); return; }
+		if (reorder === "down") { this.moveCurrentDown(); return; }
+
 		// Cancel
 		if (kb.matches(data, "tui.select.cancel")) {
 			this.onCancel();
@@ -256,24 +292,18 @@ export class ChainEditorComponent extends Container implements Focusable {
 		}
 
 		// Done (save)
-		if (kb.matches(data, "tui.select.confirm") || data === "d") {
+		if (kb.matches(data, "tui.select.confirm") || isSingleKey(data, "d")) {
 			this.onDone(reassignPriorities(this.items));
 			return;
 		}
 
-		// Navigation
+		// Navigation (cursor — arrows only; j/k are taken by reorder)
 		if (kb.matches(data, "tui.select.up")) { this.cursorUp(); return; }
 		if (kb.matches(data, "tui.select.down")) { this.cursorDown(); return; }
 
-		// Add (enter picker mode)
-		if (data === "a") { this.setMode({ kind: "picker" }); return; }
-
-		// Remove current
-		if (data === "x" || data === "X") { this.removeCurrent(); return; }
-
-		// Reorder (K / J uppercase = Shift+k / Shift+j)
-		if (data === "K") { this.moveCurrentUp(); return; }
-		if (data === "J") { this.moveCurrentDown(); return; }
+		// Add / Remove (case-insensitive single keys)
+		if (isSingleKey(data, "a")) { this.setMode({ kind: "picker" }); return; }
+		if (isSingleKey(data, "x")) { this.removeCurrent(); return; }
 
 		// Unhandled — consume nothing
 	}
@@ -281,8 +311,8 @@ export class ChainEditorComponent extends Container implements Focusable {
 	private handlePickerInput(data: string): void {
 		const kb = getKeybindings();
 
-		// Cancel picker → back to list
-		if (kb.matches(data, "tui.select.cancel") || data === "d") {
+		// Cancel picker → back to list (Esc only; `d` is for list-mode done)
+		if (kb.matches(data, "tui.select.cancel")) {
 			this.setMode({ kind: "list" });
 			return;
 		}

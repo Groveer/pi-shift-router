@@ -13,6 +13,8 @@ import {
   chainEditorMoveUp,
   chainEditorMoveDown,
   reassignPriorities,
+  isSingleKey,
+  reorderDirection,
 } from "../src/tui/fallback-chain-editor.js";
 import type { ModelRef } from "../src/types.js";
 
@@ -199,5 +201,93 @@ describe("reassignPriorities", () => {
     expect(updated).not.toBe(chain);
     // Original unchanged
     expect(chain[0]!.priority).toBe(1); // was already 1, but generally...
+  });
+});
+
+// ─── isSingleKey (case-insensitive single-character match) ─────────
+
+describe("isSingleKey", () => {
+  it("matches lowercase key", () => {
+    expect(isSingleKey("a", "a")).toBe(true);
+  });
+
+  it("matches uppercase key (caps lock on)", () => {
+    expect(isSingleKey("A", "a")).toBe(true);
+  });
+
+  it("is symmetric: uppercase reference, lowercase input", () => {
+    expect(isSingleKey("d", "D")).toBe(true);
+    expect(isSingleKey("D", "d")).toBe(true);
+  });
+
+  it("rejects different letters", () => {
+    expect(isSingleKey("x", "a")).toBe(false);
+    expect(isSingleKey("a", "x")).toBe(false);
+  });
+
+  it("rejects arrow escape sequences", () => {
+    expect(isSingleKey("\x1b[A", "a")).toBe(false);
+    expect(isSingleKey("\x1b[1;2A", "a")).toBe(false);
+  });
+
+  it("rejects empty string", () => {
+    expect(isSingleKey("", "a")).toBe(false);
+  });
+
+  it("rejects multi-character strings (longer than 1 char)", () => {
+    expect(isSingleKey("ab", "a")).toBe(false);
+    expect(isSingleKey("aa", "a")).toBe(false);
+  });
+});
+
+// ─── reorderDirection (J/K plain keys + best-effort Shift+Arrow) ───
+
+describe("reorderDirection", () => {
+  it("maps k (lowercase) to up", () => {
+    expect(reorderDirection("k")).toBe("up");
+  });
+
+  it("maps K (uppercase / caps lock) to up", () => {
+    expect(reorderDirection("K")).toBe("up");
+  });
+
+  it("maps j (lowercase) to down", () => {
+    expect(reorderDirection("j")).toBe("down");
+  });
+
+  it("maps J (uppercase / caps lock) to down", () => {
+    expect(reorderDirection("J")).toBe("down");
+  });
+
+  it("accepts Shift+Up ANSI escape as best-effort", () => {
+    expect(reorderDirection("\x1b[1;2A")).toBe("up");
+  });
+
+  it("accepts Shift+Down ANSI escape as best-effort", () => {
+    expect(reorderDirection("\x1b[1;2B")).toBe("down");
+  });
+
+  it("returns null for plain arrows (navigation, not reorder)", () => {
+    expect(reorderDirection("\x1b[A")).toBeNull(); // plain Up
+    expect(reorderDirection("\x1b[B")).toBeNull(); // plain Down
+  });
+
+  it("returns null for other letter keys (a/x/d are add/remove/done)", () => {
+    expect(reorderDirection("a")).toBeNull();
+    expect(reorderDirection("A")).toBeNull();
+    expect(reorderDirection("x")).toBeNull();
+    expect(reorderDirection("X")).toBeNull();
+    expect(reorderDirection("d")).toBeNull();
+    expect(reorderDirection("D")).toBeNull();
+  });
+
+  it("returns null for modifier escape sequences (Ctrl+↑ etc.)", () => {
+    expect(reorderDirection("\x1b[1;5A")).toBeNull(); // Ctrl+Up
+    expect(reorderDirection("\x1b[1;5B")).toBeNull(); // Ctrl+Down
+  });
+
+  it("returns null for empty / multi-char input", () => {
+    expect(reorderDirection("")).toBeNull();
+    expect(reorderDirection("jk")).toBeNull();
   });
 });
