@@ -350,7 +350,72 @@ For advanced users debugging routing decisions:
 | Judge JSON-mode enforcement | ✅ | v0.3.1 | API-level hard constraints |
 | Transient judging indicator | ✅ | v0.3.1 | Status bar `⚖ judging…` |
 | Verbose logging | ✅ | v0.3.1 | `ux.routerLogVerbose` |
-| **Publish to npm** | ⏳ Next | — | Final QA + release |
+| **Publish to npm** | ✅ | v0.4.0 | First release |
+| Runtime `Cannot find package` fix + `pack:check` guard | ✅ | v0.4.1 | npm install path |
+| Multi-model fallback chain editor (TUI) | ✅ | v0.5.0 | Hotkey add/remove/reorder |
+| Judge respects user explicit intent | ✅ | v0.5.0 | 4-signal prompt |
+| **Runtime failover (exponential backoff)** | ⏳ In progress | v0.6.0 | See §8.5 |
+
+## 8.5 Runtime Failover (Exponential Backoff)
+
+**Problem**: when the active model returns a rate-limit / server error (429,
+5xx), pi-agent retries internally (provider layer ×3, then agent layer ×3)
+and eventually fails with `Error: Retry failed after 3 attempts`. The router
+currently has no hook into this, so the user sees the error instead of a
+fallback model taking over.
+
+**Design goal**: use pi's own retry machinery for the primary model, then
+have the router take over with the next model in the tier's chain when pi's
+retries are exhausted.
+
+### 8.5.1 pi-agent retry layering (verified against source)
+
+| Layer | Trigger | Behavior | Router intervention |
+|-------|---------|----------|---------------------|
+| L1 provider | `retryProviderRequest()` sees 429/5xx | exponential backoff, default 3× | None — `after_provider_response` fires only on success (429 is caught and retried internally) |
+| L2 agent | `agent_end` → `_prepareRetry()` | backoff → `agent.continue()` using current `this._state.model` | `agent_end` hook can `pi.setModel(fallback)` → next continue uses it |
+| L3 next turn | user sends new message | `before_agent_start` runs | Cooldown-aware model selection |
+
+### 8.5.2 Core mechanism
+
+1. **`agent_end` hook**: inspect the last assistant message (`errorMessage`,
+   `stopReason === "error"`). If it matches a failover signature (429, 5xx,
+   rate limit / quota exhausted), mark the current model into cooldown and
+   immediately `pi.setModel(next available model in the same tier)`.
+   pi's pending `agent.continue()` then retries the turn with the fallback
+   model — **immediate failover within the same turn**. No cross-tier fallback.
+2. **Cooldown state**: `RouterState.modelCooldowns: Map<string, { until: number; attempts: number }>`
+   keyed by `provider/model`. `until` grows exponentially:
+   `backoffMs = BASE * 2^attempts` where `BASE = 60_000` (1 min).
+   Each new failure of the same model doubles the wait (1m, 2m, 4m, …,
+   capped at 30 min).
+3. **`before_agent_start` cooldown-aware selection**: `findBestModelForTier()`
+   accepts an `isCooldown(key)` predicate and skips models currently in
+   cooldown, picking the next healthy model in the chain.
+4. **Recovery**: `after_provider_response` with `status` 2xx clears the
+   cooldown for the responding model (it works again). Cooldowns are
+   session-scoped; a session restart resets all.
+
+### 8.5.3 Failover signatures
+
+- **Trigger cooldown**: HTTP 429, 5xx (500/502/503/504); body containing
+  `rate limit`, `quota`, `rate_limit_error`, `insufficient_quota`.
+- **Do NOT trigger**: 400 (invalid request — config error, not transient),
+  401 (auth — user must fix credentials).
+
+### 8.5.4 User-visible feedback
+
+On failover, show a toast notification (unless `quietMode`):
+`⚠️ <model> unavailable (429), switching to <fallback> — retry in Ns`.
+`/router status` lists each tier's active model and any cooldowns:
+`fast: deepseek-v4-flash (primary M3 in cooldown 3m12s)`.
+
+### 8.5.5 Edge cases
+
+- All models in a tier are in cooldown → keep current model (do not guess
+  across tiers), surface a warning toast.
+- Manual override (`/route-force`) bypasses cooldown (user explicitly asked).
+- A 2xx success for a model in cooldown clears it immediately (recovery).
 
 ## 9. Future Direction (Optional Enhancements)
 

@@ -436,7 +436,7 @@ git push origin --tags
 | First npm publish (international docs + i18n + CI) | ✅ | v0.4.0 |
 | Runtime `Cannot find package` fix + `pack:check` guard | ✅ | v0.4.1 |
 | **Multi-model fallback chain editor** | ✅ | v0.5.0 |
-| Runtime failover (cross-model on API errors) | Planned | v0.6 |
+| Runtime failover (exponential backoff, same-tier) | ⏳ In progress | v0.6.0 |
 | Cache-aware routing | Planned | — |
 | Multilingual Judge prompt validation | Planned | — |
 | Per-session cost statistics | Planned | — |
