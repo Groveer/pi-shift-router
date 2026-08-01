@@ -1,6 +1,6 @@
 {
   "name": "pi-shift-router",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Two-tier model router for pi-agent — automatic execution/judgment routing with LLM Judge. Pairs a fast everyday model with a strong model for planning and review.",
   "keywords": [
     "pi-package",
@@ -11,7 +11,7 @@
     "llm-router",
     "model-selection"
   ],
-  "license": "Apache-2.0",
+  "license": "MIT",
   "homepage": "https://github.com/green-dalii/pi-shift-router#readme",
   "repository": {
     "type": "git",

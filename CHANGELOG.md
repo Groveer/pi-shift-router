@@ -9,6 +9,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > (0.1.0 – 0.3.1) were developed under the `pi-slim-router` working name and never
 > published to npm. The plugin was first published to npm as `pi-shift-router` at v0.4.0.
 
+## [0.5.0] — Multi-model fallback chain editor
+
+### Added
+
+- **Multi-model per tier with a hotkey-driven chain editor (TUI)** —
+  `/router config <tier>` now opens a new in-TUI editor instead of single-model pick.
+  - `a` add (opens the existing type-to-filter model picker)
+  - `x` remove current
+  - `K` / `J` swap current with previous / next (vim-style)
+  - `d` save, `Esc` cancel
+  - `↑↓` navigate, type-to-filter for adding
+  - Schema already supported `models: ModelRef[]`; this surfaces the capability.
+  - Non-TUI mode (non-interactive sessions) keeps the previous provider-grouped flow.
+- **21 new tests** on chain-editor operations (59 → 80 total): add, remove,
+  move-up, move-down, reassign-priorities, plus immutability and edge cases.
+
+### Changed
+
+- **License: Apache 2.0 → MIT** (more permissive for downstream use).
+- **README.md + README.zh-CN.md:**
+  - Tagline rewritten for SEO/GEO keywords (Pi coding agent, LLM judge,
+    multi-model fallback, zero runtime deps).
+  - JSON config example now shows multi-model per tier (priority array).
+  - New **Fallback chains** subsection explaining chain semantics + hotkeys.
+  - Module Map updated with `tui/fallback-chain-editor.ts`.
+  - Roadmap updated: v0.4.0 / v0.4.1 marked shipped; v0.5.0 added.
+- "How It Compares" table: removed `~$0.0006/call` pricing claim (kept neutral
+  "a few thousand tokens per call") to comply with pricing-sensitivity guidelines.
+- Chinese README: comparison-table "路由维度" column corrected from "复杂度"
+  to "心智模式" (was inconsistent with the English version).
+- Chinese README `命令` table: added `/route-force <provider>/<model>` variant.
+- `scripts/pack-check.mjs`: dropped unused `typeImportPatterns` (LSP hint).
+
+### Fixed
+
+- README's **Local install** section rewritten to avoid the
+  `.pi/extensions/<name>.ts` symlink pattern — the original guidance caused
+  duplicate plugin instances (`router:1` + `router:2`) when developing from a
+  project directory that already contained the local bridge file alongside the
+  npm-installed copy. New flow uses `pi install <path>` for dev iteration.
+- Added README section **Releasing a new version** documenting the publish flow
+  (npm version bump → prepublishOnly → publish → tag → push).
+
 ## [0.4.1] — 2026-08-16
 
 ### Fixed
