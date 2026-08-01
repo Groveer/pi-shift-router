@@ -1,6 +1,6 @@
 # pi-shift-router
 
-> 让每一轮任务都跑在最合适的模型上 —— 不再需要手动 `/model` 切换。
+> 为 Pi coding agent 自动路由每轮任务 —— 在 Fast 执行模型与 Smart 判断模型间动态切换，LLM Judge 自动分类，支持多模型 fallback 链，零运行时依赖。
 
 [![npm](https://img.shields.io/npm/v/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
@@ -24,11 +24,11 @@ Pi-agent 支持多个 Provider，但每个会话锁死在单一模型上。
 
 **pi-shift-router** 接入 pi-agent 的会话周期，按 **心智模式**（执行 vs 判断）分类每轮任务，无缝切换当前激活的模型。
 
-- **两层路由** — Smart（🧠 CTO）与 Fast（🦾 程序员）。每层一个模型。
+- **两层路由** — Smart（🧠 CTO）与 Fast（🦾 程序员）。每层可保存一个按优先级排序的模型链 —— 路由器用第一个，后续项作为 primary 不可用时的备用。
 - **LLM Judge** — 用 Fast 模型的 API 调用来分类任务是"执行"还是"判断"。成本是几千 token 级别，相对于节省的开销可以忽略不计。
 - **滑动窗口** — 防止模型频繁切换：仅当最近 5 轮中 ≥60% 都判定为 fast 时才降级。
 - **零配置起步** — 两层默认都为空。直到你配置前，路由器什么都不做。
-- **交互式向导** — `/router config` 启动 TUI picker，复刻 pi 原生 `/model` 的体验：实时模糊搜索、10 项滑动视口、方向键导航、Enter 选中、Esc 取消。
+- **交互式向导** — `/router config` 启动 TUI 向导，复刻 pi 原生 `/model` 的体验：实时模糊搜索、10 项滑动视口、方向键导航、Enter 选中、Esc 取消。可用热键为每层配置多模型 fallback 链（`a` 添加、`x` 删除、`K`/`J` 重排）。
 - **原生支持跨 Provider** — Fast 可以是 DeepSeek Flash，Smart 可以是 Kimi K3。任意组合。
 
 ### CTO / 程序员类比
@@ -102,10 +102,10 @@ flowchart TD
 
 | | pi-shift-router | pi-router | pi-smart-router |
 |---|---|---|---|
-| **做什么** | 按任务复杂度路由 —— 简单任务用轻量模型，复杂任务用顶级模型 | 在 Provider 之间故障转移 —— Provider A 挂了切 Provider B | ML 优化的推理管线 —— 12 阶段混合路由 |
+| **做什么** | 按心智模式路由 —— 执行任务用轻量模型，判断任务用顶级模型 | 在 Provider 之间故障转移 —— Provider A 挂了切 Provider B | ML 优化的推理管线 —— 12 阶段混合路由 |
 | **何时用它** | "这个问题很简单，为什么要用旗舰 token？" | "Anthropic 不可用，切 Google 还能保留上下文" | "我要本地推理 + ONNX 智能路由" |
 | **Judge 机制** | LLM-as-judge | 手动策略配置（延迟 / 能力 / 成本） | ONNX embedding + Aho-Corasick + 类型分类器 |
-| **路由维度** | 任务**复杂度**（这个难不难？） | Provider **可靠性**（这个还活着吗？） | 执行**引擎**（本地 vs 云，成本 vs 延迟） |
+| **路由维度** | 心智模式**（执行 vs 判断） | Provider **可靠性**（这个还活着吗？） | 执行**引擎**（本地 vs 云，成本 vs 延迟） |
 | **依赖** | 零运行时依赖（纯 TS） | 零运行时依赖（纯 TS） | ONNX、SQLite、HuggingFace Transformers |
 | **本地推理** | 否 | 否 | 是（LM Studio、Ollama） |
 | **学习曲线** | 低 —— 选两个模型搞定 | 中低 —— 配置通道和策略 | 高 —— 下载 ONNX 模型，本地编译 |
@@ -153,6 +153,7 @@ Judge 调用期间，状态栏短暂显示 **`⚖ judging…`**，让用户在 2
 | `/router quiet` | 切换 toast 通知 |
 | `/router verbose` | 切换 verbose 日志（调试） |
 | `/route-force <tier>` | 临时锁定 Smart 或 Fast（一轮） |
+| `/route-force <provider>/<model>` | 临时锁定指定 provider/model（一轮） |
 | `/route-force auto` | 清除手动覆盖 |
 
 ---
@@ -165,8 +166,11 @@ Judge 调用期间，状态栏短暂显示 **`⚖ judging…`**，让用户在 2
 {
   "enabled": true,
   "tiers": {
-    "fast":  { "models": [{ "provider": "deepseek", "model": "deepseek-v4-flash" }] },
-    "smart": { "models": [{ "provider": "kimi", "model": "kimi-k3" }] }
+    "fast":  { "models": [
+      { "provider": "deepseek", "model": "deepseek-v4-flash", "priority": 1 },
+      { "provider": "kimi",     "model": "kimi-flash",       "priority": 2 }
+    ] },
+    "smart": { "models": [{ "provider": "kimi", "model": "kimi-k3", "priority": 1 }] }
   },
   "routing": {
     "mode": "auto",
@@ -180,6 +184,28 @@ Judge 调用期间，状态栏短暂显示 **`⚖ judging…`**，让用户在 2
   }
 }
 ```
+
+### Fallback 链
+
+每层的 `models` 数组是一个**按优先级排序的列表** —— 第一个是 primary，后续项是备用。会话启动时路由器选择第一个有合法 API key 的模型；其余项预留给未来的 runtime failover。
+
+在 TUI 中通过 `/router config` 可配多模型。向导会打开一个内嵌编辑器：
+
+```
+Edit Fast models
+  #1  deepseek/deepseek-v4-flash
+  #2  kimi/kimi-flash
+  #3  openai/gpt-4o-mini
+
+↑↓ select · a add · x remove · K/J move · d done · Esc cancel
+```
+
+- `a` 打开 type-to-filter picker（与 pi 原生 `/model` 一致）
+- `x` 删除当前行
+- `K` / `J` 与上一行 / 下一行交换（vim 风格）
+- `d` 保存退出，`Esc` 取消
+
+非 TUI 模式仍然沿用之前按 Provider 分组的单模型选择器。
 
 ---
 
@@ -234,6 +260,8 @@ src/
 | `tier.ts` | 模型查找、`findBestModelForTier()`、展示 |
 | `config.ts` | JSON 持久化、`resolveFastEndpoint()` |
 | `commands.ts` | `/router`、`/route-force`、配置向导 |
+| `tui/model-picker.ts` | TUI picker，复刻 pi 原生 `/model` UX |
+| `tui/fallback-chain-editor.ts` | Chain 编辑器：用热键添加 / 删除 / 重排层级模型 |
 | `types.ts` | 所有 interface、`DEFAULT_CONFIG` |
 
 ---
@@ -254,7 +282,7 @@ npm test
 - **两层 > 三层**。执行 vs 判断是唯一有意义的分类轴。
 - **LLM Judge，不要正则**。不维护关键字列表。LLM 是唯一的分类器。
 - **零外部运行时依赖**。只有 pi-agent SDK。
-- **测试覆盖算法**。59 个测试守护路由引擎。
+- **测试覆盖算法**。80 个测试守护路由引擎 + chain 编辑器。
 
 [完整设计文档 →](SPEC.md)
 

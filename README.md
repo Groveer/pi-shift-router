@@ -1,6 +1,6 @@
 # pi-shift-router
 
-> Routes every task to the right model — no more manual `/model` switching.
+> Auto-routing Pi coding agent turns between fast execution and smart reasoning models — an LLM judge picks the right tier per turn, multi-model fallback chains keep you running, zero runtime dependencies.
 
 [![npm](https://img.shields.io/npm/v/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
@@ -35,7 +35,7 @@
 
 ## What it does
 
-pi-shift-router classifies every turn by **mental mode** and routes between two models:
+**pi-shift-router** is a [Pi coding agent](https://github.com/earendil-works/pi-coding-agent) extension that classifies every turn by **mental mode** and routes between two models:
 
 | | Tier | Emoji | When |
 |---|------|-------|------|
@@ -58,11 +58,11 @@ Pi-agent supports multiple providers, but every conversation is locked to a sing
 
 pi-shift-router hooks into pi-agent's turn cycle. Before every turn it asks an LLM Judge to classify the task, then switches the active model accordingly.
 
-- **Two tiers** — Smart (🧠 CTO) and Fast (🦾 Programmer). One model per tier.
+- **Two tiers** — Smart (🧠 CTO) and Fast (🦾 Programmer). Each tier can hold an ordered chain of models — the router uses the first entry, and later entries stand by as fallback if the primary is unavailable.
 - **LLM Judge** — Uses the Fast model to classify "execution" vs "judgment". Cost per call is a few thousand tokens at your Fast-tier pricing — a small fraction of a cent.
 - **Sliding window** — Prevents model thrashing: only downgrades when ≥60% of last 5 turns agree.
 - **Zero-config until you want it** — Both tiers start empty. Nothing happens until you configure.
-- **Interactive setup** — `/router config` launches a TUI picker matching pi's native `/model`: real-time fuzzy search, 10-item sliding viewport, arrow keys, Enter to select, Esc to cancel.
+- **Interactive setup** — `/router config` opens a TUI wizard matching pi's native `/model`: fuzzy search, 10-item sliding viewport, arrow keys, Enter to select, Esc to cancel. Configure multiple models per tier as a hotkey-driven fallback chain (`a` add, `x` remove, `K`/`J` reorder).
 - **Cross-provider native** — Fast can be DeepSeek Flash, Smart can be Kimi K3. Mix and match.
 
 ### The Analogy
@@ -208,7 +208,7 @@ Output shows the prompt preview, judge call details (URL, raw response), decisio
 | | pi-shift-router | pi-router | pi-smart-router |
 |---|---|---|---|
 | **What it does** | Routes by task complexity — execution vs judgment | Fails over between providers | ML-optimized inference pipeline |
-| **Judge** | LLM-as-judge (uses Fast tier's model, ~$0.0006/call) | Manual strategy config | ONNX + Aho-Corasick classifier |
+| **Judge** | LLM-as-judge (uses Fast tier's model, a few thousand tokens per call) | Manual strategy config | ONNX + Aho-Corasick classifier |
 | **Dimension** | Mental mode (execute vs decide) | Provider reliability | Execution engine |
 | **Config** | 2 models (Smart + Fast) | Channel strategies | 12-stage pipeline |
 | **Deps** | Zero runtime (TS only) | Zero runtime | ONNX, SQLite, HF |
@@ -243,8 +243,11 @@ Two-layer config: user (`~/.pi/agent/pi-shift-router.json`) + project (`<cwd>/.p
 {
   "enabled": true,
   "tiers": {
-    "fast":  { "models": [{ "provider": "deepseek", "model": "deepseek-v4-flash" }] },
-    "smart": { "models": [{ "provider": "kimi", "model": "kimi-k3" }] }
+    "fast":  { "models": [
+      { "provider": "deepseek", "model": "deepseek-v4-flash", "priority": 1 },
+      { "provider": "kimi",     "model": "kimi-flash",       "priority": 2 }
+    ] },
+    "smart": { "models": [{ "provider": "kimi", "model": "kimi-k3", "priority": 1 }] }
   },
   "routing": {
     "mode": "auto",
@@ -274,6 +277,28 @@ Two-layer config: user (`~/.pi/agent/pi-shift-router.json`) + project (`<cwd>/.p
 | `ux.statusBar` | `true` | Show `[🧠 model]` in footer. |
 | `ux.inlineToast` | `true` | Notify on tier change. |
 | `ux.routerLogVerbose` | `false` | Print routing decisions to console. |
+
+### Fallback chains
+
+Each tier's `models` array is an **ordered priority list** — first entry is the primary, later entries are fallbacks. At session start the router picks the first entry whose provider has a valid API key; the rest are reserved for future runtime failover.
+
+You can configure multiple models per tier through `/router config`. The wizard opens an in-TUI editor:
+
+```
+Edit Fast models
+  #1  deepseek/deepseek-v4-flash
+  #2  kimi/kimi-flash
+  #3  openai/gpt-4o-mini
+
+↑↓ select · a add · x remove · K/J move · d done · Esc cancel
+```
+
+- `a` opens a type-to-filter picker (same UX as pi's native `/model`)
+- `x` removes the current row
+- `K` / `J` swap the current row with the one above / below (vim-style)
+- `d` saves and exits, `Esc` cancels
+
+Non-TUI mode falls back to the previous provider-grouped single-model picker.
 
 ---
 
@@ -313,7 +338,8 @@ flowchart LR
 | `tier.ts` | Model lookup, `findBestModelForTier()`, display formatting |
 | `config.ts` | JSON persistence, `resolveFastEndpoint()`, validation |
 | `commands.ts` | `/router`, `/route-force`, config wizard |
-| `tui/model-picker.ts` | TUI component mirroring pi's native `/model` UX |
+| `tui/model-picker.ts` | TUI picker mirroring pi's native `/model` UX |
+| `tui/fallback-chain-editor.ts` | Chain editor: add / remove / reorder tier models with hotkeys |
 | `types.ts` | All interfaces + `DEFAULT_CONFIG` |
 
 ### Dependency Chain
@@ -393,7 +419,7 @@ git push origin --tags
 - **Two-tier > three-tier.** Execution vs judgment is the only axis that matters.
 - **LLM judge, not regex.** No keyword lists. The LLM is the sole classifier.
 - **Zero external runtime deps.** Only pi-agent SDK.
-- **Tests cover the algorithm.** 59 tests on the routing engine + tier + config + judge parser.
+- **Tests cover the algorithm.** 80 tests on the routing engine + tier + config + judge parser + chain editor.
 
 ---
 
@@ -405,7 +431,10 @@ git push origin --tags
 | TUI model picker + wizard | ✅ | v0.2.0 |
 | Two-tier redesign (CTO / Programmer) | ✅ | v0.3.0 |
 | Judge JSON-mode + judging indicator + verbose log | ✅ | v0.3.1 |
-| **Publish to npm** | ⏳ Next | v0.4.0 |
+| First npm publish (international docs + i18n + CI) | ✅ | v0.4.0 |
+| Runtime `Cannot find package` fix + `pack:check` guard | ✅ | v0.4.1 |
+| **Multi-model fallback chain editor** | ✅ | v0.5.0 |
+| Runtime failover (cross-model on API errors) | Planned | v0.6 |
 | Cache-aware routing | Planned | — |
 | Multilingual Judge prompt validation | Planned | — |
 | Per-session cost statistics | Planned | — |
