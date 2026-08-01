@@ -44,6 +44,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Judge prompt now respects user explicit intent about model quality.**
+  When the user asks for "use the strongest model", "think carefully",
+  "最强大模型", "仔细想想", or any equivalent phrasing in any language,
+  the Judge classifies the turn as `smart` regardless of whether the
+  underlying task is execution-heavy. Conversely, explicit asks for speed
+  ("just give me a quick answer", "别想太多") route to `fast`. The prompt
+  now lists four classification signals (task content, user intent,
+  stakes/reversibility, ambiguity) with explicit conflict-resolution
+  priority. This is implemented at the prompt level (LLM-as-classifier),
+  not via regex/keyword matching, to keep the LLM as the sole classifier.
 - README's **Local install** section rewritten to avoid the
   `.pi/extensions/<name>.ts` symlink pattern — the original guidance caused
   duplicate plugin instances (`router:1` + `router:2`) when developing from a
