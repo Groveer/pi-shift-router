@@ -1,0 +1,395 @@
+/**
+ * pi-shift-router — Runtime failover tests (SPEC §8.5)
+ *
+ * Covers the exponential-backoff cooldown state machine:
+ *   - modelKey / cooldown helpers (pure, no IO)
+ *   - failover error signature detection
+ *   - same-tier fallback model selection (no cross-tier)
+ *   - cooldown-aware routing (processRoute + findBestModelForTier)
+ */
+
+import { describe, it, expect } from "vitest";
+import {
+  modelKey,
+  createCooldowns,
+  markModelFailed,
+  isModelInCooldown,
+  clearModelCooldown,
+  remainingCooldownMs,
+  detectFailoverError,
+  findFailoverModel,
+  COOLDOWN_BASE_MS,
+  COOLDOWN_MAX_MS,
+} from "../src/failover.js";
+import { findBestModelForTier } from "../src/tier.js";
+import {
+  createRouterState,
+  processRoute,
+} from "../src/router.js";
+import { DEFAULT_CONFIG, type ShiftRouterConfig, type Tier } from "../src/types.js";
+
+const NOW = 1_000_000;
+const MIN = 60_000;
+
+// ─── modelKey ──────────────────────────────────────────────────────
+describe("modelKey", () => {
+  it("joins provider and model with a separator", () => {
+    expect(modelKey("minimax", "MiniMax-M3")).toBe("minimax/MiniMax-M3");
+  });
+
+  it("distinguishes same model across providers", () => {
+    expect(modelKey("a", "x")).not.toBe(modelKey("b", "x"));
+  });
+});
+
+// ─── Cooldown marking (exponential backoff) ────────────────────────
+describe("markModelFailed exponential backoff", () => {
+  it("first failure sets a 1-minute cooldown", () => {
+    const cd = createCooldowns();
+    markModelFailed(cd, "minimax", "MiniMax-M3", NOW);
+    const e = cd.get(modelKey("minimax", "MiniMax-M3"));
+    expect(e).toBeDefined();
+    expect(e!.until).toBe(NOW + MIN);
+    expect(e!.attempts).toBe(1);
+  });
+
+  it("second failure doubles to 2 minutes", () => {
+    const cd = createCooldowns();
+    markModelFailed(cd, "minimax", "MiniMax-M3", NOW);
+    markModelFailed(cd, "minimax", "MiniMax-M3", NOW + MIN + 1);
+    const e = cd.get(modelKey("minimax", "MiniMax-M3"));
+    expect(e!.until).toBe(NOW + MIN + 1 + 2 * MIN);
+    expect(e!.attempts).toBe(2);
+  });
+
+  it("grows 1m, 2m, 4m, ... exponentially", () => {
+    const cd = createCooldowns();
+    markModelFailed(cd, "m", "model", NOW);
+    expect(cd.get(modelKey("m", "model"))!.until - NOW).toBe(MIN);
+    markModelFailed(cd, "m", "model", NOW);
+    expect(cd.get(modelKey("m", "model"))!.until - NOW).toBe(2 * MIN);
+    markModelFailed(cd, "m", "model", NOW);
+    expect(cd.get(modelKey("m", "model"))!.until - NOW).toBe(4 * MIN);
+    markModelFailed(cd, "m", "model", NOW);
+    expect(cd.get(modelKey("m", "model"))!.until - NOW).toBe(8 * MIN);
+  });
+
+  it("caps backoff at 30 minutes", () => {
+    const cd = createCooldowns();
+    // Fail 10 times — should hit the cap
+    for (let i = 0; i < 10; i++) {
+      markModelFailed(cd, "m", "model", NOW);
+    }
+    const e = cd.get(modelKey("m", "model"))!;
+    expect(e.until - NOW).toBeLessThanOrEqual(COOLDOWN_MAX_MS);
+    expect(e.until - NOW).toBe(COOLDOWN_MAX_MS);
+  });
+});
+
+// ─── Cooldown queries ──────────────────────────────────────────────
+describe("isModelInCooldown", () => {
+  it("returns true while within the cooldown window", () => {
+    const cd = createCooldowns();
+    markModelFailed(cd, "m", "model", NOW);
+    expect(isModelInCooldown(cd, "m", "model", NOW + 30_000)).toBe(true);
+  });
+
+  it("returns false after the cooldown expires", () => {
+    const cd = createCooldowns();
+    markModelFailed(cd, "m", "model", NOW);
+    expect(isModelInCooldown(cd, "m", "model", NOW + MIN + 1)).toBe(false);
+  });
+
+  it("returns false when never failed", () => {
+    const cd = createCooldowns();
+    expect(isModelInCooldown(cd, "m", "model", NOW)).toBe(false);
+  });
+});
+
+describe("remainingCooldownMs", () => {
+  it("returns remaining time while cooling", () => {
+    const cd = createCooldowns();
+    markModelFailed(cd, "m", "model", NOW);
+    expect(remainingCooldownMs(cd, "m", "model", NOW + 30_000)).toBe(30_000);
+  });
+
+  it("returns 0 when not in cooldown", () => {
+    const cd = createCooldowns();
+    expect(remainingCooldownMs(cd, "m", "model", NOW)).toBe(0);
+  });
+
+  it("returns 0 after expiry", () => {
+    const cd = createCooldowns();
+    markModelFailed(cd, "m", "model", NOW);
+    expect(remainingCooldownMs(cd, "m", "model", NOW + MIN + 1)).toBe(0);
+  });
+});
+
+describe("clearModelCooldown", () => {
+  it("removes the entry entirely (recovery)", () => {
+    const cd = createCooldowns();
+    markModelFailed(cd, "m", "model", NOW);
+    clearModelCooldown(cd, "m", "model");
+    expect(cd.has(modelKey("m", "model"))).toBe(false);
+    expect(isModelInCooldown(cd, "m", "model", NOW)).toBe(false);
+  });
+
+  it("no-ops for unknown model", () => {
+    const cd = createCooldowns();
+    expect(() => clearModelCooldown(cd, "ghost", "x")).not.toThrow();
+  });
+});
+
+// ─── Failover error signatures (SPEC §8.5.3) ───────────────────────
+describe("detectFailoverError", () => {
+  it("detects 429 rate limit status", () => {
+    const r = detectFailoverError("Error: 429 {\"type\":\"error\",\"message\":\"rate_limit_error\"}");
+    expect(r).not.toBeNull();
+    expect(r!.code).toBe("429");
+  });
+
+  it("detects 5xx server errors", () => {
+    expect(detectFailoverError("Error: 502 Bad Gateway")).not.toBeNull();
+    expect(detectFailoverError("Error: 503 Service Unavailable")).not.toBeNull();
+    expect(detectFailoverError("Error: 504 Gateway Timeout")).not.toBeNull();
+    expect(detectFailoverError("HTTP 500 internal server error")).not.toBeNull();
+  });
+
+  it("detects quota / token plan exhaustion", () => {
+    expect(detectFailoverError("已达到 Token Plan 用量上限：请升级 Token Plan 套餐")).not.toBeNull();
+    expect(detectFailoverError("insufficient_quota for model")).not.toBeNull();
+    expect(detectFailoverError("Quota exceeded for API key")).not.toBeNull();
+    expect(detectFailoverError("rate limit exceeded")).not.toBeNull();
+    expect(detectFailoverError("Too Many Requests")).not.toBeNull();
+  });
+
+  it("does NOT detect 400/401/404 (config/auth errors)", () => {
+    expect(detectFailoverError("400 Bad Request: invalid_prompt")).toBeNull();
+    expect(detectFailoverError("401 Unauthorized: invalid api key")).toBeNull();
+    expect(detectFailoverError("404 model not found")).toBeNull();
+  });
+
+  it("returns null for arbitrary errors", () => {
+    expect(detectFailoverError("TypeError: cannot read property of undefined")).toBeNull();
+    expect(detectFailoverError("")).toBeNull();
+    expect(detectFailoverError(undefined as unknown as string)).toBeNull();
+  });
+
+  it("does not misread '500' embedded in a normal message", () => {
+    // "500" without an HTTP error context is not a failover signal
+    expect(detectFailoverError("the output was 500 tokens")).toBeNull();
+    expect(detectFailoverError("cost: 500")).toBeNull();
+  });
+});
+
+// ─── Same-tier fallback selection (SPEC §8.5.2) ─────────────────────
+describe("findFailoverModel — same tier only, skips cooldowns", () => {
+  const cfg = (models: { provider: string; model: string; priority: number }[]): ShiftRouterConfig => ({
+    ...DEFAULT_CONFIG,
+    tiers: {
+      ...DEFAULT_CONFIG.tiers,
+      fast: { ...DEFAULT_CONFIG.tiers.fast, models },
+      smart: { ...DEFAULT_CONFIG.tiers.smart, models: [
+        { provider: "smart-p", model: "smart-m", priority: 1 },
+      ]},
+    },
+  });
+  const registry = {
+    find: (p: string, m: string) => ({ provider: p, modelId: m }),
+  };
+
+  it("picks the next healthy model when primary is in cooldown", () => {
+    const config = cfg([
+      { provider: "minimax", model: "M3", priority: 1 },
+      { provider: "deepseek", model: "deepseek-v4-flash", priority: 2 },
+    ]);
+    const cd = createCooldowns();
+    markModelFailed(cd, "minimax", "M3", NOW);
+
+    const r = findFailoverModel("fast", config, registry, cd, NOW);
+    expect(r).toEqual({ provider: "deepseek", modelId: "deepseek-v4-flash", tier: "fast" });
+  });
+
+  it("returns null when all models in the tier are in cooldown", () => {
+    const config = cfg([
+      { provider: "minimax", model: "M3", priority: 1 },
+      { provider: "deepseek", model: "deepseek-v4-flash", priority: 2 },
+    ]);
+    const cd = createCooldowns();
+    markModelFailed(cd, "minimax", "M3", NOW);
+    markModelFailed(cd, "deepseek", "deepseek-v4-flash", NOW);
+
+    expect(findFailoverModel("fast", config, registry, cd, NOW)).toBeNull();
+  });
+
+  it("never crosses tiers (smart model not considered for fast tier)", () => {
+    const config = cfg([
+      { provider: "minimax", model: "M3", priority: 1 },
+    ]);
+    const cd = createCooldowns();
+    markModelFailed(cd, "minimax", "M3", NOW);
+
+    // Fast tier is fully in cooldown — smart model must NOT be used
+    expect(findFailoverModel("fast", config, registry, cd, NOW)).toBeNull();
+  });
+
+  it("returns primary when it is not in cooldown", () => {
+    const config = cfg([
+      { provider: "minimax", model: "M3", priority: 1 },
+      { provider: "deepseek", model: "deepseek-v4-flash", priority: 2 },
+    ]);
+    const cd = createCooldowns();
+
+    const r = findFailoverModel("fast", config, registry, cd, NOW);
+    expect(r?.modelId).toBe("M3");
+  });
+
+  it("ignores cooldowns that have already expired", () => {
+    const config = cfg([
+      { provider: "minimax", model: "M3", priority: 1 },
+      { provider: "deepseek", model: "deepseek-v4-flash", priority: 2 },
+    ]);
+    const cd = createCooldowns();
+    markModelFailed(cd, "minimax", "M3", NOW);
+
+    // After expiry, M3 becomes eligible again
+    const r = findFailoverModel("fast", config, registry, cd, NOW + MIN + 1);
+    expect(r?.modelId).toBe("M3");
+  });
+
+  it("works without a cooldowns map (no cooling)", () => {
+    const config = cfg([
+      { provider: "minimax", model: "M3", priority: 1 },
+    ]);
+    const r = findFailoverModel("fast", config, registry, undefined, NOW);
+    expect(r?.modelId).toBe("M3");
+  });
+
+  it("supports excluding the current model (immediate failover)", () => {
+    const config = cfg([
+      { provider: "minimax", model: "M3", priority: 1 },
+      { provider: "deepseek", model: "deepseek-v4-flash", priority: 2 },
+    ]);
+    const cd = createCooldowns();
+
+    // Current is M3, not yet cooled — but for immediate failover we want
+    // to skip it and go straight to the next one.
+    const r = findFailoverModel(
+      "fast", config, registry, cd, NOW,
+      modelKey("minimax", "M3"),
+    );
+    expect(r).toEqual({ provider: "deepseek", modelId: "deepseek-v4-flash", tier: "fast" });
+  });
+});
+
+// ─── Cooldown-aware findBestModelForTier ───────────────────────────
+describe("findBestModelForTier with cooldown predicate", () => {
+  const cfg = (models: { provider: string; model: string; priority: number }[]): ShiftRouterConfig => ({
+    ...DEFAULT_CONFIG,
+    tiers: {
+      ...DEFAULT_CONFIG.tiers,
+      fast: { ...DEFAULT_CONFIG.tiers.fast, models },
+    },
+  });
+  const registry = {
+    find: (p: string, m: string) => ({ provider: p, modelId: m }),
+  };
+
+  it("skips cooled models and picks next available", () => {
+    const config = cfg([
+      { provider: "minimax", model: "M3", priority: 1 },
+      { provider: "deepseek", model: "deepseek-v4-flash", priority: 2 },
+    ]);
+    const isCooldown = (p: string, m: string) => p === "minimax" && m === "M3";
+
+    const r = findBestModelForTier("fast", config, registry, isCooldown);
+    expect(r?.modelId).toBe("deepseek-v4-flash");
+  });
+
+  it("returns null when all models are cooled", () => {
+    const config = cfg([
+      { provider: "minimax", model: "M3", priority: 1 },
+      { provider: "deepseek", model: "deepseek-v4-flash", priority: 2 },
+    ]);
+    const isCooldown = () => true;
+
+    expect(findBestModelForTier("fast", config, registry, isCooldown)).toBeNull();
+  });
+
+  it("ignores predicate when omitted (backward compatible)", () => {
+    const config = cfg([
+      { provider: "minimax", model: "M3", priority: 1 },
+    ]);
+    const r = findBestModelForTier("fast", config, registry);
+    expect(r?.modelId).toBe("M3");
+  });
+});
+
+// ─── Cooldown-aware processRoute ───────────────────────────────────
+describe("processRoute respects model cooldowns", () => {
+  const makeConfig = (): ShiftRouterConfig => ({
+    ...DEFAULT_CONFIG,
+    tiers: {
+      fast: { label: "Fast", models: [
+        { provider: "minimax", model: "M3", priority: 1 },
+        { provider: "deepseek", model: "deepseek-v4-flash", priority: 2 },
+      ], description: "" },
+      smart: { label: "Smart", models: [
+        { provider: "smart-p", model: "smart-m", priority: 1 },
+      ], description: "" },
+    },
+  });
+  const registry = { find: (p: string, m: string) => ({ provider: p, modelId: m }) };
+
+  it("upgrade picks fallback when primary is cooled", () => {
+    const state = createRouterState();
+    state.currentTier = "fast";
+    markModelFailed(state.modelCooldowns, "smart-p", "smart-m", NOW);
+    const config = makeConfig();
+
+    const d = processRoute({ tier: "smart", source: "llm" }, state, config, registry, NOW);
+    // All smart models are cooled → no switch available → stay (keep current)
+    expect(d.action).toBe("stay");
+    expect(d.switchTo).toBeNull();
+  });
+
+  it("upgrade picks the healthy smart model when primary cooled but fallback exists", () => {
+    const state = createRouterState();
+    state.currentTier = "fast";
+    const config: ShiftRouterConfig = {
+      ...DEFAULT_CONFIG,
+      tiers: {
+        fast: { label: "Fast", models: [
+          { provider: "minimax", model: "M3", priority: 1 },
+        ], description: "" },
+        smart: { label: "Smart", models: [
+          { provider: "smart-p", model: "smart-a", priority: 1 },
+          { provider: "smart-p", model: "smart-b", priority: 2 },
+        ], description: "" },
+      },
+    };
+    markModelFailed(state.modelCooldowns, "smart-p", "smart-a", NOW);
+
+    const d = processRoute({ tier: "smart", source: "llm" }, state, config, registry, NOW);
+    expect(d.action).toBe("upgrade");
+    expect(d.switchTo?.modelId).toBe("smart-b");
+  });
+
+  it("manual override bypasses cooldowns entirely", () => {
+    const state = createRouterState();
+    state.currentTier = "fast";
+    state.manualOverride = { active: true, provider: "smart-p", modelId: "smart-a" };
+    markModelFailed(state.modelCooldowns, "smart-p", "smart-a", NOW);
+    const config = makeConfig();
+
+    const d = processRoute({ tier: "fast", source: "llm" }, state, config, registry);
+    expect(d.action).toBe("manual");
+    expect(d.switchTo?.modelId).toBe("smart-a"); // cooled but forced
+  });
+
+  it("initializes modelCooldowns on createRouterState", () => {
+    const state = createRouterState();
+    expect(state.modelCooldowns).toBeInstanceOf(Map);
+    expect(state.modelCooldowns.size).toBe(0);
+  });
+});

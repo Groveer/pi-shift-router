@@ -187,7 +187,7 @@ Judge 调用期间，状态栏短暂显示 **`⚖ judging…`**，让用户在 2
 
 ### Fallback 链
 
-每层的 `models` 数组是一个**按优先级排序的列表** —— 第一个是 primary，后续项是备用。会话启动时路由器选择第一个有合法 API key 的模型；其余项预留给未来的 runtime failover。
+每层的 `models` 数组是一个**按优先级排序的列表** —— 第一个是 primary，后续项是备用。会话启动时路由器选择第一个有合法 API key 的模型；其余项用于运行时 failover（v0.6.0）。
 
 在 TUI 中通过 `/router config` 可配多模型。向导会打开一个内嵌编辑器：
 
@@ -208,6 +208,20 @@ Press: ↑↓ select · A add · X remove · J/K move · D done · Esc cancel
 字母键不区分大小写——图例里用大写是 TUI 惯例，但 `j` 和 `J` 都生效。`J`/`K` 是普通按键（不需要 Shift），保证跨终端可用。
 
 非 TUI 模式仍然沿用之前按 Provider 分组的单模型选择器。
+
+### 运行时 Failover（v0.6.0）
+
+当模型遇到临时故障（429 限流、5xx、或 Token Plan 配额耗尽）时，路由器会在 pi 自身的重试用尽后接管：
+
+1. **pi 先重试** —— pi 的 provider 层对失败模型指数退避重试（约 3 次），agent 层再重试。路由器刻意让 pi 在 primary 上用尽重试预算。
+2. **`agent_end` hook 接管** —— 若本轮仍以 failover 签名失败，路由器将模型标记进**指数退避冷却**（1m、2m、4m、… 封顶 30m），并立即 `setModel` 到**同一层级**的下一个健康模型。pi 待定的重试随即用 fallback 继续 —— 同轮 failover，不跨层级。
+3. **Judge 同样 failover** —— 分类器使用 fast 层的完整模型链（按优先级）。若 primary fast 模型 429 或超时，Judge 会先回退到下一个 fast 模型才放弃（并与路由共享同一冷却表，被 Judge 判定失败的模型也会被路由跳过）。
+4. **冷却感知路由** —— 后续轮次的 `before_agent_start` 跳过冷却中的模型，primary 在冷却到期前不再被重试。
+5. **恢复** —— 2xx 响应立即清除冷却；会话重启全部重置。
+
+Failover 签名：HTTP 429、5xx、`rate limit`、`quota`、`rate_limit_error`、`insufficient_quota`、`Token Plan` / `用量上限`。认证 / 配置错误（400/401）**不会**触发 failover —— 它们需要人工修复。手动覆盖（`/route-force`）始终绕过冷却。
+
+用户反馈：切换时弹出 toast（`⚠️ M3 unavailable (429), switching to deepseek-v4-flash — retry in 1m`），`/router status` 列出活跃冷却项（`⏳ minimax/MiniMax-M3 — retry in 3m12s`）。
 
 ---
 
@@ -241,10 +255,11 @@ flowchart LR
 
 ```
 src/
-├── index.ts        → router.ts, judge.ts, tier.ts, commands.ts
+├── index.ts        → router.ts, judge.ts, tier.ts, failover.ts, commands.ts
 ├── router.ts       → tier.ts, types.ts
 ├── judge.ts        → types.ts (+ prompts/judge.md)
 ├── tier.ts         → types.ts
+├── failover.ts     → types.ts
 ├── commands.ts     → config.ts, tier.ts, router.ts, types.ts
 ├── config.ts       → types.ts
 ├── tui/
@@ -256,10 +271,11 @@ src/
 
 | 文件 | 职责 |
 |------|------|
-| `index.ts` | 生命周期 hook：`session_start`、`before_agent_start` |
+| `index.ts` | 生命周期 hook：`session_start`（只读）、`before_agent_start`（分类 + 路由）、`agent_end`（failover）、`after_provider_response`（冷却恢复） |
 | `router.ts` | `processRoute()`、`applyModelSwitch()`、滑动窗口 |
 | `judge.ts` | LLM Judge + 保持当前挡位兜底 |
 | `tier.ts` | 模型查找、`findBestModelForTier()`、展示 |
+| `failover.ts` | 运行时 failover：指数退避冷却、错误签名、同层 fallback |
 | `config.ts` | JSON 持久化、`resolveFastEndpoint()` |
 | `commands.ts` | `/router`、`/route-force`、配置向导 |
 | `tui/model-picker.ts` | TUI picker，复刻 pi 原生 `/model` UX |
@@ -284,7 +300,7 @@ npm test
 - **两层 > 三层**。执行 vs 判断是唯一有意义的分类轴。
 - **LLM Judge，不要正则**。不维护关键字列表。LLM 是唯一的分类器。
 - **零外部运行时依赖**。只有 pi-agent SDK。
-- **测试覆盖算法**。80 个测试守护路由引擎 + chain 编辑器。
+- **测试覆盖算法**。176 个测试守护路由引擎 + chain 编辑器 + 运行时 failover + Judge fast 链 fallback。
 
 [完整设计文档 →](SPEC.md)
 

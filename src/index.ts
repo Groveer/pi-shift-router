@@ -8,7 +8,7 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { Tier, ShiftRouterConfig, RouterState, ProviderEndpoint } from "./types.js";
-import { loadConfig, resolveFastEndpoint } from "./config.js";
+import { loadConfig, resolveFastEndpoints } from "./config.js";
 import { findBestModelForTier, formatTierDisplay } from "./tier.js";
 import { classify } from "./judge.js";
 import {
@@ -18,6 +18,14 @@ import {
   clearManualOverride,
   setManualOverrideTier,
 } from "./router.js";
+import {
+  planTurnFailover,
+  clearModelCooldown,
+  isModelInCooldown,
+  cooldownPredicate,
+  remainingCooldownMs,
+  formatRemaining,
+} from "./failover.js";
 import { registerCommands } from "./commands.js";
 
 /** Check if both tiers share the same model configuration */
@@ -31,7 +39,7 @@ function allTiersIdentical(config: ShiftRouterConfig): boolean {
 export default function slimRouterExtension(pi: ExtensionAPI) {
   let config: ShiftRouterConfig;
   let state: RouterState;
-  let fastEndpoint: ProviderEndpoint | null = null;
+  let fastEndpoints: ProviderEndpoint[] = [];
   let initialized = false;
 
   const getConfig = () => config;
@@ -43,7 +51,7 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
     if (initialized) return;
     config = await loadConfig(ctx.cwd);
     state = createRouterState();
-    fastEndpoint = await resolveFastEndpoint(config);
+    fastEndpoints = await resolveFastEndpoints(config);
     initialized = true;
   }
 
@@ -98,9 +106,10 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
     try {
       judgeResult = await classify(
         event.prompt,
-        fastEndpoint,
+        fastEndpoints,
         config.routing.judgeTimeout,
         verbose,
+        cooldownPredicate(state.modelCooldowns, Date.now()),
       );
     } finally {
       // Restore the proper status badge immediately, regardless of judge outcome.
@@ -134,8 +143,9 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
         ctx.ui.notify(`${formatTierDisplay(state.currentTier, state.currentModelId)}`, "info");
       }
     } else if (!state.currentModelId && state.currentTier) {
-      // First turn with no model yet — resolve one for current tier
-      const m = findBestModelForTier(state.currentTier, config, ctx.modelRegistry as any);
+      // First turn with no model yet — resolve one for current tier,
+      // skipping models in cooldown.
+      const m = findBestModelForTier(state.currentTier, config, ctx.modelRegistry as any, cooldownPredicate(state.modelCooldowns, Date.now()));
       if (m) {
         await applyModelSwitch(m, state, ctx.modelRegistry as any, (model) => pi.setModel(model as any));
       }
@@ -145,6 +155,77 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
     if (state.manualOverride.active) clearManualOverride(state);
   });
 
+  // ── Runtime failover (SPEC §8.5) ──────────────────────────────
+  //
+  // agent_end: if the turn failed with a failover signature, mark the
+  // model into exponential-backoff cooldown and immediately setModel to
+  // the next healthy model in the same tier. pi's pending
+  // agent.continue() retry then runs with the fallback model.
+
+  pi.on("agent_end", async (event, ctx) => {
+    if (!initialized) await init(ctx);
+    if (!config?.enabled) return;
+    if (state.manualOverride.active) return; // user forced a model — don't override
+
+    const now = Date.now();
+    const plan = planTurnFailover(
+      (event as any).messages ?? [],
+      state,
+      config,
+      (ctx as any).modelRegistry as any,
+      now,
+    );
+    if (!plan) return; // healthy turn or non-failover error
+
+    if (config.ux.routerLogVerbose) {
+      console.log(
+        `[ShiftRouter] ⚠ ${plan.failed.provider}/${plan.failed.model} failed (${plan.failed.code}) → cooldown ${formatRemaining(remainingFor(state, plan.failed.provider, plan.failed.model))}`,
+      );
+    }
+
+    if (plan.switched && plan.fallback) {
+      const ok = await applyModelSwitch(
+        plan.fallback, state,
+        (ctx as any).modelRegistry as any,
+        (m) => pi.setModel(m as any),
+      );
+      if (ok && !config.ux.quietMode && config.ux.inlineToast) {
+        const retry = formatRemaining(remainingFor(state, plan.failed.provider, plan.failed.model));
+        ctx.ui.notify(
+          `⚠️ ${shortModel(plan.failed.provider, plan.failed.model)} unavailable (${plan.failed.code}), ` +
+          `switching to ${shortModel(plan.fallback.provider, plan.fallback.modelId)} — retry in ${retry}`,
+          "warning",
+        );
+      }
+    } else if (!config.ux.quietMode && config.ux.inlineToast) {
+      ctx.ui.notify(
+        `⚠️ ${shortModel(plan.failed.provider, plan.failed.model)} unavailable (${plan.failed.code}) — ` +
+        `all ${plan.failed.provider} models in cooldown, keeping current`,
+        "warning",
+      );
+    }
+
+    updateBar(ctx.ui, config, state);
+  });
+
+  // after_provider_response: a 2xx response means the model works again —
+  // clear its cooldown immediately (SPEC §8.5.2(4) recovery).
+
+  pi.on("after_provider_response", async (event, ctx) => {
+    if (!initialized) await init(ctx);
+    if (!config?.enabled) return;
+    if (event.status >= 200 && event.status < 300 && state.currentProvider && state.currentModelId) {
+      if (isModelInCooldown(state.modelCooldowns, state.currentProvider, state.currentModelId, Date.now())) {
+        clearModelCooldown(state.modelCooldowns, state.currentProvider, state.currentModelId);
+        if (config.ux.routerLogVerbose) {
+          console.log(
+            `[ShiftRouter] ✓ ${state.currentProvider}/${state.currentModelId} recovered (HTTP ${event.status}) — cooldown cleared`,
+          );
+        }
+      }
+    }
+  });
+
   // ── Commands ────────────────────────────────────────────────
 
   registerCommands(
@@ -152,11 +233,28 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
     getConfig,
     getState,
     async () => {
-      fastEndpoint = await resolveFastEndpoint(config);
+      fastEndpoints = await resolveFastEndpoints(config);
       state.window = [];
+      state.modelCooldowns.clear();
       clearManualOverride(state);
     },
     (tier: Tier) => setManualOverrideTier(state, tier),
     (ui: any) => updateBar(ui, config, state),
   );
+}
+
+// ── Display helpers ────────────────────────────────────────────────
+
+/** Short model name: "minimax/MiniMax-M3" → "MiniMax-M3". */
+function shortModel(_provider: string, model: string): string {
+  return model.split("/").pop() ?? model;
+}
+
+/** Remaining cooldown for a model from the state map. */
+function remainingFor(
+  state: RouterState,
+  provider: string,
+  model: string,
+): number {
+  return remainingCooldownMs(state.modelCooldowns, provider, model, Date.now());
 }

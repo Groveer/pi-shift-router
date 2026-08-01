@@ -9,6 +9,7 @@
 import type { ShiftRouterConfig, Tier, WindowEntry, RouterState, JudgeResult } from "./types.js";
 import { TIERS } from "./types.js";
 import { findBestModelForTier, type ResolvedModel } from "./tier.js";
+import { createCooldowns, cooldownPredicate } from "./failover.js";
 
 /** Create an initial RouterState */
 export function createRouterState(): RouterState {
@@ -18,6 +19,7 @@ export function createRouterState(): RouterState {
     currentProvider: null,
     window: [],
     manualOverride: { active: false },
+    modelCooldowns: createCooldowns(),
   };
 }
 
@@ -63,6 +65,7 @@ export function processRoute(
   state: RouterState,
   config: ShiftRouterConfig,
   modelRegistry: { find: (p: string, m: string) => unknown } | undefined,
+  now: number = Date.now(),
 ): RouteDecision {
   const { tier: targetTier } = judgeResult;
 
@@ -86,7 +89,7 @@ export function processRoute(
 
   // 2. Immediate upgrade: fast → smart
   if (shouldUpgrade(state.currentTier, targetTier)) {
-    const m = findBestModelForTier(targetTier, config, modelRegistry);
+    const m = findBestModelForTier(targetTier, config, modelRegistry, cooldownPredicate(state.modelCooldowns, now));
     if (m) {
       // Clear window on upgrade (fresh start for the new tier)
       state.window = [];
@@ -106,7 +109,7 @@ export function processRoute(
   // 4. Check downgrade
   const down = analyzeDowngrade(state.window, state.currentTier, config);
   if (down.shouldDowngrade && down.targetTier) {
-    const m = findBestModelForTier(down.targetTier, config, modelRegistry);
+    const m = findBestModelForTier(down.targetTier, config, modelRegistry, cooldownPredicate(state.modelCooldowns, now));
     if (m) return { switchTo: m, action: "downgrade" };
   }
 

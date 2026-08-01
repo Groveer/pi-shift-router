@@ -18,11 +18,15 @@ export interface ResolvedModel {
 /**
  * Find the best available model for a given tier.
  * Searches pi's model registry by provider + model id, falls back by priority.
+ *
+ * @param isCooldown Optional predicate; when provided, models for which it
+ *   returns true are skipped (SPEC §8.5 runtime failover).
  */
 export function findBestModelForTier(
   tier: Tier,
   config: ShiftRouterConfig,
   modelRegistry: { find: (provider: string, modelId: string) => unknown } | undefined,
+  isCooldown?: (provider: string, modelId: string) => boolean,
 ): ResolvedModel | null {
   const tierConfig = config.tiers[tier];
   if (!tierConfig?.models?.length || !modelRegistry?.find) return null;
@@ -31,6 +35,7 @@ export function findBestModelForTier(
 
   for (const ref of sorted) {
     try {
+      if (isCooldown?.(ref.provider, ref.model)) continue;
       if (modelRegistry.find(ref.provider, ref.model)) {
         return { provider: ref.provider, modelId: ref.model, tier };
       }

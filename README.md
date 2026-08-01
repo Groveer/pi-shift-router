@@ -26,7 +26,7 @@
 - [Configuration](#configuration)
 - [Architecture](#architecture)
 - [Development](#development)
-- [Roadmap](#roadmap)
+- [Roadmap](ROADMAP.md)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 - [Acknowledgements](#acknowledgements)
@@ -280,7 +280,7 @@ Two-layer config: user (`~/.pi/agent/pi-shift-router.json`) + project (`<cwd>/.p
 
 ### Fallback chains
 
-Each tier's `models` array is an **ordered priority list** — first entry is the primary, later entries are fallbacks. At session start the router picks the first entry whose provider has a valid API key; the rest are reserved for future runtime failover.
+Each tier's `models` array is an **ordered priority list** — first entry is the primary, later entries are fallbacks. At session start the router picks the first entry whose provider has a valid API key; the rest are reserved for runtime failover.
 
 You can configure multiple models per tier through `/router config`. The wizard opens an in-TUI editor:
 
@@ -301,6 +301,41 @@ Press: ↑↓ select · A add · X remove · J/K move · D done · Esc cancel
 Letter keys are case-insensitive — the legend shows them uppercase (TUI convention) but `j` and `J` both work. `J`/`K` are plain keys (no Shift needed) for terminal portability.
 
 Non-TUI mode falls back to the previous provider-grouped single-model picker.
+
+### Runtime failover (v0.6.0)
+
+When a model hits a transient failure (429 rate limit, 5xx, or quota/
+Token Plan exhaustion), the router takes over after pi's own retries give
+up:
+
+1. **pi retries first** — pi's provider layer retries the failing model
+   (exponential backoff, ~3×), then the agent layer retries again. The
+   router deliberately lets pi exhaust its retry budget on the primary.
+2. **`agent_end` hook takes over** — if the turn still failed with a
+   failover signature, the router marks the model into **exponential
+   backoff cooldown** (1m, 2m, 4m, … capped at 30m) and immediately
+   calls `setModel` to the next healthy model **in the same tier**.
+   pi's pending retry then continues with the fallback — same-turn
+   failover, no cross-tier.
+3. **The Judge fails over too** — the classifier uses the fast tier's
+   entire model chain (priority order). If the primary fast model 429s
+   or times out, the Judge falls back to the next fast model before
+   ever giving up (and shares the same cooldown map, so a judge-failed
+   model is skipped by routing as well).
+4. **Cooldown-aware routing** — subsequent turns skip models in cooldown
+   at `before_agent_start`, so the primary isn't retried until its
+   cooldown expires.
+5. **Recovery** — a 2xx response clears the cooldown immediately; a
+   session restart resets everything.
+
+Failover signatures: HTTP 429, 5xx, `rate limit`, `quota`,
+`rate_limit_error`, `insufficient_quota`, `Token Plan` / `用量上限`.
+Auth/config errors (400/401) do **not** trigger failover — they need a
+human fix. Manual override (`/route-force`) always bypasses cooldowns.
+
+User feedback: a toast shows the switch (`⚠️ M3 unavailable (429),
+switching to deepseek-v4-flash — retry in 1m`) and `/router status`
+lists active cooldowns (`⏳ minimax/MiniMax-M3 — retry in 3m12s`).
 
 ---
 
@@ -334,10 +369,11 @@ flowchart LR
 
 | File | Responsibility |
 |------|---------------|
-| `index.ts` | Lifecycle hooks: `session_start` (read-only), `before_agent_start` (classify + route) |
+| `index.ts` | Lifecycle hooks: `session_start` (read-only), `before_agent_start` (classify + route), `agent_end` (failover), `after_provider_response` (cooldown recovery) |
 | `router.ts` | `processRoute()`, `applyModelSwitch()`, sliding window |
 | `judge.ts` | LLM Judge with JSON-mode enforcement + 3-layer parse fallback |
 | `tier.ts` | Model lookup, `findBestModelForTier()`, display formatting |
+| `failover.ts` | Runtime failover: exponential-backoff cooldowns, error signatures, same-tier fallback |
 | `config.ts` | JSON persistence, `resolveFastEndpoint()`, validation |
 | `commands.ts` | `/router`, `/route-force`, config wizard |
 | `tui/model-picker.ts` | TUI picker mirroring pi's native `/model` UX |
@@ -421,25 +457,13 @@ git push origin --tags
 - **Two-tier > three-tier.** Execution vs judgment is the only axis that matters.
 - **LLM judge, not regex.** No keyword lists. The LLM is the sole classifier.
 - **Zero external runtime deps.** Only pi-agent SDK.
-- **Tests cover the algorithm.** 80 tests on the routing engine + tier + config + judge parser + chain editor.
+- **Tests cover the algorithm.** 176 tests on the routing engine + tier + config + judge parser + chain editor + runtime failover + judge fast-chain fallback.
 
 ---
 
 ## Roadmap
 
-| Phase | Status | Version |
-|-------|--------|---------|
-| Core engine + LLM Judge | ✅ | v0.1.0 |
-| TUI model picker + wizard | ✅ | v0.2.0 |
-| Two-tier redesign (CTO / Programmer) | ✅ | v0.3.0 |
-| Judge JSON-mode + judging indicator + verbose log | ✅ | v0.3.1 |
-| First npm publish (international docs + i18n + CI) | ✅ | v0.4.0 |
-| Runtime `Cannot find package` fix + `pack:check` guard | ✅ | v0.4.1 |
-| **Multi-model fallback chain editor** | ✅ | v0.5.0 |
-| Runtime failover (exponential backoff, same-tier) | ⏳ In progress | v0.6.0 |
-| Cache-aware routing | Planned | — |
-| Multilingual Judge prompt validation | Planned | — |
-| Per-session cost statistics | Planned | — |
+See [ROADMAP.md](ROADMAP.md) for release history and planned work.
 
 ---
 

@@ -191,23 +191,32 @@ function parseResponse(raw: Record<string, unknown>, apiType: string): Tier | nu
 // ─── Public API ───────────────────────────────────────────────────
 
 /**
- * Unified task classifier.
- * 1. If LLM endpoint is provided, try LLM judge (with timeout).
- * 2. On failure: log a warning and hold position (fast).
+ * Unified task classifier with fast-tier fallback.
+ *
+ * `endpoints` is the fast tier's model list (priority order). The Judge
+ * walks it: each failed call (429/5xx/network/timeout/unparseable) tries
+ * the next model. `isCooldown` (if provided) skips models in cooldown.
+ * Only when ALL fast-tier models fail do we hold position (fallback).
  */
 export async function classify(
   prompt: string,
-  fastEndpoint: ProviderEndpoint | null | undefined,
+  endpoints: ProviderEndpoint[] | null | undefined,
   timeout = 5000,
   verbose = false,
+  isCooldown?: (provider: string, model: string) => boolean,
 ): Promise<JudgeResult> {
-  if (fastEndpoint) {
+  const list = endpoints ?? [];
+
+  for (const endpoint of list) {
+    if (isCooldown?.(endpoint.provider, endpoint.modelId)) continue;
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout);
-    const result = await classifyLLM(prompt, fastEndpoint, controller.signal, verbose);
+    const result = await classifyLLM(prompt, endpoint, controller.signal, verbose);
     clearTimeout(timer);
     if (result) return result;
-    console.warn("[ShiftRouter] Judge LLM unavailable — holding position on current tier");
   }
+
+  console.warn("[ShiftRouter] Judge LLM unavailable — holding position on current tier");
   return { tier: "fast", source: "fallback" };
 }

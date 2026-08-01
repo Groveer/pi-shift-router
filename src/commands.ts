@@ -21,6 +21,9 @@ import {
   setManualOverrideModel,
 } from "./router.js";
 import {
+  formatRemaining,
+} from "./failover.js";
+import {
   getConfigPath,
   loadModelsStore,
   flattenModels,
@@ -344,6 +347,18 @@ export function registerCommands(
         const counts: Record<string, number> = { fast: 0, smart: 0 };
         for (const e of state.window) counts[e.tier]++;
 
+        // Cooldown summary (SPEC §8.5.4): models currently cooling down.
+        const now = Date.now();
+        const cooldownLines: string[] = [];
+        for (const [key, entry] of state.modelCooldowns) {
+          if (entry.until <= now) continue;
+          const [provider, ...rest] = key.split("/");
+          const model = rest.join("/");
+          cooldownLines.push(
+            `  ⏳ ${provider}/${model} — retry in ${formatRemaining(entry.until - now)}`,
+          );
+        }
+
         ctx.ui.notify(
           [
             `Mode: ${config.routing.mode.toUpperCase()}  Enabled: ${config.enabled ? "✅" : "⛔"}  Quiet: ${config.ux.quietMode ? "🔇" : "🔊"}`,
@@ -352,6 +367,9 @@ export function registerCommands(
             `Window: ${formatWindow(state.window)}  (${state.window.length} entries)`,
             `Counts: S=${counts.smart} F=${counts.fast}`,
             `Manual: ${state.manualOverride.active ? `✅ ${state.manualOverride.tier ?? state.manualOverride.modelId ?? "active"}` : "✗ None"}`,
+            ...(cooldownLines.length > 0
+              ? [``, `Cooldowns:`, ...cooldownLines]
+              : [``, `Cooldowns: none`]),
             ``,
             `Config: ${getConfigPath() ?? "N/A"}`,
             ``,

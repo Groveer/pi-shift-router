@@ -9,6 +9,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > (0.1.0 – 0.3.1) were developed under the `pi-slim-router` working name and never
 > published to npm. The plugin was first published to npm as `pi-shift-router` at v0.4.0.
 
+## [0.6.0] — Runtime failover (exponential backoff)
+
+### Added
+
+- **Runtime failover** (SPEC §8.5): when a model fails mid-turn with a
+  transient provider error, the router takes over after pi's own retries
+  give up.
+  - `agent_end` hook inspects the transcript for a failover signature
+    (429 / 5xx / `rate limit` / `quota` / `rate_limit_error` /
+    `insufficient_quota` / `Token Plan` / `用量上限`), marks the model
+    into exponential-backoff cooldown (1m, 2m, 4m, … capped at 30m),
+    and immediately calls `setModel` to the next healthy model **in the
+    same tier** — pi's pending retry then continues with the fallback.
+  - Cooldown-aware selection in `before_agent_start` (`processRoute` and
+    first-turn resolution) skips models in cooldown.
+  - `after_provider_response` hook clears a model's cooldown on a 2xx
+    response (immediate recovery).
+  - **Judge uses the full fast-tier chain** — `resolveFastEndpoints()`
+    resolves every fast model (priority order) and `classify()` walks it:
+    a 429/5xx/timeout on the primary fast model falls back to the next
+    one instead of giving up. The Judge shares the same cooldown map, so
+    a model that fails the Judge is also skipped by routing.
+  - `detectFailoverError` is signature-matching only (not a routing
+    decision) — auth/config errors (400/401) never trigger failover.
+  - `/route-force` (manual override) always bypasses cooldowns.
+  - Toast notification on failover
+    (`⚠️ M3 unavailable (429), switching to deepseek-v4-flash — retry in 1m`);
+    `/router status` lists active cooldowns (`⏳ minimax/MiniMax-M3 — retry in 3m12s`).
+  - New `src/failover.ts` module (pure functions, unit-tested):
+    `markModelFailed`, `isModelInCooldown`, `clearModelCooldown`,
+    `remainingCooldownMs`, `detectFailoverError`, `findFailoverModel`,
+    `planTurnFailover`, `findTierForModel`.
+- **56 new tests** (114 → 176): cooldown state machine, error signatures,
+  same-tier fallback selection, turn-failure detection, cooldown-aware
+  routing, manual-override bypass, tier reverse-lookup, Judge fast-chain
+  fallback (429/5xx/timeout/unparseable), `resolveFastEndpoints` chain
+  resolution.
+- **`vitest.config.ts`**: sandbox-compatible worker pool (single-thread
+  `threads`) + explicit `css: false`; added a valid empty `postcss.config.js`
+  so vite stops searching parent directories.
+
+### Changed
+
+- `RouterState` gains `modelCooldowns: Map<string, CooldownEntry>`.
+- `findBestModelForTier()` accepts an optional `isCooldown` predicate.
+- `processRoute()` accepts an optional `now` parameter (testability).
+
 ## [0.5.0] — Multi-model fallback chain editor
 
 ### Added

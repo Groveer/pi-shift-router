@@ -103,23 +103,31 @@ export function invalidateConfigCache(): void {
 // ─── Fast endpoint resolution ────────────────────────────────────
 
 /**
- * Resolve endpoint info for the LLM Judge (uses fast tier's model).
+ * Resolve endpoint info for the LLM Judge — the ENTIRE fast tier chain
+ * (priority order), so the Judge can fall back to the next fast model when
+ * one fails (SPEC §8.5 / runtime failover parity).
+ *
  * Order:
- *   1. fast tier's first model (user chose this as the cheap workhorse)
- *   2. cheapest model with valid auth (fallback)
+ *   1. fast tier's models in priority order (each with valid auth)
+ *   2. cheapest model with valid auth (global fallback)
  */
-export async function resolveFastEndpoint(config: ShiftRouterConfig): Promise<ProviderEndpoint | null> {
-  const store = await loadModelsStore();
-  const auth = await loadAuthStore();
+export async function resolveFastEndpoints(
+  config: ShiftRouterConfig,
+  storeOverride?: ModelsStore,
+  authOverride?: AuthStore,
+): Promise<ProviderEndpoint[]> {
+  const store = storeOverride ?? (await loadModelsStore());
+  const auth = authOverride ?? (await loadAuthStore());
 
   async function resolve(provider: string, modelId: string): Promise<ProviderEndpoint | null> {
     const provEntry = store[provider];
-    if (!provEntry) { console.warn(`[ShiftRouter] Judge: provider "${provider}" not found in store`); return null; }
+    if (!provEntry) return null;
     const modelInfo = provEntry.models.find((m) => m.id === modelId);
-    if (!modelInfo) { console.warn(`[ShiftRouter] Judge: model "${modelId}" not found in provider "${provider}"`); return null; }
+    if (!modelInfo) return null;
     const apiKey = auth[provider]?.key;
-    if (!apiKey) { console.warn(`[ShiftRouter] Judge: no API key for provider "${provider}"`); return null; }
+    if (!apiKey) return null;
     return {
+      provider,
       baseUrl: (modelInfo.baseUrl ?? "").replace(/\/+$/, ""),
       apiType: modelInfo.api ?? "openai-completions",
       apiKey,
@@ -127,14 +135,20 @@ export async function resolveFastEndpoint(config: ShiftRouterConfig): Promise<Pr
     };
   }
 
-  // 1. Use fast tier's first model as judge
-  const fastFirst = config.tiers.fast.models[0];
-  if (fastFirst) {
-    const ep = await resolve(fastFirst.provider, fastFirst.model);
-    if (ep) { console.log(`[ShiftRouter] Judge endpoint: ${fastFirst.provider}/${fastFirst.model}`); return ep; }
+  const endpoints: ProviderEndpoint[] = [];
+
+  // 1. Fast tier chain, in priority order.
+  const fastModels = [...(config.tiers.fast.models ?? [])].sort((a, b) => a.priority - b.priority);
+  for (const ref of fastModels) {
+    const ep = await resolve(ref.provider, ref.model);
+    if (ep) endpoints.push(ep);
+  }
+  if (endpoints.length > 0) {
+    console.log(`[ShiftRouter] Judge endpoints: ${endpoints.map((e) => `${e.provider}/${e.modelId}`).join(", ")}`);
+    return endpoints;
   }
 
-  // 2. Fallback: cheapest model with auth
+  // 2. Fallback: cheapest model with auth.
   const candidates: Array<{ provider: string; modelId: string; cost: number }> = [];
   for (const [prov, entry] of Object.entries(store)) {
     if (!auth[prov]?.key) continue;
@@ -146,10 +160,15 @@ export async function resolveFastEndpoint(config: ShiftRouterConfig): Promise<Pr
   candidates.sort((a, b) => a.cost - b.cost);
   if (candidates.length === 0) {
     console.warn("[ShiftRouter] Judge: no provider with valid API key found — cannot resolve judge endpoint");
-    return null;
+    return [];
   }
-  console.warn(`[ShiftRouter] Judge: fast tier unavailable, falling back to cheapest: ${candidates[0].provider}/${candidates[0].modelId}`);
-  return resolve(candidates[0].provider, candidates[0].modelId);
+  const cheapest = candidates[0];
+  const ep = await resolve(cheapest.provider, cheapest.modelId);
+  if (ep) {
+    console.warn(`[ShiftRouter] Judge: fast tier unavailable, falling back to cheapest: ${cheapest.provider}/${cheapest.modelId}`);
+    return [ep];
+  }
+  return [];
 }
 
 // ─── Config persistence ────────────────────────────────────────────

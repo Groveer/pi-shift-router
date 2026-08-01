@@ -128,6 +128,7 @@ export interface AuthStore {
 
 /** Resolved info for making an API call to a provider */
 export interface ProviderEndpoint {
+  provider: string;
   baseUrl: string;
   apiType: string;       // "openai-completions" | "anthropic-messages"
   apiKey: string;
@@ -142,6 +143,8 @@ export interface TierEntry {
   models: Array<{ provider: string; model: string }>;
 }
 
+import type { CooldownMap } from "./failover.js";
+
 /** Router internal state */
 export interface RouterState {
   currentTier: Tier;
@@ -154,4 +157,6 @@ export interface RouterState {
     modelId?: string;
     provider?: string;
   };
+  /** Models in exponential-backoff cooldown after runtime failure (SPEC §8.5) */
+  modelCooldowns: CooldownMap;
 }

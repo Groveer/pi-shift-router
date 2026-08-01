@@ -1,6 +1,6 @@
 {
   "name": "pi-shift-router",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Two-tier model router for pi-agent — automatic execution/judgment routing with LLM Judge. Pairs a fast everyday model with a strong model for planning and review.",
   "keywords": [
     "pi-package",
