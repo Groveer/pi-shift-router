@@ -3,13 +3,25 @@
 > Auto-routing Pi coding agent turns between fast execution and smart reasoning models — an LLM judge picks the right tier per turn, multi-model fallback chains keep you running, zero runtime dependencies.
 
 [![npm](https://img.shields.io/npm/v/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
+[![Downloads](https://img.shields.io/npm/dm/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
 [![Node](https://img.shields.io/badge/node-%E2%89%A524-green)](https://nodejs.org)
 [![Pi Agent](https://img.shields.io/badge/pi--agent-extension-purple)](https://github.com/earendil-works/pi-coding-agent)
 [![CI](https://github.com/green-dalii/pi-shift-router/actions/workflows/ci.yml/badge.svg)](https://github.com/green-dalii/pi-shift-router/actions)
+[![GitHub stars](https://img.shields.io/github/stars/green-dalii/pi-shift-router.svg)](https://github.com/green-dalii/pi-shift-router)
 
 [English] | [简体中文](README.zh-CN.md)
+
+---
+
+## TL;DR
+
+- **What it is:** A [pi-coding-agent](https://github.com/earendil-works/pi-coding-agent) extension that routes every turn to either a fast execution model or a smart judgment model.
+- **How it works:** Before each turn, a small LLM Judge (the fast-tier model itself) classifies the task as `fast` or `smart`; an LLM-as-classifier with exponential-backoff failover.
+- **Reliability:** Multi-model fallback chains per tier + exponential-backoff cooldown on 429/5xx — turns keep flowing when one provider rate-limits.
+- **Zero dependencies:** Pure TypeScript, no runtime deps. Single npm install, two-tier config, done.
+- **Stable since:** v0.4.0 (npm published, MIT, 176 unit tests, Node 24+).
 
 ---
 
@@ -93,8 +105,9 @@ This registers the package in pi-agent's `settings.json` and downloads it into `
 
 ### Configure
 
-```bash
-# Inside pi-agent:
+Inside pi-agent, run:
+
+```
 /router config
 ```
 
@@ -102,7 +115,7 @@ The wizard walks you through provider → model selection for both tiers. Pick a
 
 ### Verify
 
-```bash
+```
 /router status
 ```
 
@@ -428,27 +441,6 @@ After changing `src/`, rebuild and restart pi-agent:
 ```bash
 npm run build
 # restart pi-agent
-```
-
-### Releasing a new version
-
-```bash
-# 1. Bump version
-npm version patch  # or minor / major
-
-# 2. Validate before publish (test + build + pack:check)
-npm run prepublishOnly
-
-# 3. Publish (bypass 2FA token configured in ~/.npmrc)
-npm publish --registry=https://registry.npmjs.org/
-
-# 4. Update your local install
-pi remove pi-shift-router
-pi install npm:pi-shift-router
-
-# 5. Tag the release
-git tag -a v$(node -p "require('./package.json').version") -m "..."
-git push origin --tags
 ```
 
 ### Principles

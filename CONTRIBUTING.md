@@ -89,3 +89,41 @@ src/
 ## License
 
 By contributing, you agree that your contributions will be licensed under the [MIT](LICENSE) license.
+
+## Releasing a new version
+
+Only maintainers do this. Releases follow a manual checklist because pi's sandbox blocks
+`npm run` exit codes and the npm cache is owned by root; the workaround is documented here
+so future releases stay reproducible.
+
+```bash
+# 1. Bump version (commit message will follow the modules convention)
+npm version patch   # or: minor / major
+
+# 2. Validate before publish (test + build + pack:check).
+#    If you hit "EPERM" or "Maximum call stack size exceeded" under a sandbox,
+#    run the underlying commands directly:
+node --experimental-vm-modules node_modules/vitest/vitest.mjs run
+node node_modules/typescript/lib/tsc.js
+node scripts/copy-assets.mjs
+node scripts/pack-check.mjs
+
+# 3. Publish. Use --ignore-scripts when the npm wrapper returns 255
+#    even though the underlying commands succeed.
+NPM_CONFIG_CACHE=/tmp/npm-cache npm publish --ignore-scripts \
+  --registry=https://registry.npmjs.org/
+
+# 4. Push the commit and the tag to GitHub
+git push origin main
+git push origin v$(node -p "require('./package.json').version")
+
+# 5. Edit the GitHub Release notes for the tag (optional but recommended)
+gh release create v$(node -p "require('./package.json').version") --generate-notes
+```
+
+After publishing, update your local install:
+
+```bash
+pi remove pi-shift-router
+pi install npm:pi-shift-router
+```

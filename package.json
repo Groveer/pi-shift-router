@@ -1,15 +1,24 @@
 {
   "name": "pi-shift-router",
   "version": "0.6.0",
-  "description": "Two-tier model router for pi-agent — automatic execution/judgment routing with LLM Judge. Pairs a fast everyday model with a strong model for planning and review.",
+  "description": "Two-tier model router for pi-coding-agent — automatic execution/judgment routing with LLM Judge, multi-model fallback chains, and exponential-backoff runtime failover. Zero runtime dependencies.",
   "keywords": [
     "pi-package",
     "pi-extension",
+    "pi-coding-agent",
+    "pi-agent",
     "shift-router",
     "model-routing",
     "ai-router",
     "llm-router",
-    "model-selection"
+    "model-selection",
+    "task-classifier",
+    "llm-judge",
+    "two-tier-routing",
+    "multi-model-fallback",
+    "exponential-backoff",
+    "agent-failover",
+    "rate-limit-handling"
   ],
   "license": "MIT",
   "homepage": "https://github.com/green-dalii/pi-shift-router#readme",

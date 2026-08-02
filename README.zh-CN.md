@@ -3,14 +3,41 @@
 > 为 Pi coding agent 自动路由每轮任务 —— 在 Fast 执行模型与 Smart 判断模型间动态切换，LLM Judge 自动分类，支持多模型 fallback 链，零运行时依赖。
 
 [![npm](https://img.shields.io/npm/v/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
+[![Downloads](https://img.shields.io/npm/dm/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
 [![Pi Agent](https://img.shields.io/badge/pi--agent-extension-purple)](https://github.com/earendil-works/pi-coding-agent)
 [![CI](https://github.com/green-dalii/pi-shift-router/actions/workflows/ci.yml/badge.svg)](https://github.com/green-dalii/pi-shift-router/actions)
+[![GitHub stars](https://img.shields.io/github/stars/green-dalii/pi-shift-router.svg)](https://github.com/green-dalii/pi-shift-router)
 
 [English](README.md) | [简体中文]
 
 ---
+
+## 摘要
+
+- **是什么**：[pi-coding-agent](https://github.com/earendil-works/pi-coding-agent) 扩展。每轮任务根据心智模式自动路由到 fast 执行模型 或 smart 判断模型。
+- **怎么工作**：每轮开始前，用一个小型 LLM Judge（就是 fast 层模型本身）把任务分类为 `fast` 或 `smart`。LLM 作分类器 + 指数退避故障转移。
+- **可靠性**：每层多模型 fallback 链 + 429/5xx 下的指数退避冷却 —— 一个 Provider 限流时任务依然进行。
+- **零运行时依赖**：纯 TypeScript，单个 npm install + 两层配置即可。
+- **稳定状态**：v0.4.0 起 npm 发布（MIT / 176 单测 / Node 24+）。
+
+---
+
+## 目录
+
+- [问题](#问题)
+- [解决方案](#解决方案)
+- [快速开始](#快速开始)
+- [工作原理](#工作原理)
+- [对比一览](#对比一览)
+- [The Judge](#the-judge)
+- [命令](#命令)
+- [配置](#配置)
+- [架构](#架构)
+- [故障排查](#故障排查)
+- [贡献](#贡献)
+- [许可](#许可)
 
 ## 问题
 
@@ -311,6 +338,46 @@ npm test
 **pi-shift-router** 由 [green-dalii](https://github.com/green-dalii) 开发并维护。
 
 欢迎贡献 —— 见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+---
+
+## 贡献
+
+Bug 报告、特性想法、文档改进、代码改动，都欢迎。先读 [CONTRIBUTING.md](CONTRIBUTING.md)；设计契约见 [SPEC.md](SPEC.md)，开发哲学见 [AGENTS.md](AGENTS.md)。
+
+---
+
+## 故障排查
+
+### Judge 解析失败警告
+
+最常见原因：
+
+- **推理模型 token 不够**。DeepSeek Reasoner 等会把推理内容放在 `reasoning_content`、JSON 放在 `content` 中。路由器默认 `max_tokens: 4000`，极长 prompt 可能不足。试用 `/router verbose` 看原始响应。
+- **Provider 不支持 JSON mode**。部分自定义 OpenAI 兼容端点会忽略 `response_format`。
+- **API key 失效**。检查 pi-agent 的 `auth.json`，确认 key 可用。
+
+### 向导里“找不到模型”
+
+模型列表来自 pi-agent 的 `models-store.json`。新配置的 provider 不显示，重启 pi-agent 让其重新发现。
+
+### 状态栏一直显示 ⛔
+
+路由器被禁用了。运行 `/router on`。如果 config 里 `enabled: true` 却仍显示 ⛔，看 `/router status` 的 `Config:` 行确认读取的配置文件路径。
+
+### “Model not found” 警告
+
+配置的 model ID 在 Provider 里不存在。更新 model ID 或重新跑 `/router config`（向导只会列出真实存在的模型）。
+
+### 总是被降级到 Fast
+
+要么 Judge 误分类（用 `/router verbose` 查看），要么滑动窗口阈值太激进。调整：
+
+```json
+"routing": { "window": { "size": 5, "threshold": 0.8 } }
+```
+
+`0.8` 要求最近 5 轮中至少 4 轮是 Fast 才降级。
 
 ---
 
