@@ -20,6 +20,11 @@ export function createRouterState(): RouterState {
     window: [],
     manualOverride: { active: false },
     modelCooldowns: createCooldowns(),
+    totalOutputTokens: 0,
+    recentSpeeds: [],
+    streamingStartTime: null,
+    upgradeCount: 0,
+    downgradeCount: 0,
   };
 }
 
@@ -31,7 +36,7 @@ function shouldUpgrade(current: Tier, target: Tier): boolean {
   return tierIndex(target) > tierIndex(current);
 }
 
-function analyzeDowngrade(
+export function analyzeDowngrade(
   window: WindowEntry[],
   currentTier: Tier,
   config: ShiftRouterConfig,
@@ -39,13 +44,27 @@ function analyzeDowngrade(
   // Can't downgrade further from fast
   if (currentTier !== "smart") return { shouldDowngrade: false, targetTier: null };
 
-  const { size, threshold } = config.routing.window;
+  const { size, threshold, minConfidence } = config.routing.window;
+  const minConf = minConfidence ?? 0.5;
   if (window.length === 0) return { shouldDowngrade: false, targetTier: null };
 
   const relevant = window.slice(-Math.min(window.length, size));
-  const fastCount = relevant.filter((e) => e.tier === "fast").length;
-  const ratio = fastCount / relevant.length;
 
+  // Confidence-weighted ratio: entries below minConfidence are ignored.
+  // weighted ratio = Σ confidence_for_fast / count_of_considered_entries
+  let considered = 0;
+  let fastConfidenceSum = 0;
+  for (const e of relevant) {
+    const conf = e.confidence ?? 1.0;
+    if (conf < minConf) continue;
+    considered += 1;
+    if (e.tier === "fast") fastConfidenceSum += conf;
+  }
+
+  // All entries below minConfidence → no signal → don't downgrade
+  if (considered === 0) return { shouldDowngrade: false, targetTier: null };
+
+  const ratio = fastConfidenceSum / considered;
   if (ratio >= threshold) {
     return { shouldDowngrade: true, targetTier: "fast" };
   }
@@ -93,12 +112,17 @@ export function processRoute(
     if (m) {
       // Clear window on upgrade (fresh start for the new tier)
       state.window = [];
+      state.upgradeCount += 1;
       return { switchTo: m, action: "upgrade" };
     }
   }
 
   // 3. Push current judgment to window
-  state.window.push({ tier: targetTier, timestamp: Date.now() });
+  state.window.push({
+    tier: targetTier,
+    timestamp: Date.now(),
+    confidence: judgeResult.confidence,
+  });
 
   // Cap window
   const maxSize = config.routing.window.size;
@@ -110,7 +134,10 @@ export function processRoute(
   const down = analyzeDowngrade(state.window, state.currentTier, config);
   if (down.shouldDowngrade && down.targetTier) {
     const m = findBestModelForTier(down.targetTier, config, modelRegistry, cooldownPredicate(state.modelCooldowns, now));
-    if (m) return { switchTo: m, action: "downgrade" };
+    if (m) {
+      state.downgradeCount += 1;
+      return { switchTo: m, action: "downgrade" };
+    }
   }
 
   return { switchTo: null, action: "stay" };

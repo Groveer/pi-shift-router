@@ -122,8 +122,15 @@ async function classifyLLM(
       );
       return null;
     }
-    if (verbose) console.log(`[ShiftRouter] Judge → ${answer}`);
-    return { tier: answer, source: "llm" };
+    if (verbose) {
+      console.log(
+        `[ShiftRouter] Judge → ${answer.tier}` +
+        (answer.confidence !== undefined ? ` (confidence ${answer.confidence.toFixed(2)})` : ""),
+      );
+    }
+    return answer.confidence !== undefined
+      ? { tier: answer.tier, source: "llm", confidence: answer.confidence }
+      : { tier: answer.tier, source: "llm" };
   } catch (err) {
     console.warn(`[ShiftRouter] Judge fetch failed for ${endpoint.baseUrl}: ${err}`);
     return null;
@@ -162,7 +169,13 @@ function buildRequestBody(endpoint: ProviderEndpoint, prompt: string): Record<st
   };
 }
 
-function parseResponse(raw: Record<string, unknown>, apiType: string): Tier | null {
+/** Result of parsing a Judge response: tier + optional confidence (0-1). */
+export interface ParsedJudgeResponse {
+  tier: Tier;
+  confidence?: number;
+}
+
+function parseResponse(raw: Record<string, unknown>, apiType: string): ParsedJudgeResponse | null {
   try {
     let contentText = "";
     let reasoningText = "";
@@ -177,15 +190,39 @@ function parseResponse(raw: Record<string, unknown>, apiType: string): Tier | nu
       reasoningText = msg.reasoning_content ?? "";
     }
 
-    // 1. Primary: parse content
-    const fromContent = extractTier(contentText);
+    // Try content first, then reasoning. Each can yield {tier, confidence}.
+    const fromContent = parseJudgeAnswer(contentText);
     if (fromContent) return fromContent;
-
-    // 2. Fallback: try reasoning_content (CoT models occasionally emit answer there)
-    return extractTier(reasoningText);
+    return parseJudgeAnswer(reasoningText);
   } catch {
     return null;
   }
+}
+
+/** Parse a Judge answer string (JSON or loose) for tier + confidence. */
+function parseJudgeAnswer(text: string): ParsedJudgeResponse | null {
+  const tier = extractTier(text);
+  if (!tier) return null;
+  const confidence = parseConfidenceFromText(text);
+  return confidence === undefined ? { tier } : { tier, confidence };
+}
+
+/** Extract confidence (0-1) from a Judge answer string. Returns undefined when absent/invalid. */
+function parseConfidenceFromText(text: string): number | undefined {
+  // Try JSON first: {"tier":"fast","confidence":0.85}
+  const jsonMatch = text.match(/\{[\s\S]*"confidence"\s*:\s*([0-9]*\.?[0-9]+)[\s\S]*\}/);
+  if (jsonMatch) {
+    const n = Number(jsonMatch[1]);
+    if (Number.isFinite(n) && n >= 0 && n <= 1) return n;
+    return undefined;
+  }
+  // Loose: confidence: 0.85 or confidence=0.85
+  const looseMatch = text.match(/["']?confidence["']?\s*[:=]\s*([0-9]*\.?[0-9]+)/i);
+  if (looseMatch) {
+    const n = Number(looseMatch[1]);
+    if (Number.isFinite(n) && n >= 0 && n <= 1) return n;
+  }
+  return undefined;
 }
 
 // ─── Public API ───────────────────────────────────────────────────

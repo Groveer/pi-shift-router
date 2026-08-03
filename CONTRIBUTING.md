@@ -86,6 +86,89 @@ src/
 
 **Dependency rule:** `index → router → judge|tier → config → types`. No circular imports.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Entry
+        I["index.ts<br/>Lifecycle hooks"]
+    end
+    subgraph Engine
+        R["router.ts<br/>processRoute + sliding window"]
+        J["judge.ts<br/>LLM classifier (JSON mode)"]
+        T["tier.ts<br/>Model lookup"]
+        F["failover.ts<br/>Cooldown + same-tier fallback"]
+    end
+    subgraph Persistence
+        C["config.ts<br/>JSON persistence"]
+    end
+    subgraph UX
+        M["commands.ts<br/>Slash commands + wizard"]
+    end
+
+    I --> R & M
+    R --> J & T & F
+    M --> C
+    T --> C
+    F --> C
+    C --> Y["types.ts<br/>DEFAULT_CONFIG"]
+```
+
+### Module Map
+
+| File | Responsibility |
+|------|---------------|
+| `index.ts` | Lifecycle hooks: `session_start` (read-only), `before_agent_start` (classify + route), `agent_end` (failover), `after_provider_response` (cooldown recovery) |
+| `router.ts` | `processRoute()`, `applyModelSwitch()`, sliding window |
+| `judge.ts` | LLM Judge with JSON-mode enforcement + 3-layer parse fallback |
+| `tier.ts` | Model lookup, `findBestModelForTier()`, display formatting |
+| `failover.ts` | Runtime failover: exponential-backoff cooldowns, error signatures, same-tier fallback |
+| `config.ts` | JSON persistence, `resolveFastEndpoints()`, validation |
+| `commands.ts` | `/router`, `/route-force`, config wizard |
+| `tui/model-picker.ts` | TUI picker mirroring pi's native `/model` UX |
+| `tui/fallback-chain-editor.ts` | Chain editor: add / remove / reorder tier models with hotkeys |
+| `types.ts` | All interfaces + `DEFAULT_CONFIG` |
+
+### Dependency Chain
+
+```
+index.ts → router.ts → judge.ts | tier.ts | failover.ts → config.ts → types.ts
+commands.ts → config.ts, tier.ts, router.ts, types.ts
+```
+
+One-way, no cycles. See [`SPEC.md`](SPEC.md) for the full design.
+
+## Development
+
+### Local install (for testing in pi)
+
+The canonical install is the npm package. For local dev iteration against your checkout, use pi's path install:
+
+```bash
+# Remove any globally-installed version first (avoid duplicate plugins)
+pi remove pi-shift-router
+
+# Install from local path — pi runs npm install against this folder
+pi install /Users/greener/project/slimrouter
+```
+
+After changing `src/`, rebuild and restart pi-agent:
+
+```bash
+npm run build
+# restart pi-agent
+```
+
+### Scripts
+
+| Script | What it does |
+|--------|--------------|
+| `npm run build` | TypeScript compile + copy `prompts/` to `dist/` |
+| `npm run typecheck` | `tsc --noEmit` strict mode |
+| `npm test` | Run vitest once |
+| `npm run test:watch` | vitest watch mode |
+| `npm run clean` | Remove `node_modules/` and `dist/` |
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the [MIT](LICENSE) license.

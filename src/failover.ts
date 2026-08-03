@@ -180,6 +180,24 @@ export function formatRemaining(ms: number): string {
   return m > 0 ? `${m}m${s}s` : `${s}s`;
 }
 
+/** Max number of recent speed samples kept for averaging. */
+export const SPEED_WINDOW_SIZE = 5;
+
+/**
+ * Compute tokens-per-second from elapsed ms and output tokens.
+ * Returns 0 when elapsed ≤ 0 or output_tokens ≤ 0.
+ */
+export function tokensPerSecond(outputTokens: number, elapsedMs: number): number {
+  if (elapsedMs <= 0 || outputTokens <= 0) return 0;
+  return Math.round((outputTokens / elapsedMs) * 1000);
+}
+
+/** Push a new speed reading into the sliding window (evict oldest beyond limit). */
+export function recordSpeed(speeds: number[], tps: number): void {
+  speeds.push(tps);
+  while (speeds.length > SPEED_WINDOW_SIZE) speeds.shift();
+}
+
 // ── Integration helpers (SPEC §8.5.2) ──────────────────────────────
 // These are kept pure and dependency-injected so they can be unit-tested
 // without touching pi's extension API. index.ts wires them to hooks.

@@ -13,6 +13,7 @@ import {
   tierEmoji,
   tierLabel,
   formatTierDisplay,
+  formatTierDisplayWithSpeed,
 } from "../src/tier.js";
 import { DEFAULT_CONFIG, type ShiftRouterConfig } from "../src/types.js";
 
@@ -155,6 +156,25 @@ describe("formatTierDisplay", () => {
 
   it("uses ellipsis when modelId is null", () => {
     expect(formatTierDisplay("smart", null)).toBe("[🧠 …]");
+  });
+});
+
+// ─── formatTierDisplayWithSpeed ────────────────────────────────────
+describe("formatTierDisplayWithSpeed", () => {
+  it("appends tok/s when speed > 0", () => {
+    expect(formatTierDisplayWithSpeed("smart", "kimi/kimi-k3", 23))
+      .toBe("[🧠 kimi-k3] • 23 tok/s");
+  });
+
+  it("omits speed when 0 or negative", () => {
+    expect(formatTierDisplayWithSpeed("smart", "kimi/kimi-k3", 0))
+      .toBe("[🧠 kimi-k3]");
+    expect(formatTierDisplayWithSpeed("smart", "kimi/kimi-k3", -1))
+      .toBe("[🧠 kimi-k3]");
+  });
+
+  it("falls back to base when tier is null", () => {
+    expect(formatTierDisplayWithSpeed(null, "x", 10)).toBe("");
   });
 });
 

@@ -6,16 +6,16 @@ classify it into one of two tiers representing the **cognitive mode** to handle 
 **Respond with ONLY this exact JSON format, no other text, no markdown fences:**
 
 ```json
-{"tier": "fast"}
+{"tier": "fast", "confidence": 0.95}
 ```
 
 or
 
 ```json
-{"tier": "smart"}
+{"tier": "smart", "confidence": 0.85}
 ```
 
-The classification word (`fast` or `smart`) must appear on its own with no extra prose.
+The classification word (`fast` or `smart`) and the `confidence` value must appear on its own with no extra prose. The confidence is a float in [0, 1] indicating how clearly the signals point to that tier — higher = clearer, low (~0.3) means the signals were mixed. The router treats low-confidence votes as uncertain.
 
 ## What each tier means
 

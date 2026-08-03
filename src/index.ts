@@ -9,7 +9,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { Tier, ShiftRouterConfig, RouterState, ProviderEndpoint } from "./types.js";
 import { loadConfig, resolveFastEndpoints } from "./config.js";
-import { findBestModelForTier, formatTierDisplay } from "./tier.js";
+import { findBestModelForTier, formatTierDisplay, formatTierDisplayWithSpeed } from "./tier.js";
 import { classify } from "./judge.js";
 import {
   createRouterState,
@@ -25,6 +25,8 @@ import {
   cooldownPredicate,
   remainingCooldownMs,
   formatRemaining,
+  tokensPerSecond,
+  recordSpeed,
 } from "./failover.js";
 import { registerCommands } from "./commands.js";
 
@@ -59,8 +61,9 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
 
   function updateBar(ui: any, cfg: ShiftRouterConfig, s: RouterState) {
     if (!cfg.ux.statusBar) { ui.setStatus("shift-router", undefined); return; }
+    const speed = s.recentSpeeds.length > 0 ? s.recentSpeeds[s.recentSpeeds.length - 1] : 0;
     const badge = cfg.enabled
-      ? formatTierDisplay(s.currentTier, s.currentModelId)
+      ? formatTierDisplayWithSpeed(s.currentTier, s.currentModelId, speed)
       : "⛔";
     ui.setStatus("shift-router", badge);
   }
@@ -224,6 +227,61 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
         }
       }
     }
+  });
+
+  // Track token throughput. message_start records when streaming began;
+  // message_end computes tokens/sec from elapsed time and usage.output.
+
+  pi.on("message_start", async (_event, ctx) => {
+    if (!initialized) await init(ctx);
+    const msg: any = (_event as any).message;
+    // Use Date.now() rather than msg.timestamp because at stream-start the
+    // timestamp field may not yet be populated on the partial message.
+    if (msg?.role === "assistant") {
+      state.streamingStartTime = Date.now();
+    }
+  });
+
+  pi.on("message_end", async (event, ctx) => {
+    if (!initialized) await init(ctx);
+    const msg: any = (event as any).message;
+    if (!msg || msg.role !== "assistant") return;
+
+    const usage = msg.usage;
+    const outputTokens: number = usage?.output ?? 0;
+    state.totalOutputTokens += outputTokens;
+
+    // Compute throughput from wall-clock elapsed (we used Date.now() at
+    // message_start, so streamingStartTime is reliably set for any assistant
+    // message that ran through streaming).
+    const startTime = state.streamingStartTime;
+    if (startTime !== null && outputTokens > 0) {
+      const elapsed = Date.now() - startTime;
+      const tps = tokensPerSecond(outputTokens, elapsed);
+      if (tps > 0) {
+        recordSpeed(state.recentSpeeds, tps);
+        if (config.ux.routerLogVerbose) {
+          console.log(
+            `[ShiftRouter] ${outputTokens} tokens in ${elapsed}ms = ${tps} tok/s (total ${state.totalOutputTokens.toLocaleString()})`,
+          );
+        }
+      } else if (config.ux.routerLogVerbose) {
+        // tokens>0 but elapsed<=0 — defensive log so we can see time-source issues
+        console.log(
+          `[ShiftRouter] message_end: tokens=${outputTokens} elapsed=${elapsed}ms startTime=${startTime} msgTs=${msg.timestamp}`,
+        );
+      }
+    } else if (config.ux.routerLogVerbose) {
+      console.log(
+        `[ShiftRouter] message_end: tokens=${outputTokens} startTime=${startTime} usage=${usage ? JSON.stringify(usage) : "undefined"}`,
+      );
+    }
+
+    // Always reset start time and refresh status bar — guarantees the bar
+    // updates even when output_tokens=0 (reasoning-only models, free providers,
+    // etc.).
+    state.streamingStartTime = null;
+    updateBar(ctx.ui, config, state);
   });
 
   // ── Commands ────────────────────────────────────────────────

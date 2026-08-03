@@ -20,9 +20,8 @@ import {
   clearManualOverride,
   setManualOverrideModel,
 } from "./router.js";
-import {
-  formatRemaining,
-} from "./failover.js";
+import { formatStats } from "./stats.js";
+import { formatRemaining } from "./failover.js";
 import {
   getConfigPath,
   loadModelsStore,
@@ -302,7 +301,7 @@ export function registerCommands(
   pi.registerCommand("router", {
     description: "pi-shift-router: show status, enable/disable",
     getArgumentCompletions: (prefix: string) => {
-      const cmds = ["on", "off", "status", "quiet", "verbose", "config"].filter((c) => c.startsWith(prefix));
+      const cmds = ["on", "off", "status", "stats", "quiet", "verbose", "config"].filter((c) => c.startsWith(prefix));
       return cmds.length > 0 ? cmds.map((c) => ({ value: c, label: c })) : null;
     },
     handler: async (args, ctx) => {
@@ -343,7 +342,7 @@ export function registerCommands(
         );
         return;
       }
-      if (arg === "status") {
+      if (arg === "status" || arg === "stats") {
         const counts: Record<string, number> = { fast: 0, smart: 0 };
         for (const e of state.window) counts[e.tier]++;
 
@@ -359,6 +358,7 @@ export function registerCommands(
           );
         }
 
+        const stats = formatStats(state, config).split("\n");
         ctx.ui.notify(
           [
             `Mode: ${config.routing.mode.toUpperCase()}  Enabled: ${config.enabled ? "✅" : "⛔"}  Quiet: ${config.ux.quietMode ? "🔇" : "🔊"}`,
@@ -370,6 +370,9 @@ export function registerCommands(
             ...(cooldownLines.length > 0
               ? [``, `Cooldowns:`, ...cooldownLines]
               : [``, `Cooldowns: none`]),
+            ``,
+            `Stats:`,
+            ...stats.map((line) => `  ${line}`),
             ``,
             `Config: ${getConfigPath() ?? "N/A"}`,
             ``,

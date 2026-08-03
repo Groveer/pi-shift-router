@@ -18,6 +18,8 @@ import {
   remainingCooldownMs,
   detectFailoverError,
   findFailoverModel,
+  tokensPerSecond,
+  recordSpeed,
   COOLDOWN_BASE_MS,
   COOLDOWN_MAX_MS,
 } from "../src/failover.js";
@@ -263,6 +265,33 @@ describe("findFailoverModel — same tier only, skips cooldowns", () => {
     ]);
     const r = findFailoverModel("fast", config, registry, undefined, NOW);
     expect(r?.modelId).toBe("M3");
+  });
+
+  it("records and trims speed samples", () => {
+    const speeds: number[] = [];
+    recordSpeed(speeds, 10);
+    expect(speeds).toEqual([10]);
+    recordSpeed(speeds, 20);
+    recordSpeed(speeds, 30);
+    expect(speeds).toEqual([10, 20, 30]);
+    recordSpeed(speeds, 40);
+    recordSpeed(speeds, 50);
+    recordSpeed(speeds, 60); // pushes out first
+    expect(speeds.length).toBe(5);
+    expect(speeds[0]).toBe(20);
+  });
+
+  it("tokensPerSecond returns 0 for invalid inputs", () => {
+    expect(tokensPerSecond(0, 1000)).toBe(0);
+    expect(tokensPerSecond(100, 0)).toBe(0);
+    expect(tokensPerSecond(100, -1)).toBe(0);
+  });
+
+  it("tokensPerSecond rounds correctly", () => {
+    // 100 tokens in 2000ms = 50 tok/s
+    expect(tokensPerSecond(100, 2000)).toBe(50);
+    // 30 tokens in 1500ms = 20 tok/s
+    expect(tokensPerSecond(30, 1500)).toBe(20);
   });
 
   it("supports excluding the current model (immediate failover)", () => {

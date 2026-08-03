@@ -30,8 +30,9 @@ describe("Judge prompt structure", () => {
     // Must explicitly forbid prose / markdown fences
     expect(prompt).toMatch(/no markdown fences/i);
     expect(prompt).toMatch(/no other text/i);
-    expect(prompt).toMatch(/\{"tier":\s*"fast"\}/);
-    expect(prompt).toMatch(/\{"tier":\s*"smart"\}/);
+    // Must include both tier literals in the example outputs
+    expect(prompt).toMatch(/"tier"\s*:\s*"fast"/);
+    expect(prompt).toMatch(/"tier"\s*:\s*"smart"/);
   });
 
   it("specifies the strict 'no extra prose' wording", () => {

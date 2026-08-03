@@ -16,6 +16,13 @@ export const TIERS: readonly Tier[] = ["fast", "smart"] as const;
 export interface JudgeResult {
   tier: Tier;
   source: "llm" | "fallback";
+  /**
+   * LLM's confidence in the tier classification, in [0, 1].
+   * Used by the confidence-weighted sliding window: entries below
+   * `window.minConfidence` are ignored; weighted ratio decides downgrade.
+   * Defaults to 1.0 when the Judge doesn't emit it (backward-compat).
+   */
+  confidence?: number;
 }
 
 /** A reference to a specific model in a specific provider */
@@ -46,8 +53,12 @@ export interface RoutingConfig {
   mode: "auto" | "manual" | "off";
   /** LLM Judge timeout in ms */
   judgeTimeout: number;
-  /** Sliding window: downgrade only when ≥threshold fraction of last `size` entries are the lower tier */
-  window: { size: number; threshold: number };
+  /**
+   * Sliding window for downgrade gating. Entries whose confidence is
+   * below `minConfidence` are ignored. Downgrade fires when
+   * `Σ confidence_for_fast / window_size` ≥ `threshold`.
+   */
+  window: { size: number; threshold: number; minConfidence?: number };
 }
 
 /** Full SLIM Router configuration */
@@ -79,7 +90,7 @@ export const DEFAULT_CONFIG: ShiftRouterConfig = {
   routing: {
     mode: "auto",
     judgeTimeout: 5000,
-    window: { size: 5, threshold: 0.6 },
+    window: { size: 5, threshold: 0.6, minConfidence: 0.5 },
   },
   ux: {
     quietMode: false,
@@ -119,6 +130,11 @@ export interface ModelsStore {
 export interface WindowEntry {
   tier: Tier;
   timestamp: number;
+  /**
+   * Confidence of this classification (defaults to 1.0 when missing).
+   * Used by the confidence-weighted sliding window.
+   */
+  confidence?: number;
 }
 
 /** Auth store shape — maps provider name to API key */
@@ -159,4 +175,14 @@ export interface RouterState {
   };
   /** Models in exponential-backoff cooldown after runtime failure (SPEC §8.5) */
   modelCooldowns: CooldownMap;
+  /** Cumulative output tokens across the session (from AssistantMessage.usage.output). */
+  totalOutputTokens: number;
+  /** Sliding window of recent tokens-per-second readings (for `/router stats`). */
+  recentSpeeds: number[];
+  /** Epoch ms when the current in-flight assistant message started streaming; null when none. */
+  streamingStartTime: number | null;
+  /** Cumulative count of fast→smart tier transitions. */
+  upgradeCount: number;
+  /** Cumulative count of smart→fast tier transitions. */
+  downgradeCount: number;
 }

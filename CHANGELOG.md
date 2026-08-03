@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > (0.1.0 – 0.3.1) were developed under the `pi-slim-router` working name and never
 > published to npm. The plugin was first published to npm as `pi-shift-router` at v0.4.0.
 
+## [0.8.0] — Token throughput + `/router stats` + Tuning Guide
+
+### Added
+
+- **Status bar shows tokens/sec** — when a message finishes streaming, the footer displays `[🧠 kimi-k3 • 23 tok/s]` based on `usage.output / elapsed_ms`. Hooked via `message_start` (records stream start timestamp) + `message_end` (computes throughput, pushes into a 5-sample sliding window).
+- **`/router stats`** — new command showing:
+  - window size + confidence distribution (high/mid/low/none buckets)
+  - cumulative `↑upgrade` / `↓downgrade` counts
+  - cumulative output tokens + current / average tokens-per-second
+  - active cooldowns with remaining time
+- **New pure module `src/stats.ts`** — `computeStats(state, config, now?)` for testable snapshots; `formatStats(state, config)` for the command output.
+- **`RouterState` extended** with `totalOutputTokens`, `recentSpeeds`, `streamingStartTime`, `upgradeCount`, `downgradeCount`. Backwards-compatible defaults (zero).
+- **Pure helpers in `src/failover.ts`**: `tokensPerSecond(output, elapsedMs)`, `recordSpeed(speeds, tps)` + `SPEED_WINDOW_SIZE = 5`. Unit-tested.
+- **`formatTierDisplayWithSpeed(tier, modelId, tps)`** in `src/tier.ts` — drops the suffix when speed is 0.
+- **Tuning Guide section** in both READMEs: workload-to-recommendation table, knob-by-knob explanation, sample `/router stats` reading guide.
+- **14 new tests** (188 → 202): stats snapshot, confidence bucketing, speed helpers, status-bar formatting.
+
+### Changed
+
+- `processRoute` now increments `state.upgradeCount` / `state.downgradeCount` on tier transitions (for stats).
+- `/router` autocomplete now includes `stats`.
+
+---
+
+## [0.7.0] — Confidence-weighted sliding window
+
+### Added
+
+- **Confidence-weighted sliding window** — Judge now emits `{"tier":"...","confidence":0.0-1.0}` instead of just the tier. Entries whose confidence is below `routing.window.minConfidence` (default `0.5`) are ignored by the downgrade gate. The downgrade ratio is the **sum of confidences for fast entries / count of considered entries**, so a single low-confidence vote can't nudge the gate either way.
+- **New config field** `routing.window.minConfidence` (default `0.5`). Entries below this threshold are skipped entirely. Set to `0` to restore pure-count behavior.
+- **`JudgeResult.confidence?: number`** and **`WindowEntry.confidence?: number`** propagate confidence from the Judge through the window.
+- **Judge prompt** now explicitly requests a `confidence` field with the rationale ("higher = clearer signal, low means mixed signals"). The strict `must appear on its own with no extra prose` wording is preserved.
+- **12 new tests** (176 → 188): confidence parsing, weighted downgrade, low-confidence skip, threshold gating, default 1.0 for legacy entries, window-size cap interaction with confidence.
+
+### Changed
+
+- `routing.window.minConfidence` added to `DEFAULT_CONFIG.routing.window`.
+- `analyzeDowngrade` now exported (was internal) for direct unit testing.
+- `parseResponse` returns `ParsedJudgeResponse` (`{tier, confidence?}`) instead of bare `Tier`.
+
+---
+
 ## [0.6.0] — Runtime failover (exponential backoff)
 
 ### Added
