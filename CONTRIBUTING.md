@@ -148,8 +148,8 @@ The canonical install is the npm package. For local dev iteration against your c
 # Remove any globally-installed version first (avoid duplicate plugins)
 pi remove pi-shift-router
 
-# Install from local path — pi runs npm install against this folder
-pi install /Users/greener/project/slimrouter
+# Install from local path — runs `npm install` against this folder
+pi install <path-to-this-repo>    # e.g. `pi install .` from the repo root, or `pi install ~/code/pi-shift-router`
 ```
 
 After changing `src/`, rebuild and restart pi-agent:
