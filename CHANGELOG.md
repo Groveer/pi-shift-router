@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > (0.1.0 – 0.3.1) were developed under the `pi-slim-router` working name and never
 > published to npm. The plugin was first published to npm as `pi-shift-router` at v0.4.0.
 
+## [0.8.1] — Judge crash fix
+
+### Fixed
+
+- **Judge "Cannot read 'slice' of undefined" crash** — when an LLM endpoint returns HTTP 200 with an error-shaped body (no `choices[]`, which some OpenAI-compatible providers do for 429/5xx), `JSON.stringify(undefined)` returned the actual `undefined` value, which then crashed `content.slice(...)` in the verbose log. Wrapped all `.slice()` calls in a `jsonStr()` helper that returns the literal string `"undefined"` for `undefined` input. Regression tests added for "200 + error body" and "200 + empty choices" scenarios.
+- **README badges restored** — TypeScript + Pi Agent badges removed in the earlier SEO pass are back. They signal language stack and that this is a pi-coding-agent extension.
+
 ## [0.8.0] — Token throughput + `/router stats` + Tuning Guide
 
 ### Added
