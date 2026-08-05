@@ -44,6 +44,16 @@ function judgeApiUrl(baseUrl: string, apiType: string): string {
 }
 
 /** Try to extract a tier answer from text (JSON or keyword). Exported for unit tests. */
+
+/**
+ * Safe JSON.stringify that returns the literal string "undefined" when
+ * given `undefined` (since JSON.stringify(undefined) is `undefined`, not a
+ * string — which crashes any subsequent `.slice()`).
+ */
+function jsonStr(v: unknown): string {
+  return v === undefined ? "undefined" : JSON.stringify(v);
+}
+
 export function extractTier(text: string): Tier | null {
   if (!text) return null;
   const trimmed = text.trim();
@@ -94,8 +104,8 @@ async function classifyLLM(
     });
 
     if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      console.warn(`[ShiftRouter] Judge API error ${res.status} from ${url}: ${body.slice(0, 200)}`);
+      const text = await res.text().catch(() => "");
+      console.warn(`[ShiftRouter] Judge API error ${res.status} from ${url}: ${text.slice(0, 200)}`);
       return null;
     }
 
@@ -104,8 +114,8 @@ async function classifyLLM(
     if (verbose) {
       const choice = (raw as any).choices?.[0];
       console.log(
-        `[ShiftRouter] Judge raw: content=${JSON.stringify(choice?.message?.content)}, ` +
-        `reasoning=${JSON.stringify(choice?.message?.reasoning_content)?.slice(0, 150)}, ` +
+        `[ShiftRouter] Judge raw: content=${jsonStr(choice?.message?.content)}, ` +
+        `reasoning=${jsonStr(choice?.message?.reasoning_content).slice(0, 150)}, ` +
         `finish=${choice?.finish_reason}`,
       );
     }
@@ -113,8 +123,8 @@ async function classifyLLM(
     const answer = parseResponse(raw, endpoint.apiType);
     if (!answer) {
       const choice = (raw as any).choices?.[0];
-      const content = JSON.stringify(choice?.message?.content);
-      const reasoning = JSON.stringify(choice?.message?.reasoning_content);
+      const content = jsonStr(choice?.message?.content);
+      const reasoning = jsonStr(choice?.message?.reasoning_content);
       const finish = choice?.finish_reason ?? "?";
       console.warn(
         `[ShiftRouter] Judge unparseable from ${url}: ` +

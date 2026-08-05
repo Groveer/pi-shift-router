@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `processRoute` now increments `state.upgradeCount` / `state.downgradeCount` on tier transitions (for stats).
 - `/router` autocomplete now includes `stats`.
 
+### Fixed
+
+- **Judge "Cannot read 'slice' of undefined" crash** — when an LLM endpoint returns HTTP 200 but with an error-shaped body (no `choices[]`, some custom OpenAI-compatible endpoints do this for 429/5xx), `JSON.stringify(undefined)` returned the actual `undefined` value, which then crashed `content.slice(...)` in the verbose log. Wrapped all `.slice()` calls in a `jsonStr()` helper that returns the literal string `"undefined"` for `undefined` input. Regression test added.
+
 ---
 
 ## [0.7.0] — Confidence-weighted sliding window

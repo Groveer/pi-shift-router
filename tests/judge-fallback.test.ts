@@ -246,3 +246,34 @@ describe("resolveFastEndpoints — Judge fast-chain fallback", () => {
     expect(eps).toEqual([]);
   });
 });
+
+// ─── Regression: JSON.stringify(undefined) safety ──────────────────
+// Bug: when an LLM returns 200 but the body lacks `choices` (some
+// providers return error-shaped JSON without choices[]), the verbose/warn
+// log used to call content.slice(0, 100) on undefined and crash with
+// "Cannot read properties of undefined (reading 'slice')". The fix:
+// jsonStr() returns the literal "undefined" string for undefined input.
+
+describe("classify handles error-shaped 200 responses without crashing", () => {
+  it("does not throw when response is 200 but body lacks choices[]", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(
+      JSON.stringify({ error: { message: "rate limit" } }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    )));
+
+    const r = await classify("test", [endpoint("M3")]);
+    expect(r).toEqual({ tier: "fast", source: "fallback" });
+    vi.unstubAllGlobals();
+  });
+
+  it("does not throw when response is 200 with empty choices", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(
+      JSON.stringify({ choices: [] }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    )));
+
+    const r = await classify("test", [endpoint("M3")]);
+    expect(r).toEqual({ tier: "fast", source: "fallback" });
+    vi.unstubAllGlobals();
+  });
+});

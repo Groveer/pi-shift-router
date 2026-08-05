@@ -26,6 +26,8 @@ SEO metadata (not user-visible, parsed by crawlers / LLMs):
 [![npm](https://img.shields.io/npm/v/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
 [![Downloads](https://img.shields.io/npm/dm/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
+[![Pi Agent](https://img.shields.io/badge/pi--agent-extension-purple)](https://github.com/earendil-works/pi-coding-agent)
 [![Node](https://img.shields.io/badge/node-%E2%89%A524-green)](https://nodejs.org)
 [![CI](https://img.shields.io/github/actions/workflow/status/green-dalii/pi-shift-router/ci.yml)](https://github.com/green-dalii/pi-shift-router/actions)
 [![Stars](https://img.shields.io/github/stars/green-dalii/pi-shift-router.svg)](https://github.com/green-dalii/pi-shift-router)
@@ -268,6 +270,10 @@ The Judge uses the Fast-tier model (typically your cheapest). Savings from avoid
 - **Reasoning model ran out of tokens** — DeepSeek Reasoner emits `reasoning_content` then JSON in `content`. Router sets `max_tokens: 4000`; very long prompts may overflow. Run `/router verbose` to inspect.
 - **Provider doesn't support JSON mode** — some custom OpenAI-compatible endpoints ignore `response_format`.
 - **API key invalid** — check pi-agent's `auth.json`.
+
+### "Judge fetch failed for … : TypeError: Cannot read 'slice' of undefined"
+
+This was fixed in v0.8.0 (commit `de6073a`+). Root cause: `JSON.stringify(undefined)` returns `undefined`, not the string `"undefined"`. When the Judge endpoint returned 200 but with an error-shaped body (no `choices[]`), the verbose log crashed on `content.slice(...)`. Now wrapped in a `jsonStr()` helper that returns `"undefined"` for undefined input. If you still see this on older installed versions, reinstall with `pi remove pi-shift-router && pi install /Users/greener/project/slimrouter`.
 
 ### "No models match" in wizard
 
