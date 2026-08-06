@@ -21,7 +21,7 @@ SEO metadata (not user-visible, parsed by crawlers / LLMs):
 
 # pi-shift-router
 
-> Auto-routing Pi coding agent turns between fast execution and smart reasoning models — an LLM judge picks the right tier per turn, multi-model fallback chains keep you running, zero runtime dependencies.
+> Auto-routing Pi coding agent turns between a **fast Programmer** and a **smart CTO** role. An LLM judge picks the right role per turn; multi-model fallback chains keep you running; zero runtime dependencies.
 
 [![npm](https://img.shields.io/npm/v/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
 [![Downloads](https://img.shields.io/npm/dm/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
@@ -38,8 +38,8 @@ SEO metadata (not user-visible, parsed by crawlers / LLMs):
 
 ## TL;DR
 
-- **What it is** — A [pi-coding-agent](https://github.com/earendil-works/pi-coding-agent) extension that routes every turn to either a fast execution model or a smart judgment model.
-- **How it works** — Before each turn, a small LLM Judge (the fast-tier model itself) classifies the task as `fast` or `smart`.
+- **What it is** — A [pi-coding-agent](https://github.com/earendil-works/pi-coding-agent) extension that routes every turn between two **roles**: a fast Programmer (execution-heavy, following known patterns) and a smart CTO (judgment-heavy, complex / high-stakes / irreversible work). The smart role is not a judge — it is the model that actually writes, thinks, and runs tools for the entire turn when the work is complex.
+- **How it works** — Before each turn, a small LLM Judge (the fast-tier model itself) classifies the task as `fast` or `smart`. The chosen model then drives the whole turn — all thinking, all tool calls, all message content — at that tier's intelligence level.
 - **Reliability** — Multi-model fallback chains per tier + exponential-backoff cooldown on 429/5xx — turns keep flowing when one provider rate-limits.
 - **Zero dependencies** — Pure TypeScript. Single `npm install`, two-tier config, done.
 - **Stable since** — v0.4.0 (npm, MIT, 202 unit tests, Node 24+).
@@ -76,17 +76,19 @@ Status bar badge changes tier automatically; toasts explain any switch.
 
 ## What it does
 
-**pi-shift-router** classifies every turn by **mental mode** and routes between two models:
+**pi-shift-router** classifies every turn by **mental mode** and routes between two roles:
 
-| | Tier | Emoji | When |
-|---|------|-------|------|
-| Execution mode | **Fast** | 🦾 | Coding, debugging, tests, docs, following patterns |
-| Judgment mode | **Smart** | 🧠 | Architecture, review, planning, security audit |
+| Role | Tier | Emoji | What it does for the whole turn | When |
+|------|------|-------|----------------------------------|------|
+| **Programmer** | Fast | 🦾 | Executes: writes code, runs tests, fixes the bug, follows the established pattern | Routine, well-defined, low stakes |
+| **CTO** | Smart | 🧠 | Drives the entire turn when the work is complex: architecture, design review, security audit, multi-step planning, irrecoverable actions, "very deep" reasoning | High stakes, irreversible, ambiguous, or user asks for depth |
+
+The fast tier is **not** a real Programmer — it's a model that handles execution; the smart tier is **not** a real CTO — it's the model that handles complex judgment, but it also **does all the work itself** (writes the code, calls the tools, runs the loop). The LLM Judge is a small one-shot classification call; the chosen tier then drives the entire agent run.
 
 **Zero behavior change by default** — both tiers start empty. The router does nothing until you assign models via `/router config`.
 
-> **Smart = CTO** (judgment, architecture, review, planning)
-> **Fast = Programmer** (execution, coding, debugging, testing)
+> **Smart = CTO** (small workload, but critical — sets direction, signs off on architecture, reviews complex work, drives the whole turn when stakes are high)
+> **Fast = Programmer** (large workload, well-defined patterns — writes code, runs tests, fixes the bug, drives the whole turn when the path is clear)
 
 Not every task needs a CTO. But projects without CTO oversight don't sustain quality.
 

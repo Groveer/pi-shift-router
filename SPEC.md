@@ -8,17 +8,18 @@
 
 ### Core Value
 
-- **Quality**: critical steps (planning, review, architecture) automatically use the higher-intelligence model (Smart / CTO mode).
-- **Cost**: everyday execution (coding, debugging, testing) automatically uses the cheaper model (Fast / Programmer mode).
-- **Speed**: cheap models respond faster on execution tasks; strong models think more carefully on judgment tasks.
+- **Quality**: complex, high-stakes, or irreversible work (planning, architecture, review, security audit) automatically uses the higher-intelligence model — the smart tier. When the task is complex, the smart model **drives the entire turn**: it writes the code, calls the tools, runs the loop, just at a higher intelligence level.
+- **Cost**: everyday execution (well-defined tasks, established patterns) automatically uses the cheaper model — the fast tier. The fast tier is execution-heavy and covers the bulk of routine work.
+- **Speed**: cheap models respond faster on execution tasks; strong models think more carefully on complex tasks.
 - **Zero interference by default**: both tiers start empty. The router does nothing until you assign models via `/router config`.
 
-### The CTO / Programmer Analogy
+### The CTO / Programmer Role
 
-> **Smart = CTO** (small workload, critically important): architecture, evaluation, code review, route selection.
-> **Fast = Programmer** (large workload, well-defined patterns): writing code, fixing bugs, adding tests, writing comments.
+> **Smart = CTO** (small workload, critically important): when the task is complex or high-stakes, the smart model acts as the CTO who drives the whole turn — architecture, evaluation, code review, security audit, multi-step planning, irrecoverable actions. It does not merely "judge"; it executes the entire turn at high intelligence.
+>
+> **Fast = Programmer** (large workload, well-defined patterns): when the path is clear, the fast model acts as the senior engineer who executes the whole turn — writing code, fixing bugs, adding tests, writing comments.
 
-Not every task needs CTO-level intelligence. But projects without CTO oversight don't sustain quality.
+Not every task needs CTO-level intelligence. But projects without CTO oversight don't sustain quality. The LLM Judge is a small, one-shot classification call — the chosen tier then drives the entire agent run, including all thinking, tool calls, and message content.
 
 ---
 
@@ -60,10 +61,10 @@ User sends message
 
 ### 2.2 Tiers
 
-| Tier | Mental Mode | Use Cases |
-|------|-------------|-----------|
-| **🧠 Smart (CTO)** | Judgment: evaluation, planning, review, direction-setting | Architecture design, technology selection, code review, security audit, performance optimization. **Small workload, critically important.** |
-| **🦾 Fast (Programmer)** | Execution: following known patterns | Writing code, fixing bugs, adding tests, writing docs, adding comments, small refactors. **Large workload, well-defined patterns.** |
+| Tier | Role | What it does for the whole turn | Use Cases |
+|------|------|------------------------------|-----------|
+| **🧠 Smart (CTO)** | Complex-work driver: evaluation, planning, review, direction-setting — and when chosen, executes the entire turn at high intelligence | Architecture design, technology selection, code review, security audit, performance optimization, multi-step planning, any irrecoverable action. **Small workload, critically important.** |
+| **🦾 Fast (Programmer)** | Execution driver: follows known patterns, drives the whole turn with the simpler model | Writing code, fixing bugs, adding tests, writing docs, adding comments, small refactors. **Large workload, well-defined patterns.** |
 
 ### 2.3 Transition Rules
 

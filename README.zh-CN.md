@@ -20,7 +20,7 @@ SEO 元数据（用户不可见，供爬虫 / LLM 解析）：
 
 # pi-shift-router
 
-> 为 Pi coding agent 自动路由每轮任务 —— 在 Fast 执行模型与 Smart 判断模型间动态切换，LLM Judge 自动分类，支持多模型 fallback 链，零运行时依赖。
+> 为 Pi coding agent 每轮自动分配 **fast Programmer** 或 **smart CTO** 角色。LLM Judge 判定本轮角色；多模型 fallback 链保证稳定性；零运行时依赖。
 
 [![npm](https://img.shields.io/npm/v/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
 [![Downloads](https://img.shields.io/npm/dm/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
@@ -37,8 +37,8 @@ SEO 元数据（用户不可见，供爬虫 / LLM 解析）：
 
 ## 摘要
 
-- **是什么** — [pi-coding-agent](https://github.com/earendil-works/pi-coding-agent) 扩展。每轮任务按心智模式自动路由到 fast 执行模型 或 smart 判断模型。
-- **怎么工作** — 每轮开始前，用 Fast 模型本身做小型 LLM Judge，分类为 `fast` 或 `smart`。
+- **是什么** — [pi-coding-agent](https://github.com/earendil-works/pi-coding-agent) 扩展。每轮在两个**角色**间路由：fast Programmer（执行型、套用已知模式）与 smart CTO（判断型、复杂 / 高风险 / 不可逆任务）。smart 角色不是一个判断模型 —— 它是当任务复杂度高时，该轮全程实际负责写代码、思考、调工具的模型。
+- **怎么工作** — 每轮开始前，用 Fast 模型本身做小型 LLM Judge，分类为 `fast` 或 `smart`。被选中的模型随后驱动整轮 run —— 所有的思考、所有的工具调用、所有的消息内容 —— 都在该角色的智能水平上进行。
 - **可靠性** — 每层多模型 fallback 链 + 429/5xx 下的指数退避冷却 —— 一个 Provider 限流时任务依然进行。
 - **零依赖** — 纯 TypeScript，单个 `npm install` + 两层配置即可。
 - **稳定状态** — v0.4.0 起 npm 发布（MIT / 202 单测 / Node 24+）。
@@ -74,17 +74,19 @@ SEO 元数据（用户不可见，供爬虫 / LLM 解析）：
 
 ## 它做什么
 
-**pi-shift-router** 按**心智模式**（执行 vs 判断）对每轮任务分类，并在两个模型间路由：
+**pi-shift-router** 按**心智模式**对每轮任务分类，并在两个角色间路由：
 
-| | 层级 | Emoji | 何时用 |
-|---|------|-------|--------|
-| 执行模式 | **Fast** | 🦾 | 写代码、调试、测试、文档、套用模式 |
-| 判断模式 | **Smart** | 🧠 | 架构、审查、规划、安全审计 |
+| Role | Tier | Emoji | 该轮整个 drive 什么 | 何时用 |
+|------|------|-------|------------------------------|--------|
+| **Programmer** | Fast | 🦾 | 执行：写代码、运行测试、修 bug、套用既定模式 | 例行、路径明确、风险低 |
+| **CTO** | Smart | 🧠 | 任务复杂时驱动整轮：架构、设计 review、安全审计、多步规划、不可逆操作、用户要求深度思考 | 高风险、不可逆、路径不明确，或用户明确要深度 |
+
+Fast 不是真的程序员 —— 它是负责执行的模型；Smart 不是真的 CTO —— 它是负责复杂判断的模型，但 **它也会自己亲手干所有活**（写代码、调工具、跑循环）。LLM Judge 只是一次性的小分类调用；被选中的 tier 随后驱动整个 agent run。
 
 **默认无任何行为** —— 两层默认都为空，配置前路由器不起任何作用（`/router config`）。
 
-> **Smart = CTO**：判断、架构、审查、规划 —— 工作量小但极其关键
-> **Fast = 程序员**：执行、写代码、调试、测试 —— 工作量大但模式明确
+> **Smart = CTO**（工作量小但极其关键 —— 定方向、签字架构、 review 复杂工作、风险高时亲自驱动整轮）
+> **Fast = Programmer**（工作量大、模式明确 —— 写代码、跑测试、修 bug、路径清晰时亲自驱动整轮）
 
 不是所有任务都需要 CTO 级别的智力。但项目如果没有 CTO 把关，质量底线撑不住。
 
