@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > (0.1.0 – 0.3.1) were developed under the `pi-slim-router` working name and never
 > published to npm. The plugin was first published to npm as `pi-shift-router` at v0.4.0.
 
+## [0.8.2] — Docs + Judge prompt clarity
+
+### Changed
+
+- **Smart tier is a role that drives the whole turn, not a judge.** The previous wording in `README.md`, `README.zh-CN.md`, `SPEC.md`, and `src/prompts/judge.md` implied that the smart tier "judges" or "sets direction before execution happens", which is misleading. In reality (see `processRoute` in `src/router.ts` and `SPEC.md` § 2.1), the LLM Judge is a small one-shot classification call in `before_agent_start`; the chosen tier then drives the **entire** agent run — all thinking, all tool calls, all message content. The smart model is not a judge that signs off; it is the model that actually does the complex work when the CTO role is chosen.
+  - `README.md` / `README.zh-CN.md` TL;DR, What it does, and the role table
+  - `SPEC.md` § 1 Core Value + § 2.2 Tiers table
+  - `src/prompts/judge.md` opening paragraph, tier definitions, and Examples table
+  - `AGENTS.md` Architecture Principle "Two tiers, not three" updated to reflect the role-not-judgment framing
+
+### Documentation
+
+- **Added "Recommended Model Pairings" section** to `README.md` and `README.zh-CN.md` — four patterns (token-plan bundles / local by VRAM / same-provider tier ladder / cross-provider pairing) that help users pick concrete fast / smart combos without prescribing provider-specific JSON. All model IDs verified against HuggingFace's `safetensors` total weight size + `models.dev` release dates on 2026-08.
+- **Generalized absolute install paths** — replaced three hard-coded `/Users/greener/project/slimrouter` references in `README.md`, `README.zh-CN.md`, and `CONTRIBUTING.md` with the portable form `pi install <path-to-this-repo>`.
+- **Added Hard-Stop rule to `AGENTS.md`** — the agent must NOT run `git push` or `npm publish` without explicit user approval in the same turn. "Commit" is local and reversible; "push" and "publish" are public and irreversible. The change came from a regression where the agent pushed without confirmation.
+
 ## [0.8.1] — Judge crash fix
 
 ### Fixed
