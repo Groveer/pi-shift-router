@@ -1,7 +1,7 @@
 <!--
 SEO metadata (not user-visible, parsed by crawlers / LLMs):
 - name: pi-shift-router
-- type: software / npm package / pi-coding-agent extension
+- type: software / npm package / pi-coding-agent extension / model router / LLM classifier
 - license: MIT
 - language: TypeScript
 - runtime: Node.js >= 24
@@ -10,24 +10,28 @@ SEO metadata (not user-visible, parsed by crawlers / LLMs):
 - repo: https://github.com/green-dalii/pi-shift-router
 - docs: README.md / README.zh-CN.md / SPEC.md / CONTRIBUTING.md
 - first-published: v0.4.0
-- latest: v0.6.0
+- latest: v0.8.2
+- alternate-names: shift router, pi extension, model router, two-tier router, auto router, tier model router, model failover router
+- search-intents: "auto-route pi agent turns", "LLM as classifier", "two-tier model routing", "model failover on 429", "cost vs quality model selection", "pi-coding-agent extension", "model cooldown exponential backoff", "JSON-mode classifier"
 - features: two-tier routing, LLM judge, JSON-mode classifier, sliding-window
   downgrade gate, multi-model fallback chains, TUI chain editor,
   exponential-backoff runtime failover (429/5xx), shared cooldown map
-  between routing and Judge, zero-config defaults, cross-provider native
-- complementary: pi-model-router (3-tier + budget + rules), pi-smart-router (ML inference, local ONNX)
+  between routing and Judge, zero-config defaults, cross-provider native,
+  token throughput telemetry, /router stats command, recommended model pairings
+- direct-competitor: pi-model-router (3-tier + budget + keyword rules; same agent-routing problem)
 - author: green-dalii (https://github.com/green-dalii)
+- canonical: https://github.com/green-dalii/pi-shift-router/blob/main/README.md
 -->
 
 # pi-shift-router
 
-> Auto-routing Pi coding agent turns between a **fast Programmer** and a **smart CTO** role. An LLM judge picks the right role per turn; multi-model fallback chains keep you running; zero runtime dependencies.
+> **pi-shift-router** is a zero-dependency **auto-routing** tier model router for the [pi-coding-agent](https://github.com/earendil-works/pi) CLI. It classifies every turn between a **fast Programmer** role and a **smart CTO** role using an LLM-as-classifier (Judge), with multi-model fallback chains, exponential-backoff runtime failover on 429/5xx, and a shared cooldown map. Two-tier **model router** with one config file, zero runtime deps.
 
 [![npm](https://img.shields.io/npm/v/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
 [![Downloads](https://img.shields.io/npm/dm/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
-[![Pi Agent](https://img.shields.io/badge/pi--agent-extension-purple)](https://github.com/earendil-works/pi-coding-agent)
+[![Pi Agent](https://img.shields.io/badge/pi--agent-extension-purple)](https://github.com/earendil-works/pi)
 [![Node](https://img.shields.io/badge/node-%E2%89%A524-green)](https://nodejs.org)
 [![CI](https://img.shields.io/github/actions/workflow/status/green-dalii/pi-shift-router/ci.yml)](https://github.com/green-dalii/pi-shift-router/actions)
 [![Stars](https://img.shields.io/github/stars/green-dalii/pi-shift-router.svg)](https://github.com/green-dalii/pi-shift-router)
@@ -38,7 +42,7 @@ SEO metadata (not user-visible, parsed by crawlers / LLMs):
 
 ## TL;DR
 
-- **What it is** — A [pi-coding-agent](https://github.com/earendil-works/pi-coding-agent) extension that routes every turn between two **roles**: a fast Programmer (execution-heavy, following known patterns) and a smart CTO (judgment-heavy, complex / high-stakes / irreversible work). The smart role is not a judge — it is the model that actually writes, thinks, and runs tools for the entire turn when the work is complex.
+- **What it is** — A [pi-coding-agent](https://github.com/earendil-works/pi) extension that routes every turn between two **roles**: a fast Programmer (execution-heavy, following known patterns) and a smart CTO (judgment-heavy, complex / high-stakes / irreversible work). The smart role is not a judge — it is the model that actually writes, thinks, and runs tools for the entire turn when the work is complex.
 - **How it works** — Before each turn, a small LLM Judge (the fast-tier model itself) classifies the task as `fast` or `smart`. The chosen model then drives the whole turn — all thinking, all tool calls, all message content — at that tier's intelligence level.
 - **Reliability** — Multi-model fallback chains per tier + exponential-backoff cooldown on 429/5xx — turns keep flowing when one provider rate-limits.
 - **Zero dependencies** — Pure TypeScript. Single `npm install`, two-tier config, done.
@@ -47,11 +51,11 @@ SEO metadata (not user-visible, parsed by crawlers / LLMs):
 ### In pi, it looks like this
 
 ```text
-🦾 [MiniMax-M3] → fix the failing test
+🦾 [deepseek-v4-flash] → fix the failing test
 ⚖ judging…
-🧠 [kimi-k3]              ← upgraded for the architecture question
-⚠️ MiniMax-M3 429 → switching to deepseek-v4-flash — retry in 1m
-🦾 [deepseek-v4-flash]     ← same-tier failover (v0.6.0)
+🧠 [claude-opus-5]              ← upgraded for the architecture question
+⚠️ deepseek-v4-flash 429 → switching to glm-5.2 — retry in 1m
+🦾 [glm-5.2]                    ← same-tier failover (v0.6.0)
 ```
 
 Status bar badge changes tier automatically; toasts explain any switch.
@@ -60,12 +64,17 @@ Status bar badge changes tier automatically; toasts explain any switch.
 
 ## Contents
 
+- [What is pi-shift-router?](#what-is-pi-shift-router)
 - [What it does](#what-it-does)
 - [Quick Start](#quick-start)
+  - [Installation](#installation)
+  - [Verify](#verify)
 - [How It Works](#how-it-works)
 - [Commands](#commands)
-- [Configuration](#configuration)
+- [Configuration Reference](#configuration-reference)
+- [Tuning Guide](#tuning-guide)
 - [Recommended Model Pairings](#recommended-model-pairings)
+- [Use Cases](#use-cases)
 - [How It Compares](#how-it-compares)
 - [FAQ](#faq)
 - [Troubleshooting](#troubleshooting)
@@ -73,6 +82,19 @@ Status bar badge changes tier automatically; toasts explain any switch.
 - [Contributing](CONTRIBUTING.md)
 
 ---
+
+## What is pi-shift-router?
+
+**pi-shift-router** is a **tier model router** (also called a **shift router** or **two-tier auto router**) for the [pi-coding-agent](https://github.com/earendil-works/pi) CLI. It is a small npm extension that sits between you and the LLM provider: each time you send a message to pi, it classifies the turn with an **LLM-as-classifier** (the Judge), then routes the entire agent run to the right model.
+
+Two tiers, by mental mode:
+
+- 🦾 **Fast** — execution-heavy model that drives the whole turn for routine / well-defined work (writing code, running tests, fixing bugs, applying known patterns).
+- 🧠 **Smart** — high-intelligence model that drives the whole turn for complex / high-stakes / irreversible work (architecture, design review, security audit, multi-step planning).
+
+It is **not** a third-party router that you need to learn a new CLI for; it is an in-process pi extension that adds a status bar badge, a config command, and a Judge hook. It is **not** a budget tracker, an ML classifier, or a remote proxy: it is a local TypeScript router with zero runtime dependencies.
+
+If you've ever wished pi could automatically pick a cheaper model for the boring turns and a stronger model for the critical turns — that's what this does.
 
 ## What it does
 
@@ -96,23 +118,47 @@ Not every task needs a CTO. But projects without CTO oversight don't sustain qua
 
 ## Quick Start
 
-**Prerequisites** — Node.js ≥ 24, pi-agent ≥ 0.80, one provider account with API key in pi-agent's `auth.json`, one model for each tier.
+**Prerequisites** — Node.js ≥ 24, [pi-coding-agent](https://github.com/earendil-works/pi) ≥ 0.80, one provider account with API key in pi-agent's `auth.json`, one model for each tier.
 
-**Install**
+### Installation
+
+Install from npm:
 
 ```bash
 pi install npm:pi-shift-router
 ```
 
-Registers in `~/.pi/agent/settings.json` and auto-loads on next pi launch. See [pi's packages docs](https://github.com/earendil-works/pi-coding-agent/blob/main/docs/packages.md) for git / local-path install.
+Install from a local checkout (development):
 
-**Configure**
+```bash
+pi install <path-to-this-repo>
+```
 
-Inside pi, run `/router config` and pick one Fast + one Smart model. Save to user or project scope.
+Install from a git URL:
 
-**Verify**
+```bash
+pi install git:github.com/green-dalii/pi-shift-router
+```
 
-`/router status` shows your tiers and models; the next turn triggers the first Judge call.
+All three forms register the extension in `~/.pi/agent/settings.json` and auto-load on the next pi launch. See [pi's packages docs](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md) for the full install grammar.
+
+### Verify
+
+Open the TUI wizard and pick one Fast + one Smart model per tier (or several for a fallback chain):
+
+```text
+/router config
+```
+
+Save to user or project scope; project wins on conflict. See [Configuration Reference](#configuration-reference) for the full JSON schema.
+
+Then run:
+
+```text
+/router status
+```
+
+…to see your tiers, current scope, the configured Judge threshold, and the streaming telemetry. The next turn triggers the first Judge call.
 
 ---
 
@@ -176,24 +222,81 @@ The Judge also walks the full fast-tier chain before giving up, sharing the same
 
 ---
 
-## Configuration
+## Configuration Reference
 
-Two-layer config: user (`~/.pi/agent/pi-shift-router.json`) + project (`<cwd>/.pi/pi-shift-router.json`). Project wins on conflict.
+> **The recommended way to configure is `/router config` — a TUI wizard.** You won't normally need to touch JSON. Use the JSON reference below when scripting, sharing config across machines, or pinning to a project repo.
 
-```json
-{
-  "enabled": true,
-  "tiers": {
-    "fast":  { "models": [
-      { "provider": "deepseek", "model": "deepseek-v4-flash", "priority": 1 },
-      { "provider": "kimi",     "model": "kimi-k3",          "priority": 2 }
-    ] },
-    "smart": { "models": [{ "provider": "kimi", "model": "kimi-k3", "priority": 1 }] }
-  },
-  "routing": { "mode": "auto", "judgeTimeout": 5000, "window": { "size": 5, "threshold": 0.6 } },
-  "ux": { "quietMode": false, "statusBar": true, "inlineToast": true, "routerLogVerbose": false }
-}
+**Configurable from the TUI (`/router config`):**
+
+- Master on/off (`/router on` / `/router off`)
+- Per-tier model chain — add / remove / reorder (`a`, `x`, `J` / `K`, `d` save, `Esc` cancel)
+- Save scope: user (`~/.pi/agent/pi-shift-router.json`) or project (`<cwd>/.pi/pi-shift-router.json`); project wins on conflict.
+
+**Configurable only via JSON** (advanced — these are not in the TUI):
+
+- `routing.judgeTimeout`, `routing.window.minConfidence`, `routing.window.threshold`
+- `ux.quietMode`, `ux.routerLogVerbose`
+
+For these, edit the JSON file directly — the schema is below. After saving, run `/router config` once to re-load, or restart pi.
+
+### JSON Schema (reference)
+
+Two layers, with the **configurable from TUI** block written automatically by the wizard and the **advanced block** for hand-editing:
+
+```text
+~/.pi/agent/pi-shift-router.json         (user scope — wins by default)
+<cwd>/.pi/pi-shift-router.json           (project scope — wins on conflict)
 ```
+
+```text
+pi-shift-router.json
+├── enabled                    boolean  master switch; default true
+├── tiers
+│   ├── fast
+│   │   └── models[]           ordered list; first is primary, rest are fallbacks
+│   │       ├── provider       string   must match a provider in pi-agent's auth.json
+│   │       ├── model          string   model ID within that provider
+│   │       └── priority       integer  1 = primary, 2 = first fallback, …
+│   └── smart                  same shape as fast
+├── routing
+│   ├── mode                   "auto" | "manual"; default "auto"
+│   ├── judgeTimeout           ms; default 5000
+│   └── window
+│       ├── size               sliding-window length; default 5
+│       ├── threshold          weighted fast-share to trigger downgrade; default 0.6
+│       └── minConfidence      votes below this are ignored; default 0.5
+└── ux
+    ├── quietMode              suppress inline toasts; default false
+    ├── statusBar              show the 🦾 / 🧠 badge; default true
+    ├── inlineToast            show model-switch toasts; default true
+    └── routerLogVerbose       log to console; default false
+```
+
+**Minimal working config** (one model per tier, all defaults elsewhere):
+
+```text
+enabled:  true
+tiers:
+  fast:   [{ provider: openai, model: gpt-5.6-luna }]
+  smart:  [{ provider: openai, model: gpt-5.6-sol }]
+```
+
+**Multi-provider with per-tier fallback chains** (the typical production setup):
+
+```text
+enabled:  true
+tiers:
+  fast:
+    - { provider: deepseek,   model: deepseek-v4-flash, priority: 1 }
+    - { provider: z.ai,       model: glm-5.2,           priority: 2 }
+    - { provider: xai,        model: grok-4.5-fast,     priority: 3 }
+  smart:
+    - { provider: anthropic,  model: claude-opus-5,     priority: 1 }
+    - { provider: openai,     model: gpt-5.6-sol,       priority: 2 }
+    - { provider: moonshotai, model: kimi-k3,           priority: 3 }
+```
+
+Field-by-field defaults:
 
 | Field | Default | Meaning |
 |-------|---------|---------|
@@ -201,9 +304,8 @@ Two-layer config: user (`~/.pi/agent/pi-shift-router.json`) + project (`<cwd>/.p
 | `tiers.<tier>.models[]` | `[]` | Ordered by `priority`. First hit wins; rest are run-time fallbacks. |
 | `routing.judgeTimeout` | `5000` | ms. Judge API call timeout. |
 | `routing.window.size` / `threshold` | `5` / `0.6` | Sliding-window downgrade gate. |
+| `routing.window.minConfidence` | `0.5` | Votes below this confidence are ignored. |
 | `ux.quietMode` / `statusBar` / `inlineToast` / `routerLogVerbose` | various | Surface controls. |
-
-Each tier's `models` array is an **ordered priority list** — first entry is the primary; later entries stand by as fallback. Configure multiple models via `/router config`'s TUI chain editor (`a` add, `x` remove, `J`/`K` reorder, `d` save, `Esc` cancel).
 
 ---
 
@@ -211,27 +313,22 @@ Each tier's `models` array is an **ordered priority list** — first entry is th
 
 No JSON snippets here — your provider setup is yours. This section teaches **how to choose**, not **how to fill**. Data is snapshotted from [models.dev](https://models.dev/) on 2026-08-05; refresh with `curl -s https://models.dev/api.json | jq` to see the latest.
 
-> **Fast tier rule of thumb**: if your provider exposes `deepseek-v4-flash-0731` (2026-07-31), prefer it for `fast` — the 0731 update pushed quality close to Opus 4.8 / GLM-5.2 territory while keeping prices at the low end of the table.
+> **Fast tier rule of thumb**: if your provider exposes `deepseek-v4-flash` (2026-07), prefer it for `fast` — the 0731 refresh pushed quality close to Opus 5 / GLM-5.2 territory while keeping prices at the low end of the table.
 >
 > **Smart tier rule of thumb**: keep `smart` on a frontier cloud model. Local smart is impractical on hardware under ~80 GB of VRAM/unified memory, and even at 96 GB the cost/quality tradeoff almost never beats a flat-fee token plan.
 
 ### Pattern 1 — Token-plan bundles (one key, many models)
 
-Combines an Alibaba international/CN entry into one row (same product, two regional endpoints). Lists candidate model IDs you can mix across the chain — not a single canonical pairing.
+Lists candidate model IDs you can mix across the chain — not a single canonical pairing. Provider names below are well-known aggregate / token-bundle gateways that proxy Anthropic, OpenAI, Google, DeepSeek, xAI, Z.AI, Qwen, Moonshot, and others under one billing account.
 
 | Plan | `fast` candidates 🦾 | `smart` candidates 🧠 |
 |---|---|---|
-| **Alibaba Token Plan** (intl + CN) | `qwen3.7-plus`, `qwen3.6-flash`, `deepseek-v4-flash-0731` | `qwen3.8-max`, `qwen3.7-max`, `kimi-k2.7-code` |
-| **OpenCode Go** | `deepseek-v4-flash`, `gpt-5.6-luna (2× usage)`, `hy3`, `qwen3.6-plus` | `qwen3.7-max`, `qwen3.8-max`, `kimi-k3`, `grok-4.5`, `glm-5.2` |
-| **OpenCode Zen** (free tier included) | `deepseek-v4-flash-free`, `ling-3.0-flash-free`, `laguna-s-2.1-free`, `gemini-3.5-flash-lite` | `claude-opus-5`, `kimi-k3`, `gpt-5.6-sol`, `glm-5.2` |
-| **Moonshot Token Plan** | `kimi-k2.7-code`, `kimi-k2.7-code-highspeed` | `kimi-k3` |
-| **MiniMax Token Plan** | `MiniMax-M2.7-highspeed` | `MiniMax-M3` (1 M ctx, multimodal) |
-| **Xiaomi Token Plan** | `mimo-v2.5` | `mimo-v2.5-pro` |
-| **Vercel AI Gateway** | any of the above through one gateway | any of the above |
-| **OpenRouter** | 337 models; `auto` is **not** a valid Judge target (opaque) | 337 models |
+| **Alibaba Token Plan** (intl + CN) | `qwen3.7-plus`, `qwen3.6-flash`, `deepseek-v4-flash` | `qwen3.8-max`, `qwen3.7-max`, `kimi-k3` |
+| **Vercel AI Gateway** | any of the providers below through one gateway | any of the providers below |
+| **OpenRouter** | 200+ models; `auto` is **not** a valid Judge target (opaque) | 200+ models |
 | **Hugging Face Inference** | `Qwen/Qwen3.5-9B`, `Qwen/Qwen3.6-35B-A3B` | `Qwen/Qwen3.6-27B`, `google/gemma-4-31B-it` |
-| **Nebius Token Factory** | `deepseek-ai/DeepSeek-V4-Flash-0731`, `moonshotai/Kimi-K2.7-Code` | `Kimi-K3`, `MiniMaxAI/MiniMax-M3`, `zai-org/GLM-5.2` |
-| **NovitaAI** | `inclusionai/ling-2.6-flash`, `qwen/qwen3.5-27b` | `qwen/qwen3.7-max`, `moonshotai/kimi-k3` |
+| **Nebius Token Factory** | `deepseek-ai/DeepSeek-V4-Flash`, `moonshotai/Kimi-K2.7-Code` | `Kimi-K3`, `zai-org/GLM-5.2`, `Qwen/Qwen3.7-Max` |
+| **NovitaAI** | `deepseek-ai/DeepSeek-V4-Flash`, `Qwen/Qwen3.6-27B` | `moonshotai/Kimi-K3`, `Qwen/Qwen3.7-Max` |
 
 ### Pattern 2 — Local models by VRAM / unified memory
 
@@ -261,28 +358,27 @@ One provider, one bill, one rate-limit pool. Use this if you already have a paid
 
 | Provider | `fast` 🦾 | `smart` 🧠 | Note |
 |---|---|---|---|
-| **Anthropic** | `claude-sonnet-5` | `claude-opus-5` or `claude-fable-5` | Haiku 4.5 is the old `fast` tier; Sonnet 5 replaced it. |
-| **OpenAI** | `gpt-5.6-luna` | `gpt-5.6-sol` | GPT-5.6 has luna < terra < sol internal tiering. |
+| **Anthropic** | `claude-sonnet-5` | `claude-opus-5` or `claude-fable-5` | Sonnet 5 is the current `fast` tier. |
+| **OpenAI** | `gpt-5.6-luna` | `gpt-5.6-sol` | GPT-5.6 has `luna` < `terra` < `sol` internal tiering. |
 | **Google** | `gemini-3.5-flash-lite` | `gemini-3.6-flash` | Gemini 3.x, 1 M context on both tiers. |
 | **Qwen (Alibaba)** | `qwen3.7-plus` | `qwen3.8-max` | Native `plus` / `max` split. |
-| **Moonshot Kimi** | `kimi-k2.7-code` or `kimi-k2.7-code-highspeed` | `kimi-k3` | K2.7-code = `fast`, K3 = `smart`. |
-| **DeepSeek** | `deepseek-v4-flash-0731` | `deepseek-v4-pro` | `flash` ≈ mini pricing tier, `pro` ≈ flagship. |
-| **MiMo (Xiaomi)** | `mimo-v2.5` | `mimo-v2.5-pro` | v2.5 is the current generation. |
+| **DeepSeek** | `deepseek-v4-flash` | `deepseek-v4-pro` | `flash` ≈ mini pricing tier, `pro` ≈ flagship. |
 | **Z.AI (GLM)** | `glm-5` or `glm-5-turbo` | `glm-5.2` | GLM-5 series. |
+| **xAI (Grok)** | `grok-4.5-fast` | `grok-4.5` | Grok 4.5 generation. |
 
 ### Pattern 4 — Cross-provider pairing (best-of-breed)
 
-When you want the strongest model in each tier, regardless of who sells it. The default `fast` pick below is `deepseek-v4-flash-0731` wherever available.
+When you want the strongest model in each tier, regardless of who sells it. The default `fast` pick below is `deepseek-v4-flash` wherever available; the default `smart` pick is `claude-opus-5`, with `gpt-5.6-sol` and `kimi-k3` as cross-provider fallback.
 
 | Scenario | `fast` 🦾 | `smart` 🧠 |
 |---|---|---|
-| Coding + lowest cost | `deepseek/deepseek-v4-flash-0731` | `anthropic/claude-opus-5` |
-| Coding + flat-fee (best $/quality) | `alibaba-token-plan/deepseek-v4-flash-0731` | `alibaba-token-plan/qwen3.8-max` |
-| 1 M context, long repo / PDF research | `deepseek-v4-flash-0731` | `moonshotai/kimi-k3` |
-| Multimodal (image / video) | `deepseek-v4-flash-0731` | `minimax-cn/MiniMax-M3` |
-| Multilingual, Chinese-first | `deepseek-v4-flash-0731` | `alibaba/qwen3.8-max` |
-| Europe / GDPR preference | `deepseek-v4-flash-0731` (via OpenRouter) | `mistral/mistral-medium-2604` |
-| Hardware-accelerated inference | `groq/deepseek-v4-flash-0731` or `groq/qwen3.6-27b` | `togetherai/deepseek-v4-flash-0731` |
+| Coding + lowest cost | `deepseek/deepseek-v4-flash` | `anthropic/claude-opus-5` |
+| Coding + multi-provider fallback | `deepseek-v4-flash` + `glm-5.2` (fallback) | `claude-opus-5` + `gpt-5.6-sol` + `kimi-k3` (fallback chain) |
+| Coding + flat-fee (best $/quality) | `alibaba-token-plan/deepseek-v4-flash` | `alibaba-token-plan/qwen3.8-max` |
+| 1 M context, long repo / PDF research | `deepseek-v4-flash` | `google/gemini-3.6-pro` or `kimi-k3` |
+| Multimodal (image / video) | `deepseek-v4-flash` | `anthropic/claude-opus-5` (vision) or `google/gemini-3.6-pro` |
+| Multilingual, Chinese-first | `deepseek-v4-flash` | `alibaba/qwen3.8-max` |
+| Europe / GDPR preference | `deepseek-v4-flash` (via OpenRouter) | `mistral/mistral-medium-2604` |
 
 ---
 
@@ -290,26 +386,45 @@ For live pricing and the full model catalog per provider, see [models.dev](https
 
 ---
 
+## Use Cases
+
+Five patterns where the auto-routing tier model router pays for itself immediately.
+
+**1. Cost-quality split for a long coding session.** Configure `fast = deepseek-v4-flash` and `smart = claude-opus-5`. Routine turns (file edits, test runs, doc fixes) stay on the cheap model; the strong model only fires when the Judge sees architecture / review / planning signals.
+
+**2. One provider, two tiers — zero ops.** Configure `fast = gpt-5.6-luna` and `smart = gpt-5.6-sol` on the same OpenAI account. No multi-provider juggling, one bill, one rate-limit pool. The router never bridges providers; it just switches models within your existing setup.
+
+**3. Resilience when a provider rate-limits mid-session.** Configure each tier as a chain of 2–3 models (e.g. `fast = [deepseek-v4-flash, glm-5.2, grok-4.5-fast]`). When the primary returns 429 / 5xx, the router marks it cooldown (exponential backoff 1m→2m→4m…30m), immediately calls `setModel` to the next healthy entry in the same tier, and pi's pending retry continues against the fallback. Subsequent turns skip cooled models without retrying. Manual `/route-force` always bypasses cooldown.
+
+**4. Multi-provider best-of-breed (recommended for serious work).** Configure `fast = [deepseek-v4-flash, glm-5.2]` and `smart = [claude-opus-5, gpt-5.6-sol, kimi-k3]`. Each tier draws from different providers — if Anthropic rate-limits, smart falls back to OpenAI then Moonshot; if DeepSeek rate-limits, fast falls back to GLM. The Judge also walks the fast-tier chain on failure. One JSON file, three providers, full resilience.
+
+**5. Sticky deep mode without per-prompt hand-tuning.** Most users want pi to stay on the strong model during a planning session, then come back down once they're editing files. The [sliding-window weighted downgrade gate](#how-it-works) (default `size: 5`, `threshold: 0.6`, `minConfidence: 0.5`) does this without you having to think about it: upgrades are always immediate, downgrades only happen after a sustained fast trend. Bump `threshold` to `0.8` if you want smart stickier.
+
+---
+
 ## How It Compares
 
-| | pi-shift-router (this plugin) | pi-model-router | pi-smart-router |
-|---|---|---|---|
-| **Tiers** | 2 (fast/smart) | 3 (high/medium/low) | n-stage ML pipeline |
-| **Classifier** | LLM Judge (JSON mode) | Optional LLM classifier → heuristic fallback | ONNX + Aho-Corasick |
-| **Custom rules** | — | Keyword overrides | — |
-| **Budget cap** | — | USD session budget; auto-downgrades high→medium | — |
-| **Phase memory** | Sliding window for downgrade gate | `phaseBias` stickiness across turns | — |
-| **Persistence** | Session-scoped | Cross-session, cross-branch (`router-state`) | Per-session |
-| **Runtime failover** | 429/5xx + exponential-backoff cooldown | Profile-level fallback chain | — |
-| **Deps** | Zero runtime (TS only) | npm package on pi SDK | ONNX, SQLite, HF |
+Both solve the same problem — per-turn agent-routing to a different model tier — but bet differently on what "good classification" looks like.
+
+| | 🦾 **pi-shift-router** (this plugin) | pi-model-router |
+|---|---|---|
+| **🧠 Classifier** | ✅ LLM Judge (JSON mode) — always LLM, natural-language reasoning | ⚠️ Optional LLM classifier → heuristic / keyword fallback |
+| **🪜 Tier count** | ✅ 2 (fast / smart) — small surface, easy to reason about | 3 (high / medium / low) — more knobs |
+| **📝 Custom rules** | ✅ None — Judge reads natural-language signals | ⚠️ Keyword-based overrides (manual / regex / etc.) — maintenance burden |
+| **💰 Budget cap** | — | USD session budget, auto-downgrades high → medium |
+| **🗂️ Persistence** | Session-scoped | Cross-session, cross-branch (`router-state`) |
+| **🛡️ Runtime failover** | ✅ 429/5xx + exponential-backoff cooldown, shared with Judge | Profile-level fallback chain |
+| **📦 Deps** | ✅ Zero runtime | npm package on pi SDK |
+
+**The two philosophies:**
+
+- **🦾 pi-shift-router bets on "less is more"** — 2 tiers is small enough to reason about, the Judge is a single LLM call you can read and re-prompt, and there are no keyword lists to maintain. Less surface area → fewer surprises. The Judge's reasoning is LLM-based, so it generalizes to prompts you didn't anticipate (no rule to add when a new task style appears).
+- **pi-model-router bets on "more control"** — 3 tiers + explicit budget caps + rule overrides is more expressive when you want to enforce a hard USD ceiling or pin specific phrases to specific tiers, but the rule list becomes a maintenance artifact: every new provider or new prompt style is potentially a new rule. The heuristic fallback is opaque — when the LLM classifier is unavailable, the keyword layer silently makes different choices.
 
 **Pick by need:**
 
-- **pi-shift-router** — LLM-as-classifier with zero runtime deps and runtime failover (429/5xx cooldown).
-- **pi-model-router** — 3-tier routing, USD budget cap, keyword rules, persistent state across branches.
-- **pi-smart-router** — ML-optimized local inference (ONNX).
-
-These are complementary, not competitive — they sit at different layers of the stack.
+- **🦾 pi-shift-router** — if you want zero deps, JSON-mode LLM Judge, runtime failover (429/5xx cooldown), and a small surface you can read end-to-end.
+- **pi-model-router** — if you want a hard USD session budget cap, cross-session state, or keyword pinning.
 
 ---
 
@@ -335,9 +450,9 @@ Yes. Each tier stores an ordered list of `{provider, model, priority}` pairs. Mi
 
 Only when the **weighted** ratio of fast votes in the last 5 classified turns is ≥ `window.threshold` (default `0.6`). Low-confidence votes below `window.minConfidence` (default `0.5`) are ignored. Raise `threshold` to `0.8` to stay on Smart longer. Upgrades (Fast → Smart) are always immediate.
 
-### What's the difference from `pi-model-router` and `pi-smart-router`?
+### What's the difference from `pi-model-router`?
 
-They solve different problems and can be used together — see the [comparison table](#how-it-compares).
+Direct competitor — same problem (per-turn routing to a different model tier), different implementation choices. See [How It Compares](#how-it-compares). Pick based on which tradeoffs fit your workflow: zero deps + JSON Judge + runtime failover + small surface, vs 3-tier + budget cap + keyword rules + cross-session state.
 
 ### Can I disable the router temporarily without uninstalling?
 
@@ -346,6 +461,54 @@ They solve different problems and can be used together — see the [comparison t
 ### Is there cost overhead from the Judge?
 
 The Judge uses the Fast-tier model (typically your cheapest). Savings from avoiding unnecessary Smart-tier turns dwarf this cost.
+
+---
+
+## Tuning Guide
+
+Each knob has tradeoffs. Pick by workload:
+
+| Your session looks like… | Try… | Why |
+|---|---|---|
+| Lots of routine work (CRUD, tests, docs); little architecture | `threshold: 0.5`, `minConfidence: 0.7` | Aggressive downgrade — fewer spurious Smart hits |
+| Heavy architecture / planning / code review | `threshold: 0.8`, `minConfidence: 0.4` | Conservative downgrade — stay on Smart longer |
+| Mixed — 20 fast turns then a planning burst | Defaults (`threshold: 0.6`, `minConfidence: 0.5`) | Balanced |
+| Judge tends to over-confident (most votes ≥0.9) | `minConfidence: 0.7` | Strip the over-confident votes |
+| Judge tends to uncertain (many 0.3–0.6 votes) | `minConfidence: 0.3` | Don't drop uncertain votes |
+| Primary fast model keeps 429'ing | Add a second provider as `tiers.fast.models[1]` | v0.6.0 runtime failover picks it up |
+| Heavy streaming / long agent runs | Watch `/router stats` tokens/sec | See per-turn throughput |
+
+### Knob reference
+
+**`routing.judgeTimeout`** (ms) — Judge API call timeout. Default `5000`. Raise on slow providers, lower on flaky networks.
+
+**`routing.window.size`** — Sliding-window length. Default `5`. Larger is more stable (less reactive); smaller is more agile (more jittery).
+
+**`routing.window.threshold`** (0–1) — weighted fast-share threshold for downgrade. Default `0.6`.
+- `0.5`: a slight fast majority downgrades.
+- `0.6`: balanced (default).
+- `0.8`: a strong fast majority required to downgrade.
+- `1.0`: never downgrade (sliding window disabled).
+
+**`routing.window.minConfidence`** (0–1) — votes below this confidence are discarded. Default `0.5`. Set to `0` to restore v0.6.0's equal-weight counting; set to `0.7+` to count only confident votes.
+
+**`tiers.<tier>.models[]`** — ordered by priority. First is primary; rest are runtime fallback (v0.6.0). Put the cheapest healthy model first.
+
+**`ux.routerLogVerbose`** — set `true` (or `/router verbose`) to log every decision to the console. Useful while calibrating `threshold`.
+
+### Reading `/router stats`
+
+```text
+Tier: smart / p/claude-opus-5
+Window: 3 entries (confidence: high=2 mid=1 low=0 none=0)
+Transitions: ↑upgrade=1 ↓downgrade=0
+Tokens: total 12,345 | speed current=23 avg=25 tok/s
+Cooldowns: none
+```
+
+- **`high` / `mid` / `low` / `none`** — confidence distribution of the sliding-window entries. If `none` is high, your Judge isn't returning a confidence field (older prompt or old binary). Re-run `/router config` to refresh.
+- **`avg tok/s`** — recent per-turn throughput. Use it to spot provider slowdowns.
+- **`upgrade` / `downgrade`** — tier-switch counts. Too many downgrades → raise `threshold`; too few → lower it.
 
 ---
 
@@ -375,20 +538,15 @@ Model ID doesn't exist in the provider. Update the ID or re-pick via `/router co
 
 ### Router keeps downgrading to Fast
 
-Judge misclassifying (use `/router verbose`), or `window.threshold` too aggressive. Raise to `0.8`:
-
-```json
-"routing": { "window": { "size": 5, "threshold": 0.8, "minConfidence": 0.5 } }
-```
+See the [Tuning Guide](#tuning-guide). Most often: raise `routing.window.threshold` to `0.8`, or enable `ux.routerLogVerbose` to see why the Judge is voting the way it is.
 
 ---
 
 ## Acknowledgements
 
-- **[pi-coding-agent](https://github.com/earendil-works/pi-coding-agent)** by earendil-works — the host agent.
+- **[pi-coding-agent](https://github.com/earendil-works/pi)** by earendil-works — the host agent.
 - **[pi-tui](https://www.npmjs.com/package/@earendil-works/pi-tui)** — TUI primitives used by the model picker.
-- **[pi-smart-router](https://github.com/beettlle/pi-smart-router)** — complementary ML-optimized inference routing (local ONNX).
-- **[pi-model-router](https://github.com/yeliu84/pi-model-router)** — complementary 3-tier routing with USD budget + keyword rules.
+- **[pi-model-router](https://github.com/yeliu84/pi-model-router)** — direct routing competitor: 3-tier, USD budget cap, keyword overrides, cross-session persistence. See [How It Compares](#how-it-compares) for the full diff.
 
 ---
 

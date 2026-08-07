@@ -10,23 +10,25 @@ SEO 元数据（用户不可见，供爬虫 / LLM 解析）：
 - repo: https://github.com/green-dalii/pi-shift-router
 - docs: README.md / README.zh-CN.md / SPEC.md / CONTRIBUTING.md
 - first-published: v0.4.0
-- latest: v0.6.0
+- latest: v0.8.2
+- alternate-names: shift router, pi extension, model router, two-tier router, auto router, tier model router, model failover router
+- search-intents: "自动路由 pi agent 每轮", "LLM 作为分类器", "两层模型路由", "遇 429 模型的自动 failover", "成本与质量模型选择", "pi-coding-agent 扩展", "模型冷却指数退避", "JSON-mode 分类器"
 - features: 两层路由、LLM Judge、JSON-mode 分类器、滑动窗口降级门、多模型
   fallback 链、TUI chain 编辑器、指数退避运行时 failover（429/5xx）、路由与
-  Judge 共享冷却、原生跨 Provider、零配置起步
-- complementary: pi-model-router（三层 + 预算 + 规则）、pi-smart-router（ML 推理，本地 ONNX）
+  Judge 共享冷却、原生跨 Provider、零配置起步、token throughput 遥测、/router stats 命令
+- direct-competitor: pi-model-router（三层 + 预算 + 关键词规则；同类问题，不同实现选择）
 - author: green-dalii（https://github.com/green-dalii）
 -->
 
 # pi-shift-router
 
-> 为 Pi coding agent 每轮自动分配 **fast Programmer** 或 **smart CTO** 角色。LLM Judge 判定本轮角色；多模型 fallback 链保证稳定性；零运行时依赖。
+> 为 [pi-coding-agent](https://github.com/earendil-works/pi) 每轮自动分配 **fast Programmer** 或 **smart CTO** 角色。LLM Judge 判定本轮角色；多模型 fallback 链保证稳定性；零运行时依赖。**两层模型路由**，一个配置文件，零运行时依赖。
 
 [![npm](https://img.shields.io/npm/v/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
 [![Downloads](https://img.shields.io/npm/dm/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
-[![Pi Agent](https://img.shields.io/badge/pi--agent-extension-purple)](https://github.com/earendil-works/pi-coding-agent)
+[![Pi Agent](https://img.shields.io/badge/pi--agent-extension-purple)](https://github.com/earendil-works/pi)
 [![Node](https://img.shields.io/badge/node-%E2%89%A524-green)](https://nodejs.org)
 [![CI](https://img.shields.io/github/actions/workflow/status/green-dalii/pi-shift-router/ci.yml)](https://github.com/green-dalii/pi-shift-router/actions)
 [![Stars](https://img.shields.io/github/stars/green-dalii/pi-shift-router.svg)](https://github.com/green-dalii/pi-shift-router)
@@ -37,36 +39,40 @@ SEO 元数据（用户不可见，供爬虫 / LLM 解析）：
 
 ## 摘要
 
-- **是什么** — [pi-coding-agent](https://github.com/earendil-works/pi-coding-agent) 扩展。每轮在两个**角色**间路由：fast Programmer（执行型、套用已知模式）与 smart CTO（判断型、复杂 / 高风险 / 不可逆任务）。smart 角色不是一个判断模型 —— 它是当任务复杂度高时，该轮全程实际负责写代码、思考、调工具的模型。
-- **怎么工作** — 每轮开始前，用 Fast 模型本身做小型 LLM Judge，分类为 `fast` 或 `smart`。被选中的模型随后驱动整轮 run —— 所有的思考、所有的工具调用、所有的消息内容 —— 都在该角色的智能水平上进行。
-- **可靠性** — 每层多模型 fallback 链 + 429/5xx 下的指数退避冷却 —— 一个 Provider 限流时任务依然进行。
-- **零依赖** — 纯 TypeScript，单个 `npm install` + 两层配置即可。
-- **稳定状态** — v0.4.0 起 npm 发布（MIT / 202 单测 / Node 24+）。
+- **这是什么东西** — 一个 [pi-coding-agent](https://github.com/earendil-works/pi) 扩展，为每一轮任务自动挑选一个“角色”：**fast Programmer**（负责执行，套用已知模式写代码）和 **smart CTO**（负责复杂、高风险、不可逆的判断与决策）。注意 smart 角色不是个“裁判” —— 一旦被选中，它就是那个实际负责写代码、思考、调工具、干完全程活儿的模型。
+- **怎么跑起来的** — 每一轮开始前，先用 Fast 模型本身做一次小型 LLM Judge，判断本轮该走 `fast` 还是 `smart`。判完之后，被选中的模型接管整轮 —— 所有的思考、所有的工具调用、所有的消息内容，都会在那个模型的智能水平上走完。
+- **不会中途断掉** — 每层都有多模型 fallback 链；遇到 429/5xx 会指数退避冷却。一个 Provider 限流不会让任务停下来。
+- **零依赖** — 纯 TypeScript，一个 `npm install`，配两层即可。
+- **稳定状态** — 从 v0.4.0 起在 npm 发布（MIT / 204 个单测 / Node 24+）。
 
-### 在 pi 中长这样
+### 在 pi 里看起来是这样
 
 ```text
-🦾 [MiniMax-M3] → 修这个失败的测试
+🦾 [deepseek-v4-flash] → 修这个失败的测试
 ⚖ judging…
-🧠 [kimi-k3]              ← 架构问题自动升级到 Smart
-⚠️ MiniMax-M3 429 → switching to deepseek-v4-flash — retry in 1m
-🦾 [deepseek-v4-flash]     ← 同层 failover（v0.6.0）
+🧠 [claude-opus-5]              ← 架构问题自动升级到 Smart
+⚠️ deepseek-v4-flash 429 → switching to glm-5.2 — retry in 1m
+🦾 [glm-5.2]                    ← 同层 failover（v0.6.0）
 ```
 
-状态栏徽章自动切换；toast 解释每次变更。
+状态栏徽章自动跟着跳；切换时会有 toast 说明原因。
 
 ---
 
 ## 目录
 
+- [摘要](#摘要)
 - [它做什么](#它做什么)
 - [快速开始](#快速开始)
+  - [安装](#安装)
+  - [验证](#验证)
 - [工作原理](#工作原理)
 - [命令](#命令)
-- [配置](#配置)
+- [配置参考](#配置参考)
 - [模型选择推荐](#模型选择推荐)
 - [对比一览](#对比一览)
 - [常见问题](#常见问题)
+- [调参指南](#调参指南)
 - [故障排查](#故障排查)
 - [致谢](#致谢)
 
@@ -74,43 +80,53 @@ SEO 元数据（用户不可见，供爬虫 / LLM 解析）：
 
 ## 它做什么
 
-**pi-shift-router** 按**心智模式**对每轮任务分类，并在两个角色间路由：
+**pi-shift-router** 根据**“这件事该怎么干”**对每轮任务分类，在两个角色之间路由：
 
-| Role | Tier | Emoji | 该轮整个 drive 什么 | 何时用 |
+| 角色 | 档位 | Emoji | 选中后这一轮它实际干什么 | 什么时候用 |
 |------|------|-------|------------------------------|--------|
-| **Programmer** | Fast | 🦾 | 执行：写代码、运行测试、修 bug、套用既定模式 | 例行、路径明确、风险低 |
-| **CTO** | Smart | 🧠 | 任务复杂时驱动整轮：架构、设计 review、安全审计、多步规划、不可逆操作、用户要求深度思考 | 高风险、不可逆、路径不明确，或用户明确要深度 |
+| **Programmer** | Fast | 🦾 | 埋头执行：写代码、跑测试、修 bug、套既定模式 | 例行、路径明确、风险低 |
+| **CTO** | Smart | 🧠 | 整轮接管：架构、设计 review、安全审计、多步规划、不可逆操作、深度思考 | 高风险、不可逆、路径不清，或你明说要“仔细想想” |
 
-Fast 不是真的程序员 —— 它是负责执行的模型；Smart 不是真的 CTO —— 它是负责复杂判断的模型，但 **它也会自己亲手干所有活**（写代码、调工具、跑循环）。LLM Judge 只是一次性的小分类调用；被选中的 tier 随后驱动整个 agent run。
+Fast 不是真的程序员 —— 它是个负责执行的模型；Smart 不是真的 CTO —— 它是个负责复杂判断的模型，而且 **它自己动手干所有活**（写代码、调工具、跑循环）。LLM Judge 只是每次轮开始前一次很轻的分类调用；分完之后被选中的档位整轮接管 agent run。
 
-**默认无任何行为** —— 两层默认都为空，配置前路由器不起任何作用（`/router config`）。
+**默认什么都不做** —— 两层默认都是空的，你跑了配置才会生效。命令：`/router config`。
 
-> **Smart = CTO**（工作量小但极其关键 —— 定方向、签字架构、 review 复杂工作、风险高时亲自驱动整轮）
-> **Fast = Programmer**（工作量大、模式明确 —— 写代码、跑测试、修 bug、路径清晰时亲自驱动整轮）
+> **Smart = CTO**：活不多但每件都关键 —— 定方向、拍架构、审代码；风险高时亲自接管整轮。
+> **Fast = Programmer**：活多、模式清晰 —— 写代码、跑测试、修 bug；路径清楚时亲自接管整轮。
 
-不是所有任务都需要 CTO 级别的智力。但项目如果没有 CTO 把关，质量底线撑不住。
+不是每件事都需要 CTO 级别的智力。但项目要是没有 CTO 把关，质量底线撑不住。
 
 ---
 
 ## 快速开始
 
-**前置** — Node.js ≥ 24、pi-agent ≥ 0.80、至少一个 Provider 账号（在 pi-agent 的 `auth.json` 里），每层各一个模型。
+**你需要的** — Node.js ≥ 24、pi-agent ≥ 0.80、至少一个 Provider 账号（已经写在 pi-agent 的 `auth.json` 里）、每层至少一个模型。
 
-**安装**
+### 安装
 
 ```bash
 pi install npm:pi-shift-router
 ```
 
-写入 `~/.pi/agent/settings.json`，下次启动 pi 时自动加载。git / 本地路径安装见 [pi 包管理文档](https://github.com/earendil-works/pi-coding-agent/blob/main/docs/packages.md)。
+插件会被注册到 `~/.pi/agent/settings.json`，下次启动 pi 时自动加载。git 仓库安装或本地路径安装见 [pi 包管理文档](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md)。
 
-**配置**
+### 验证
 
-在 pi 里运行 `/router config`，为 Fast 和 Smart 各选一个模型。保存到用户或项目作用域。
+打开 TUI 向导，为每层选一个 Fast 和 Smart 模型（多个也行，会组成 fallback 链）：
 
-**验证**
+```text
+/router config
+```
 
-`/router status` 显示层级和模型；下一轮触发首次 Judge 调用。
+存到用户作用域或项目作用域都行 —— 两边同时设的话，项目级优先。完整 JSON schema 见 [配置参考](#配置参考)。
+
+接着跑：
+
+```text
+/router status
+```
+
+就能看到当前的 tier、作用城、配置的 Judge 阈值以及 streaming 遥测数据。下一轮发消息就会触发首次 Judge 调用。
 
 ---
 
@@ -174,34 +190,90 @@ Judge 也走完整个 fast 链才放弃，与路由共享同一冷却表。手�
 
 ---
 
-## 配置
+## 配置参考
 
-双层配置：用户级（`~/.pi/agent/pi-shift-router.json`）+ 项目级（`<cwd>/.pi/pi-shift-router.json`）。项目级优先。
+> **推荐配置方式：`/router config` —— TUI 向导。** 正常情况下不需要手写 JSON。仅在脚本化、跨机共享配置、固定到项目仓库时使用下方 JSON 参考。
 
-```json
-{
-  "enabled": true,
-  "tiers": {
-    "fast":  { "models": [
-      { "provider": "deepseek", "model": "deepseek-v4-flash", "priority": 1 },
-      { "provider": "kimi",     "model": "kimi-k3",          "priority": 2 }
-    ] },
-    "smart": { "models": [{ "provider": "kimi", "model": "kimi-k3", "priority": 1 }] }
-  },
-  "routing": { "mode": "auto", "judgeTimeout": 5000, "window": { "size": 5, "threshold": 0.6 } },
-  "ux": { "quietMode": false, "statusBar": true, "inlineToast": true, "routerLogVerbose": false }
-}
+**TUI 可配项（`/router config`）：**
+
+- 总开关（`/router on` / `/router off`）
+- 每层模型 chain —— 添加 / 删除 / 重排（`a`、`x`、`J`/`K`、`d` 保存、`Esc` 取消）
+- 保存作用域：用户级（`~/.pi/agent/pi-shift-router.json`）或项目级（`<cwd>/.pi/pi-shift-router.json`）；项目级优先。
+
+**只能手改 JSON 的项（高级，不在 TUI 里）：**
+
+- `routing.judgeTimeout`、`routing.window.minConfidence`、`routing.window.threshold`
+- `ux.quietMode`、`ux.routerLogVerbose`
+
+手改后调一次 `/router config` 重新加载，或重启 pi。
+
+### JSON Schema（参考）
+
+两层文件，TUI 向导写入“常规项”，手写编辑“高级项”：
+
+```text
+~/.pi/agent/pi-shift-router.json         （用户级 —— 默认生效）
+<cwd>/.pi/pi-shift-router.json           （项目级 —— 同名字段覆盖用户级）
 ```
+
+```text
+pi-shift-router.json
+├── enabled                    boolean  总开关；默认 true
+├── tiers
+│   ├── fast
+│   │   └── models[]           按优先级排序；首个为 primary，其余为 fallback
+│   │       ├── provider       string   必须与 pi-agent 的 auth.json 中某个 Provider 对应
+│   │       ├── model          string   该 Provider 下的模型 ID
+│   │       └── priority       integer  1 = primary，2 = 第一个 fallback，…
+│   └── smart                  与 fast 同形
+├── routing
+│   ├── mode                   "auto" | "manual"；默认 "auto"
+│   ├── judgeTimeout           ms；默认 5000
+│   └── window
+│       ├── size               滑动窗口长度；默认 5
+│       ├── threshold          Fast 份额权重上限，触发降级；默认 0.6
+│       └── minConfidence      低于该置信度的投票被忽略；默认 0.5
+└── ux
+    ├── quietMode              静默 inline toast；默认 false
+    ├── statusBar              显示 🦾 / 🧠 徽章；默认 true
+    ├── inlineToast            模型切换提示；默认 true
+    └── routerLogVerbose       调试日志；默认 false
+```
+
+**最小配置**（每层一个模型，其余全默认）：
+
+```text
+enabled:  true
+tiers:
+  fast:   [{ provider: openai, model: gpt-5.6-luna }]
+  smart:  [{ provider: openai, model: gpt-5.6-sol }]
+```
+
+**多 Provider + 每层 fallback chain**（典型生产配置）：
+
+```text
+enabled:  true
+tiers:
+  fast:
+    - { provider: deepseek,   model: deepseek-v4-flash, priority: 1 }
+    - { provider: z.ai,       model: glm-5.2,           priority: 2 }
+    - { provider: xai,        model: grok-4.5-fast,     priority: 3 }
+  smart:
+    - { provider: anthropic,  model: claude-opus-5,     priority: 1 }
+    - { provider: openai,     model: gpt-5.6-sol,       priority: 2 }
+    - { provider: moonshotai, model: kimi-k3,           priority: 3 }
+```
+
+逐字段默认值：
 
 | 字段 | 默认 | 含义 |
 |------|------|------|
 | `enabled` | `true` | 总开关。`/router off` 停用。 |
 | `tiers.<tier>.models[]` | `[]` | 按 `priority` 排序。首个命中；其余项作运行时备用。 |
 | `routing.judgeTimeout` | `5000` | ms。Judge 调用超时。 |
-| `routing.window.size` / `threshold` / `minConfidence` | `5` / `0.6` / `0.5` | 滑动窗口降级门；低于 `minConfidence` 的投票被忽略。 |
+| `routing.window.size` / `threshold` | `5` / `0.6` | 滑动窗口降级门。 |
+| `routing.window.minConfidence` | `0.5` | 低于该置信度的投票被忽略。 |
 | `ux.quietMode` / `statusBar` / `inlineToast` / `routerLogVerbose` | 各自 | 表面控制。 |
-
-每层的 `models` 是一个**按优先级排序的列表** —— 第一个是 primary，后续项是备用。`/router config` 打开 TUI chain 编辑器（`a` 添加、`x` 删除、`J`/`K` 重排、`d` 保存、`Esc` 取消）。
 
 ---
 
@@ -209,27 +281,22 @@ Judge 也走完整个 fast 链才放弃，与路由共享同一冷却表。手�
 
 这一节不提供可复制的 JSON 片段（各家 Provider 差异太大），只讲**选型逻辑**。数据快照于 [models.dev](https://models.dev/)，抓取时间 **2026-08-05**；用 `curl -s https://models.dev/api.json | jq` 看最新。
 
-> **Fast 档经验法则**：如果你使用的 Provider 提供 `deepseek-v4-flash-0731`（2026-07-31 发布），fast 首选它 —— 0731 升级把质量拉到了接近 Opus 4.8 / GLM-5.2 的水平，但价格仍处在表中低位。
+> **Fast 档经验法则**：如果你使用的 Provider 提供 `deepseek-v4-flash`（2026-07 发布），fast 首选它 —— 0731 刷新把质量拉到了接近 Opus 5 / GLM-5.2 的水平，但价格仍处在表中低位。
 >
 > **Smart 档经验法则**：smart 始终走云。低于 ~80 GB 显存/统一内存的硬件跑本地 smart 极其不划算；96 GB 以上也几乎永远不如 flat-fee 套餐。
 
 ### Pattern 1 — Token-plan 套餐（一个 key 走多模型）
 
-阿里云国际版与 CN 合并为同一行（同一个产品，两个区域端点）。列出的是你可混合在 chain 中的候选 ID，不是唯一推荐搭配。
+列出的是你可混合在 chain 中的候选 ID，不是唯一推荐搭配。下面这些 Provider 都是全球知名的聚合 / Token-bundle 网关，统一账号接入 Anthropic / OpenAI / Google / DeepSeek / xAI / Z.AI / Qwen / Moonshot 等。
 
 | Plan | fast 🦾 候选 | smart 🧠 候选 |
 |---|---|---|
-| **Alibaba Token Plan**（intl + CN） | `qwen3.7-plus`、`qwen3.6-flash`、`deepseek-v4-flash-0731` | `qwen3.8-max`、`qwen3.7-max`、`kimi-k2.7-code` |
-| **OpenCode Go** | `deepseek-v4-flash`、`gpt-5.6-luna (2× usage)`、`hy3`、`qwen3.6-plus` | `qwen3.7-max`、`qwen3.8-max`、`kimi-k3`、`grok-4.5`、`glm-5.2` |
-| **OpenCode Zen**（含免费档） | `deepseek-v4-flash-free`、`ling-3.0-flash-free`、`laguna-s-2.1-free`、`gemini-3.5-flash-lite` | `claude-opus-5`、`kimi-k3`、`gpt-5.6-sol`、`glm-5.2` |
-| **Moonshot Token Plan** | `kimi-k2.7-code`、`kimi-k2.7-code-highspeed` | `kimi-k3` |
-| **MiniMax Token Plan** | `MiniMax-M2.7-highspeed` | `MiniMax-M3`（1 M 上下文、多模态） |
-| **Xiaomi Token Plan** | `mimo-v2.5` | `mimo-v2.5-pro` |
+| **Alibaba Token Plan**（intl + CN） | `qwen3.7-plus`、`qwen3.6-flash`、`deepseek-v4-flash` | `qwen3.8-max`、`qwen3.7-max`、`kimi-k3` |
 | **Vercel AI Gateway** | 上述任意走同一网关 | 上述任意 |
-| **OpenRouter** | 337 个模型；`auto` **不能**当 Judge target（不透明） | 337 个模型 |
+| **OpenRouter** | 200+ 个模型；`auto` **不能**当 Judge target（不透明） | 200+ 个模型 |
 | **Hugging Face Inference** | `Qwen/Qwen3.5-9B`、`Qwen/Qwen3.6-35B-A3B` | `Qwen/Qwen3.6-27B`、`google/gemma-4-31B-it` |
-| **Nebius Token Factory** | `deepseek-ai/DeepSeek-V4-Flash-0731`、`moonshotai/Kimi-K2.7-Code` | `Kimi-K3`、`MiniMaxAI/MiniMax-M3`、`zai-org/GLM-5.2` |
-| **NovitaAI** | `inclusionai/ling-2.6-flash`、`qwen/qwen3.5-27b` | `qwen/qwen3.7-max`、`moonshotai/kimi-k3` |
+| **Nebius Token Factory** | `deepseek-ai/DeepSeek-V4-Flash`、`moonshotai/Kimi-K2.7-Code` | `Kimi-K3`、`zai-org/GLM-5.2`、`Qwen/Qwen3.7-Max` |
+| **NovitaAI** | `deepseek-ai/DeepSeek-V4-Flash`、`Qwen/Qwen3.6-27B` | `moonshotai/Kimi-K3`、`Qwen/Qwen3.7-Max` |
 
 ### Pattern 2 — 本地模型按显存 / 统一内存分级
 
@@ -259,28 +326,27 @@ Judge 也走完整个 fast 链才放弃，与路由共享同一冷却表。手�
 
 | Provider | fast 🦾 | smart 🧠 | 备注 |
 |---|---|---|---|
-| **Anthropic** | `claude-sonnet-5` | `claude-opus-5` 或 `claude-fable-5` | Haiku 4.5 是上一代 fast，Sonnet 5 取代了它。 |
-| **OpenAI** | `gpt-5.6-luna` | `gpt-5.6-sol` | GPT-5.6 内部 luna < terra < sol 三档。 |
+| **Anthropic** | `claude-sonnet-5` | `claude-opus-5` 或 `claude-fable-5` | Sonnet 5 是当前 fast 档。 |
+| **OpenAI** | `gpt-5.6-luna` | `gpt-5.6-sol` | GPT-5.6 内部 `luna` < `terra` < `sol` 三档。 |
 | **Google** | `gemini-3.5-flash-lite` | `gemini-3.6-flash` | Gemini 3.x，两档均 1 M 上下文。 |
 | **Qwen (Alibaba)** | `qwen3.7-plus` | `qwen3.8-max` | 原生 `plus` / `max` 分级。 |
-| **Moonshot Kimi** | `kimi-k2.7-code` 或 `kimi-k2.7-code-highspeed` | `kimi-k3` | K2.7-code 是 fast，K3 是 smart。 |
-| **DeepSeek** | `deepseek-v4-flash-0731` | `deepseek-v4-pro` | `flash` ≈ mini 价格档，`pro` ≈ 旗舰。 |
-| **MiMo (Xiaomi)** | `mimo-v2.5` | `mimo-v2.5-pro` | v2.5 是当前代。 |
+| **DeepSeek** | `deepseek-v4-flash` | `deepseek-v4-pro` | `flash` ≈ mini 价格档，`pro` ≈ 旗舰。 |
 | **Z.AI (GLM)** | `glm-5` 或 `glm-5-turbo` | `glm-5.2` | GLM-5 系列。 |
+| **xAI (Grok)** | `grok-4.5-fast` | `grok-4.5` | Grok 4.5 代。 |
 
 ### Pattern 4 — 跨 Provider 拼装（最佳单项）
 
-需要在两个档都拿到各 Provider 的最强能力。默认 fast 选 `deepseek-v4-flash-0731`（只要有）。
+需要在两个档都拿到各 Provider 的最强能力。默认 fast 选 `deepseek-v4-flash`（只要有）；默认 smart 选 `claude-opus-5`，用 `gpt-5.6-sol` 与 `kimi-k3` 作跨 Provider fallback。
 
 | 场景 | fast 🦾 | smart 🧠 |
 |---|---|---|
-| Coding + 最低价 | `deepseek/deepseek-v4-flash-0731` | `anthropic/claude-opus-5` |
-| Coding + flat-fee（最佳 $/质量） | `alibaba-token-plan/deepseek-v4-flash-0731` | `alibaba-token-plan/qwen3.8-max` |
-| 1 M 上下文、长 repo / PDF 研究 | `deepseek-v4-flash-0731` | `moonshotai/kimi-k3` |
-| 多模态（图 / 视频） | `deepseek-v4-flash-0731` | `minimax-cn/MiniMax-M3` |
-| 多语言、中文优先 | `deepseek-v4-flash-0731` | `alibaba/qwen3.8-max` |
-| 欧洲 / GDPR 优先 | `deepseek-v4-flash-0731`（OpenRouter 转） | `mistral/mistral-medium-2604` |
-| 硬件加速推理 | `groq/deepseek-v4-flash-0731` 或 `groq/qwen3.6-27b` | `togetherai/deepseek-v4-flash-0731` |
+| Coding + 最低价 | `deepseek/deepseek-v4-flash` | `anthropic/claude-opus-5` |
+| Coding + 多 Provider fallback | `deepseek-v4-flash` + `glm-5.2`（fallback） | `claude-opus-5` + `gpt-5.6-sol` + `kimi-k3`（fallback chain） |
+| Coding + flat-fee（最佳 $/质量） | `alibaba-token-plan/deepseek-v4-flash` | `alibaba-token-plan/qwen3.8-max` |
+| 1 M 上下文、长 repo / PDF 研究 | `deepseek-v4-flash` | `google/gemini-3.6-pro` 或 `kimi-k3` |
+| 多模态（图 / 视频） | `deepseek-v4-flash` | `anthropic/claude-opus-5`（视觉） 或 `google/gemini-3.6-pro` |
+| 多语言、中文优先 | `deepseek-v4-flash` | `alibaba/qwen3.8-max` |
+| 欧洲 / GDPR 优先 | `deepseek-v4-flash`（OpenRouter 转） | `mistral/mistral-medium-2604` |
 
 ---
 
@@ -290,24 +356,27 @@ Judge 也走完整个 fast 链才放弃，与路由共享同一冷却表。手�
 
 ## 对比一览
 
-| | pi-shift-router（本插件） | pi-model-router | pi-smart-router |
-|---|---|---|---|
-| **层数** | 2（fast / smart） | 3（high / medium / low） | n 阶段 ML 管线 |
-| **分类器** | LLM Judge（JSON mode 强制） | 可选 LLM 分类器 + 启发式兜底 | ONNX + Aho-Corasick |
-| **自定义规则** | — | 关键词覆盖 | — |
-| **预算上限** | — | USD 会话预算；超额自动 high→medium | — |
-| **Phase 记忆** | 滑动窗口降级门 | `phaseBias` 跨轮粘性 | — |
-| **持久化** | 会话级 | 跨会话、跨分支（`router-state`） | 每会话 |
-| **运行时 failover** | 429/5xx + 指数退避冷却 | Profile 级 fallback 链 | — |
-| **依赖** | 零运行时（纯 TS） | pi SDK 上 npm 包 | ONNX、SQLite、HF |
+两者解决同一个问题（按轮 agent 路由到不同档位模型），但在“什么才算好的分类”这个根本问题上走了相反的路。
+
+| | 🦾 **pi-shift-router**（本插件） | pi-model-router |
+|---|---|---|
+| **🧠 分类器** | ✅ LLM Judge（JSON mode 强制）—— 始终走 LLM，凭自然语言推理 | ⚠️ 可选 LLM 分类器 → 启发式 / 关键词兑底 |
+| **🪜 层数** | ✅ 2 层（fast / smart）—— 面小，容易讲清楚 | 3 层（high / medium / low）—— 旋钮多 |
+| **📝 自定义规则** | ✅ 无 —— Judge 读自然语言信号 | ⚠️ 关键词 override（手写 / 正则 等）—— 要维护 |
+| **💰 预算上限** | — | USD 会话预算，超额自动 high → medium |
+| **🗂️ 持久化** | 仅本会话 | 跨会话、跨分支（`router-state`） |
+| **🛡️ 运行时 failover** | ✅ 429/5xx + 指数退避冷却，与 Judge 共享 | Profile 级 fallback 链 |
+| **📦 依赖** | ✅ 零运行时依赖 | 依赖 pi SDK 的 npm 包 |
+
+**两种哲学：**
+
+- **🦾 pi-shift-router 押“少即是多”** —— 2 层足够思考清晰，Judge 只是单次 LLM 调用，prompt 可以读可以改；没有关键词表要维护。Judge 走 LLM 推理，能处理你没提前预见过的 prompt（不会出现“新场景出现 → 必须加新规则”的事）。暴露面越小，意外越少。
+- **pi-model-router 押“控制感”** —— 3 层 + 显式预算上限 + 规则 override 表达力更强，能强制设 USD 顶、能用关键词把特定表达钉到特定 tier。但规则列表本身变成要维护的产物：每加一个 Provider、每出现一种新 prompt 风格都可能要加一条规则；启发式兑底不透明 —— LLM 分类器不可用时，关键词层会静默地给出不一样的选择。
 
 **按需求选：**
 
-- **pi-shift-router** —— LLM 作分类器，零运行时依赖，运行时 failover（429/5xx 冷却）。
-- **pi-model-router** —— 三层路由、USD 预算上限、关键词规则、跨分支持久状态。
-- **pi-smart-router** —— 本地 ONNX ML 推理。
-
-三者互补，不竞争 —— 在栈的不同层上各司其职。
+- **🦾 pi-shift-router** —— 要零依赖、JSON-mode LLM Judge、运行时 failover（429/5xx 冷却），并且希望代码面小到一晚上能读完。
+- **pi-model-router** —— 要 USD 预算上限、跨会话状态、关键词钉选。
 
 ---
 
@@ -333,9 +402,9 @@ v0.6.0 起指数退避冷却：primary 标记冷却（1m → 2m → 4m … 封�
 
 仅当最近 5 轮中 fast 投票的**加权比** ≥ `window.threshold`（默认 0.6）时才降级；低 `window.minConfidence`（默认 0.5）以下的投票被忽略。改成 `threshold: 0.8` 可延长 Smart 停留。升级（Fast → Smart）始终立即。
 
-### 和 pi-model-router、pi-smart-router 的区别？
+### 和 pi-model-router 的区别？
 
-解决不同问题，可以叠加用 —— 见 [对比一览](#对比一览)。
+直接竞品 —— 同一个问题（每轮任务交给哪个 model tier），不同实现路线。完整差异见 [对比一览](#对比一览)。选哪个取决于你接受哪套取舍：要零依赖 + JSON Judge + 运行时 failover + 小到一晚上能读完的面，还是三层 + USD 预算上限 + 关键词规则 + 跨会话状态。
 
 ### 能不能临时禁用而不卸载？
 
@@ -382,7 +451,7 @@ Judge 用的是 Fast 层模型（通常是你最便宜的）。一次分类几�
 ### 读 `/router stats`
 
 ```
-Tier: smart / p/MiniMax-M3
+Tier: smart / p/claude-opus-5
 Window: 3 entries (confidence: high=2 mid=1 low=0 none=0)
 Transitions: ↑upgrade=1 ↓downgrade=0
 Tokens: total 12,345 | speed current=23 avg=25 tok/s
@@ -431,10 +500,9 @@ Judge 误分类（`/router verbose` 查看）或阈值太激进。调高：
 
 ## 致谢
 
-- **[pi-coding-agent](https://github.com/earendil-works/pi-coding-agent)** by earendil-works —— host agent。
+- **[pi-coding-agent](https://github.com/earendil-works/pi)** by earendil-works —— host agent。
 - **[pi-tui](https://www.npmjs.com/package/@earendil-works/pi-tui)** —— TUI 原语。
-- **[pi-smart-router](https://github.com/beettlle/pi-smart-router)** —— 互补的 ML 优化推理路由（本地 ONNX）。
-- **[pi-model-router](https://github.com/yeliu84/pi-model-router)** —— 互补的三层路由 + USD 预算 + 关键词规则。
+- **[pi-model-router](https://github.com/yeliu84/pi-model-router)** —— 直接路由竞品：三层、USD 预算上限、关键词 override、跨会话持久化。完整差异见 [对比一览](#对比一览)。
 
 ---
 
