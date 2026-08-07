@@ -25,7 +25,7 @@ SEO metadata (not user-visible, parsed by crawlers / LLMs):
 
 # pi-shift-router
 
-> **pi-shift-router** is a zero-dependency **auto-routing** tier model router for the [pi-coding-agent](https://github.com/earendil-works/pi) CLI. It classifies every turn between a **fast Programmer** role and a **smart CTO** role using an LLM-as-classifier (Judge), with multi-model fallback chains, exponential-backoff runtime failover on 429/5xx, and a shared cooldown map. Two-tier **model router** with one config file, zero runtime deps.
+> **pi-shift-router** is a two-tier **auto-routing** model router for the [pi-coding-agent](https://github.com/earendil-works/pi) CLI. It classifies every turn between a **fast Programmer** role and a **smart CTO** role using an LLM-as-classifier (Judge), then routes the run to the right model — with multi-model fallback chains, exponential-backoff runtime failover on 429/5xx, and a shared cooldown map. Pure TypeScript, zero runtime dependencies, one config file.
 
 [![npm](https://img.shields.io/npm/v/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
 [![Downloads](https://img.shields.io/npm/dm/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
@@ -46,7 +46,7 @@ SEO metadata (not user-visible, parsed by crawlers / LLMs):
 - **How it works** — Before each turn, a small LLM Judge (the fast-tier model itself) classifies the task as `fast` or `smart`. The chosen model then drives the whole turn — all thinking, all tool calls, all message content — at that tier's intelligence level.
 - **Reliability** — Multi-model fallback chains per tier + exponential-backoff cooldown on 429/5xx — turns keep flowing when one provider rate-limits.
 - **Zero dependencies** — Pure TypeScript. Single `npm install`, two-tier config, done.
-- **Stable since** — v0.4.0 (npm, MIT, 202 unit tests, Node 24+).
+- **Stable since** — v0.4.0 (npm, MIT, 204 unit tests, Node 24+).
 
 ### In pi, it looks like this
 
@@ -72,11 +72,11 @@ Status bar badge changes tier automatically; toasts explain any switch.
 - [How It Works](#how-it-works)
 - [Commands](#commands)
 - [Configuration Reference](#configuration-reference)
-- [Tuning Guide](#tuning-guide)
 - [Recommended Model Pairings](#recommended-model-pairings)
 - [Use Cases](#use-cases)
 - [How It Compares](#how-it-compares)
 - [FAQ](#faq)
+- [Tuning Guide](#tuning-guide)
 - [Troubleshooting](#troubleshooting)
 - [Roadmap](ROADMAP.md)
 - [Contributing](CONTRIBUTING.md)
@@ -109,7 +109,7 @@ The fast tier is **not** a real Programmer — it's a model that handles executi
 
 **Zero behavior change by default** — both tiers start empty. The router does nothing until you assign models via `/router config`.
 
-> **Smart = CTO** (small workload, but critical — sets direction, signs off on architecture, reviews complex work, drives the whole turn when stakes are high)
+> **Smart = CTO** (few turns, but each one critical — sets direction, signs off on architecture, reviews complex work, drives the whole turn when stakes are high)
 > **Fast = Programmer** (large workload, well-defined patterns — writes code, runs tests, fixes the bug, drives the whole turn when the path is clear)
 
 Not every task needs a CTO. But projects without CTO oversight don't sustain quality.
@@ -144,7 +144,7 @@ All three forms register the extension in `~/.pi/agent/settings.json` and auto-l
 
 ### Verify
 
-Open the TUI wizard and pick one Fast + one Smart model per tier (or several for a fallback chain):
+Open the TUI wizard and pick a Fast model and a Smart model — or several per tier to form a fallback chain:
 
 ```text
 /router config
@@ -188,7 +188,7 @@ flowchart TD
 Three properties that matter:
 
 - **Upgrades are immediate** (Fast → Smart). Quality first.
-- **Downgrades need sustained trend** (≥60% of last 5 turns are Fast). Cache protection.
+- **Downgrades need a sustained trend** (weighted fast share ≥ `threshold`, default 0.6, over the last 5 turns; votes below `minConfidence` are ignored). This protects the smart tier's context cache from premature downgrades.
 - **One classification per turn.** No thrashing during tool calls.
 
 **JSON-mode enforcement** (not just prompt instructions): OpenAI-compatible APIs use `response_format: { type: "json_object" }` (the API rejects non-JSON completions); Anthropic uses assistant prefill `{` to force JSON-start output. While the Judge is in flight, the status bar shows `⚖ judging…`.
@@ -305,7 +305,7 @@ Field-by-field defaults:
 | `routing.judgeTimeout` | `5000` | ms. Judge API call timeout. |
 | `routing.window.size` / `threshold` | `5` / `0.6` | Sliding-window downgrade gate. |
 | `routing.window.minConfidence` | `0.5` | Votes below this confidence are ignored. |
-| `ux.quietMode` / `statusBar` / `inlineToast` / `routerLogVerbose` | various | Surface controls. |
+| `ux.quietMode` / `statusBar` / `inlineToast` / `routerLogVerbose` | various | Display / logging controls. |
 
 ---
 
@@ -332,7 +332,7 @@ Lists candidate model IDs you can mix across the chain — not a single canonica
 
 ### Pattern 2 — Local models by VRAM / unified memory
 
-All picks below were verified against HuggingFace's `safetensors` total weight size on 2026-08. 
+All picks below were verified against HuggingFace's `safetensors` total weight size on 2026-08. Older generations (2025 and earlier), end-device outputs (<7 B), and pre-Qwen3.5 / pre-DeepSeek-V3 models were excluded as too dated. 
 
 > fp16 is a benchmark artifact, not a runtime format. Production local deployments use **q4-k-m / NVFP4 / MXFP4 / AWQ-int4 / 1–2 bit ternary**. The table below reflects that — nothing in `fast` runs at fp16.
 >

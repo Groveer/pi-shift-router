@@ -1,28 +1,30 @@
 <!--
 SEO 元数据（用户不可见，供爬虫 / LLM 解析）：
 - name: pi-shift-router
-- type: software / npm 包 / pi-coding-agent 扩展
+- type: software / npm 包 / pi-coding-agent 扩展 / 模型路由器 / LLM 分类器
 - license: MIT
 - language: TypeScript
 - runtime: Node.js >= 24
 - dependencies: 零运行时依赖
 - npm: https://www.npmjs.com/package/pi-shift-router
 - repo: https://github.com/green-dalii/pi-shift-router
+- canonical: https://github.com/green-dalii/pi-shift-router/blob/main/README.zh-CN.md
 - docs: README.md / README.zh-CN.md / SPEC.md / CONTRIBUTING.md
 - first-published: v0.4.0
+- latest: v0.8.2
 - latest: v0.8.2
 - alternate-names: shift router, pi extension, model router, two-tier router, auto router, tier model router, model failover router
 - search-intents: "自动路由 pi agent 每轮", "LLM 作为分类器", "两层模型路由", "遇 429 模型的自动 failover", "成本与质量模型选择", "pi-coding-agent 扩展", "模型冷却指数退避", "JSON-mode 分类器"
 - features: 两层路由、LLM Judge、JSON-mode 分类器、滑动窗口降级门、多模型
   fallback 链、TUI chain 编辑器、指数退避运行时 failover（429/5xx）、路由与
   Judge 共享冷却、原生跨 Provider、零配置起步、token throughput 遥测、/router stats 命令
-- direct-competitor: pi-model-router（三层 + 预算 + 关键词规则；同类问题，不同实现选择）
+- direct-competitor: pi-model-router（3 档 + 预算 + 关键词规则；同类问题，不同实现选择）
 - author: green-dalii（https://github.com/green-dalii）
 -->
 
 # pi-shift-router
 
-> 为 [pi-coding-agent](https://github.com/earendil-works/pi) 每轮自动分配 **fast Programmer** 或 **smart CTO** 角色。LLM Judge 判定本轮角色；多模型 fallback 链保证稳定性；零运行时依赖。**两层模型路由**，一个配置文件，零运行时依赖。
+> 为 [pi-coding-agent](https://github.com/earendil-works/pi) 每轮自动分配 **fast Programmer** 或 **smart CTO** 角色：LLM Judge 判定本轮角色，随后路由到对应模型跑完整轮。多模型 fallback 链与 429/5xx 指数退避 failover 保证任务不中断；纯 TypeScript、零运行时依赖、一个配置文件，即 **两层模型路由**。
 
 [![npm](https://img.shields.io/npm/v/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
 [![Downloads](https://img.shields.io/npm/dm/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
@@ -39,11 +41,11 @@ SEO 元数据（用户不可见，供爬虫 / LLM 解析）：
 
 ## 摘要
 
-- **这是什么东西** — 一个 [pi-coding-agent](https://github.com/earendil-works/pi) 扩展，为每一轮任务自动挑选一个“角色”：**fast Programmer**（负责执行，套用已知模式写代码）和 **smart CTO**（负责复杂、高风险、不可逆的判断与决策）。注意 smart 角色不是个“裁判” —— 一旦被选中，它就是那个实际负责写代码、思考、调工具、干完全程活儿的模型。
-- **怎么跑起来的** — 每一轮开始前，先用 Fast 模型本身做一次小型 LLM Judge，判断本轮该走 `fast` 还是 `smart`。判完之后，被选中的模型接管整轮 —— 所有的思考、所有的工具调用、所有的消息内容，都会在那个模型的智能水平上走完。
-- **不会中途断掉** — 每层都有多模型 fallback 链；遇到 429/5xx 会指数退避冷却。一个 Provider 限流不会让任务停下来。
-- **零依赖** — 纯 TypeScript，一个 `npm install`，配两层即可。
-- **稳定状态** — 从 v0.4.0 起在 npm 发布（MIT / 204 个单测 / Node 24+）。
+- **它是什么** — 一个 [pi-coding-agent](https://github.com/earendil-works/pi) 扩展，为每一轮任务自动挑选一个“角色”：**fast Programmer**（负责执行，套用已知模式写代码）和 **smart CTO**（负责复杂、高风险、不可逆的判断与决策）。注意 smart 角色不是“裁判” —— 一旦被选中，它就是那个实际写代码、思考、调工具、干完全程的模型。
+- **如何运作** — 每轮开始前，由 Fast 档的模型本身做一次轻量的 LLM 分类（Judge），判断该轮走 `fast` 还是 `smart`。判完之后，被选中的模型接管整轮 —— 思考、工具调用、消息内容，全部在那个模型的智能水平上完成。
+- **可靠性** — 每档都有多模型 fallback 链；遇到 429/5xx 会指数退避冷却。单个 Provider 限流不会让任务中断。
+- **零依赖** — 纯 TypeScript，一个 `npm install`，配好两档即可。
+- **自 v0.4.0 起稳定发布** — npm / MIT / 204 个单测 / Node 24+。
 
 ### 在 pi 里看起来是这样
 
@@ -52,7 +54,7 @@ SEO 元数据（用户不可见，供爬虫 / LLM 解析）：
 ⚖ judging…
 🧠 [claude-opus-5]              ← 架构问题自动升级到 Smart
 ⚠️ deepseek-v4-flash 429 → switching to glm-5.2 — retry in 1m
-🦾 [glm-5.2]                    ← 同层 failover（v0.6.0）
+🦾 [glm-5.2]                    ← 同档 failover（v0.6.0）
 ```
 
 状态栏徽章自动跟着跳；切换时会有 toast 说明原因。
@@ -70,11 +72,14 @@ SEO 元数据（用户不可见，供爬虫 / LLM 解析）：
 - [命令](#命令)
 - [配置参考](#配置参考)
 - [模型选择推荐](#模型选择推荐)
+- [使用场景](#使用场景)
 - [对比一览](#对比一览)
 - [常见问题](#常见问题)
 - [调参指南](#调参指南)
 - [故障排查](#故障排查)
 - [致谢](#致谢)
+- [路线图](ROADMAP.md)
+- [贡献指南](CONTRIBUTING.md)
 
 ---
 
@@ -87,9 +92,9 @@ SEO 元数据（用户不可见，供爬虫 / LLM 解析）：
 | **Programmer** | Fast | 🦾 | 埋头执行：写代码、跑测试、修 bug、套既定模式 | 例行、路径明确、风险低 |
 | **CTO** | Smart | 🧠 | 整轮接管：架构、设计 review、安全审计、多步规划、不可逆操作、深度思考 | 高风险、不可逆、路径不清，或你明说要“仔细想想” |
 
-Fast 不是真的程序员 —— 它是个负责执行的模型；Smart 不是真的 CTO —— 它是个负责复杂判断的模型，而且 **它自己动手干所有活**（写代码、调工具、跑循环）。LLM Judge 只是每次轮开始前一次很轻的分类调用；分完之后被选中的档位整轮接管 agent run。
+Fast 不是真的程序员 —— 它是个负责执行的模型；Smart 不是真的 CTO —— 它是个负责复杂判断的模型，而且 **它自己动手干所有活**（写代码、调工具、跑循环）。LLM Judge 只是每轮开始前一次很轻的分类调用；分完之后，被选中的档位整轮接管 agent run。
 
-**默认什么都不做** —— 两层默认都是空的，你跑了配置才会生效。命令：`/router config`。
+**默认零干扰** —— 两档默认都是空的；用 `/router config` 配置之前，路由器不动作。
 
 > **Smart = CTO**：活不多但每件都关键 —— 定方向、拍架构、审代码；风险高时亲自接管整轮。
 > **Fast = Programmer**：活多、模式清晰 —— 写代码、跑测试、修 bug；路径清楚时亲自接管整轮。
@@ -100,7 +105,7 @@ Fast 不是真的程序员 —— 它是个负责执行的模型；Smart 不是�
 
 ## 快速开始
 
-**你需要的** — Node.js ≥ 24、pi-agent ≥ 0.80、至少一个 Provider 账号（已经写在 pi-agent 的 `auth.json` 里）、每层至少一个模型。
+**前置要求** — Node.js ≥ 24、pi-agent ≥ 0.80、至少一个 Provider 账号（API key 已写入 pi-agent 的 `auth.json`）、每档至少一个模型。
 
 ### 安装
 
@@ -112,7 +117,7 @@ pi install npm:pi-shift-router
 
 ### 验证
 
-打开 TUI 向导，为每层选一个 Fast 和 Smart 模型（多个也行，会组成 fallback 链）：
+打开 TUI 向导，给 Fast 档、Smart 档各选一个模型（每档多个也行 —— 组成 fallback 链）：
 
 ```text
 /router config
@@ -126,7 +131,7 @@ pi install npm:pi-shift-router
 /router status
 ```
 
-就能看到当前的 tier、作用城、配置的 Judge 阈值以及 streaming 遥测数据。下一轮发消息就会触发首次 Judge 调用。
+就能看到当前档位、作用域、配置的 Judge 阈值以及 streaming 遥测数据。下一轮发消息就会触发首次 Judge 调用。
 
 ---
 
@@ -138,35 +143,35 @@ flowchart TD
     Input --> Hook["before_agent_start 触发"]
     Hook --> Enabled{"路由器已启用？"}
     Enabled -->|否| Skip["pi 用默认模型"]
-    Enabled -->|是| Judge["LLM Judge（Fast 层模型，JSON mode）"]
+    Enabled -->|是| Judge["LLM Judge（Fast 档模型，JSON mode）"]
     Judge --> Fail{"Judge 成功？"}
-    Fail -->|否| Fallback["保持当前挡位"]
+    Fail -->|否| Fallback["保持当前档位"]
     Fail -->|是| Decide
     Decide{"分类结果？"}
     Decide -->|Smart & 当前 Fast| Upgrade["升级 → Smart 模型（立即）"]
     Decide -->|Fast & 当前 Smart| Trend["检查滑动窗口"]
     Decide -->|与当前相同| Stay["保持（STAY）"]
-    Trend --> Stable{"Fast ≥60% of last 5?"}
+    Trend --> Stable{"Fast 占最近 5 轮 ≥60%？"}
     Stable -->|是| Down["降级 → Fast 模型"]
     Stable -->|否| Stay
-    Upgrade & Down --> Failover["遇 429/5xx：标记冷却 + 切到同层下一个健康模型"]
+    Upgrade & Down --> Failover["遇 429/5xx：标记冷却 + 切到同档下一个健康模型"]
     Failover & Stay --> Done["Agent 用选中的模型处理"]
 ```
 
 三个关键属性：
 
 - **升级立即**（Fast → Smart）。质量优先。
-- **降级需持续且高置信的趋势**（fast 投票加权比 ≥ `threshold` 默认 0.6；低于 `minConfidence` 的投票被忽略）。保护缓存。
-- **每轮只分类一次** —— 不在 tool call 粒度上切换。
+- **降级需持续且高置信的趋势**（最近 5 轮 fast 投票加权比 ≥ `threshold`，默认 0.6；低于 `minConfidence` 的投票被忽略）。避免过早降级丢掉 Smart 档的上下文缓存。
+- **每轮只分类一次** —— 不会在 tool call 之间反复切换。
 
-**JSON mode（API 层强制，非仅 prompt）**：OpenAI 兼容 API 用 `response_format: { type: "json_object" }`（API 直接拒绝非 JSON 输出）；Anthropic 用 assistant prefill `{` 强制 JSON 起始。Judge 调用期间状态栏显示 `⚖ judging…`。
+**JSON mode（API 层强制，非仅 prompt）**：OpenAI 兼容 API 用 `response_format: { type: "json_object" }`（API 直接拒绝非 JSON 输出）；Anthropic 用 assistant prefill `{` 强制输出以 JSON 开头。Judge 调用期间状态栏显示 `⚖ judging…`。
 
 ### 运行时 Failover（v0.6.0）
 
 Primary 模型遇到 429 / 5xx / 配额 / Token Plan 耗尽时，pi 先重试（provider ×3 + agent ×3），然后路由器接管：
 
 1. 把失败模型标记进**指数退避冷却**（1m、2m、4m、… 封顶 30m）。
-2. 立即 `setModel` 到**同一层**的下一个健康模型（不跨层）。
+2. 立即 `setModel` 到**同一档**的下一个健康模型（不跨档）。
 3. pi 待定的重试用 fallback 继续 —— 同轮 failover。
 4. 后续轮次的 `before_agent_start` 跳过冷却中的模型。
 5. 2xx 响应立即清除冷却；会话重启全部重置。
@@ -179,7 +184,7 @@ Judge 也走完整个 fast 链才放弃，与路由共享同一冷却表。手�
 
 | 命令 | 功能 |
 |------|------|
-| `/router status` | 显示当前挡位、模型、窗口状态、配置摘要 |
+| `/router status` | 显示当前档位、模型、窗口状态、配置摘要 |
 | `/router on` / `/router off` | 启用 / 停用路由 |
 | `/router config` | 启动 TUI 配置向导 |
 | `/router quiet` | 切换 toast 通知 |
@@ -197,7 +202,7 @@ Judge 也走完整个 fast 链才放弃，与路由共享同一冷却表。手�
 **TUI 可配项（`/router config`）：**
 
 - 总开关（`/router on` / `/router off`）
-- 每层模型 chain —— 添加 / 删除 / 重排（`a`、`x`、`J`/`K`、`d` 保存、`Esc` 取消）
+- 每档模型 chain —— 添加 / 删除 / 重排（`a`、`x`、`J`/`K`、`d` 保存、`Esc` 取消）
 - 保存作用域：用户级（`~/.pi/agent/pi-shift-router.json`）或项目级（`<cwd>/.pi/pi-shift-router.json`）；项目级优先。
 
 **只能手改 JSON 的项（高级，不在 TUI 里）：**
@@ -209,7 +214,7 @@ Judge 也走完整个 fast 链才放弃，与路由共享同一冷却表。手�
 
 ### JSON Schema（参考）
 
-两层文件，TUI 向导写入“常规项”，手写编辑“高级项”：
+配置分两层：TUI 向导自动写“常规项”，高级项需手写。配置文件位置：
 
 ```text
 ~/.pi/agent/pi-shift-router.json         （用户级 —— 默认生效）
@@ -234,13 +239,13 @@ pi-shift-router.json
 │       ├── threshold          Fast 份额权重上限，触发降级；默认 0.6
 │       └── minConfidence      低于该置信度的投票被忽略；默认 0.5
 └── ux
-    ├── quietMode              静默 inline toast；默认 false
+    ├── quietMode              关闭 inline toast；默认 false
     ├── statusBar              显示 🦾 / 🧠 徽章；默认 true
     ├── inlineToast            模型切换提示；默认 true
     └── routerLogVerbose       调试日志；默认 false
 ```
 
-**最小配置**（每层一个模型，其余全默认）：
+**最小配置**（每档一个模型，其余全默认）：
 
 ```text
 enabled:  true
@@ -249,7 +254,7 @@ tiers:
   smart:  [{ provider: openai, model: gpt-5.6-sol }]
 ```
 
-**多 Provider + 每层 fallback chain**（典型生产配置）：
+**多 Provider + 每档 fallback chain**（典型生产配置）：
 
 ```text
 enabled:  true
@@ -273,7 +278,7 @@ tiers:
 | `routing.judgeTimeout` | `5000` | ms。Judge 调用超时。 |
 | `routing.window.size` / `threshold` | `5` / `0.6` | 滑动窗口降级门。 |
 | `routing.window.minConfidence` | `0.5` | 低于该置信度的投票被忽略。 |
-| `ux.quietMode` / `statusBar` / `inlineToast` / `routerLogVerbose` | 各自 | 表面控制。 |
+| `ux.quietMode` / `statusBar` / `inlineToast` / `routerLogVerbose` | 各自 | 界面 / 日志开关。 |
 
 ---
 
@@ -300,7 +305,7 @@ tiers:
 
 ### Pattern 2 — 本地模型按显存 / 统一内存分级
 
-下列推荐均在 2026-08 针对 HuggingFace `safetensors` 权重大小逐个核实。2025 化石模型、端侧产物（<7 B）以及 Qwen3.5 / DeepSeek-V3 以前的型号均已排除（太老）。
+下列推荐均在 2026-08 针对 HuggingFace `safetensors` 权重大小逐个核实。2025 年及以前的旧型号、端侧产物（<7 B）以及 Qwen3.5 / DeepSeek-V3 之前的型号均已排除。
 
 > fp16 只是 benchmark 产物，不是运行时格式。真实本地部署几乎全用 **q4-k-m / NVFP4 / MXFP4 / AWQ-int4 / 1–2 bit ternary**。下表 fast 档一律量化，不出现 fp16。
 >
@@ -317,12 +322,12 @@ tiers:
 说明：
 
 - **量化仓库以独立 HF repo 形式发布**：`nvidia/Qwen3.6-35B-A3B-NVFP4`、`cyankiwi/Qwen3.6-27B-AWQ-INT4`、`OsaurusAI/Ornith-1.0-35B-MXFP4`、`prism-ml/Bonsai-27B-gguf`、`poolside/Laguna-S-2.1-NVFP4`，ollama / vLLM / MLX 会自动识别。
-- **任意一个暴露 OpenAI-compatible API 的运行时都可以**。常见选择：**ollama**（`ollama run qwen3.6:27b` 默认起 `:11434`）、**LM Studio**（MLX + GGUF）、**vLLM**、**llama.cpp** / **llama-server**、**exo**、**llamafile**。
+- **任何暴露 OpenAI-compatible API 的运行时都可以**。常见选择：**ollama**（`ollama run qwen3.6:27b` 默认起 `:11434`）、**LM Studio**（MLX + GGUF）、**vLLM**、**llama.cpp** / **llama-server**、**exo**、**llamafile**。
 - **Judge 也需要 JSON-mode 端点**。Qwen 3.5+ 和 Gemma 4 都 `tool_call=true`，满足 Judge 的 JSON-mode 约束；但本地 Judge 会增加 ~0.5–2 s/turn。推荐：本地 fast + 本地或云 smart + Judge 放在你最信任的 smart 上。
 
 ### Pattern 3 — 同 Provider 自带 tier ladder（最简）
 
-一个 Provider、一份账本、一个 rate limit 池。已有某 Provider 付费账户且不想多 key 管理时用这个。
+一个 Provider、一张账单、一个限流池。已有某 Provider 付费账户且不想多 key 管理时用这个。
 
 | Provider | fast 🦾 | smart 🧠 | 备注 |
 |---|---|---|---|
@@ -354,14 +359,30 @@ tiers:
 
 ---
 
+## 使用场景
+
+五种让路由器立刻回本的使用模式。
+
+**1. 长会话的成本 / 质量分层。** 配置 `fast = deepseek-v4-flash`、`smart = claude-opus-5`。例行轮次（改文件、跑测试、修文档）留在便宜模型上；只有当 Judge 识别到架构 / 审查 / 规划信号时，强模型才上场。
+
+**2. 一个 Provider、两档模型 —— 零运维。** 在同一个 OpenAI 账号下配置 `fast = gpt-5.6-luna`、`smart = gpt-5.6-sol`。不用跨 Provider 折腾：一张账单、同一个限流池。路由器从不桥接 Provider，只在你现有的配置里切换模型。
+
+**3. Provider 会话中途限流时的韧性。** 每档配成 2–3 个模型的链（如 `fast = [deepseek-v4-flash, glm-5.2, grok-4.5-fast]`）。主模型返回 429 / 5xx 时，路由器把它标记为冷却（指数退避 1m→2m→4m…30m），立即 `setModel` 到同档下一个健康模型，pi 待定的重试直接打到 fallback 上。后续轮次跳过冷却中的模型、不再重试。手动 `/route-force` 始终绕过冷却。
+
+**4. 跨 Provider 拼最强（认真干活时推荐）。** 配置 `fast = [deepseek-v4-flash, glm-5.2]`、`smart = [claude-opus-5, gpt-5.6-sol, kimi-k3]`。两档各来自不同 Provider —— Anthropic 限流，smart 依次退回 OpenAI、Moonshot；DeepSeek 限流，fast 退回 GLM。Judge 失败时也会走完整条 fast 链。一个 JSON 文件、三个 Provider、完整的韧性。
+
+**5. 深度模式自动粘住，无需逐条手调。** 多数人希望规划会话期间停在强模型上，开始改文件后再降回来。[滑动窗口加权降级门](#工作原理)（默认 `size: 5`、`threshold: 0.6`、`minConfidence: 0.5`）替你做了这件事：升级永远立即，降级只在出现持续的 fast 趋势后发生。想让 smart 更粘，把 `threshold` 调到 `0.8`。
+
+---
+
 ## 对比一览
 
 两者解决同一个问题（按轮 agent 路由到不同档位模型），但在“什么才算好的分类”这个根本问题上走了相反的路。
 
 | | 🦾 **pi-shift-router**（本插件） | pi-model-router |
 |---|---|---|
-| **🧠 分类器** | ✅ LLM Judge（JSON mode 强制）—— 始终走 LLM，凭自然语言推理 | ⚠️ 可选 LLM 分类器 → 启发式 / 关键词兑底 |
-| **🪜 层数** | ✅ 2 层（fast / smart）—— 面小，容易讲清楚 | 3 层（high / medium / low）—— 旋钮多 |
+| **🧠 分类器** | ✅ LLM Judge（JSON mode 强制）—— 始终走 LLM，凭自然语言推理 | ⚠️ 可选 LLM 分类器 → 启发式 / 关键词兜底 |
+| **🪜 档数** | ✅ 2 档（fast / smart）—— 面小，容易讲清楚 | 3 档（high / medium / low）—— 旋钮多 |
 | **📝 自定义规则** | ✅ 无 —— Judge 读自然语言信号 | ⚠️ 关键词 override（手写 / 正则 等）—— 要维护 |
 | **💰 预算上限** | — | USD 会话预算，超额自动 high → medium |
 | **🗂️ 持久化** | 仅本会话 | 跨会话、跨分支（`router-state`） |
@@ -370,8 +391,8 @@ tiers:
 
 **两种哲学：**
 
-- **🦾 pi-shift-router 押“少即是多”** —— 2 层足够思考清晰，Judge 只是单次 LLM 调用，prompt 可以读可以改；没有关键词表要维护。Judge 走 LLM 推理，能处理你没提前预见过的 prompt（不会出现“新场景出现 → 必须加新规则”的事）。暴露面越小，意外越少。
-- **pi-model-router 押“控制感”** —— 3 层 + 显式预算上限 + 规则 override 表达力更强，能强制设 USD 顶、能用关键词把特定表达钉到特定 tier。但规则列表本身变成要维护的产物：每加一个 Provider、每出现一种新 prompt 风格都可能要加一条规则；启发式兑底不透明 —— LLM 分类器不可用时，关键词层会静默地给出不一样的选择。
+- **🦾 pi-shift-router 押“少即是多”** —— 2 档足够思考清晰，Judge 只是单次 LLM 调用，prompt 可以读可以改；没有关键词表要维护。Judge 走 LLM 推理，能处理你没提前预见过的 prompt（不会出现“新场景出现 → 必须加新规则”的事）。暴露面越小，意外越少。
+- **pi-model-router 押“控制感”** —— 3 档 + 显式预算上限 + 规则 override 表达力更强，能强制设 USD 顶、能用关键词把特定表达钉到特定 tier。但规则列表本身变成要维护的产物：每加一个 Provider、每出现一种新 prompt 风格都可能要加一条规则；启发式兜底不透明 —— LLM 分类器不可用时，关键词层会静默地给出不一样的选择。
 
 **按需求选：**
 
@@ -384,19 +405,19 @@ tiers:
 
 ### 不配置任何模型会怎样？
 
-两层默认都为空。路由器不起作用，pi 用默认模型。运行 `/router config` 配置。
+两档默认都为空。路由器不起作用，pi 用默认模型。运行 `/router config` 配置。
 
 ### Judge 会增加明显延迟吗？
 
-一次 Judge 调用是几千 token、用 Fast 模型本身的价格。端到端分类往返通常 200ms–2s。状态栏 `⚖ judging…` 提示期间进度。
+一次 Judge 调用约几千 token，按 Fast 档模型本身的价格计费。端到端分类通常 200ms–2s，调用期间状态栏显示 `⚖ judging…`。
 
 ### Primary 模型 429 或超时？
 
-v0.6.0 起指数退避冷却：primary 标记冷却（1m → 2m → 4m … 封顶 30m），同层下一个健康模型接管。2xx 响应立即清除冷却。
+v0.6.0 起指数退避冷却：primary 标记冷却（1m → 2m → 4m … 封顶 30m），同档下一个健康模型接管。2xx 响应立即清除冷却。
 
 ### 能跨 Provider 混用吗？
 
-可以。每层是一个有序的 `{provider, model, priority}` 列表，任意组合。
+可以。每档是一个有序的 `{provider, model, priority}` 列表，任意组合。
 
 ### 会不会过早降级 Smart？
 
@@ -404,7 +425,7 @@ v0.6.0 起指数退避冷却：primary 标记冷却（1m → 2m → 4m … 封�
 
 ### 和 pi-model-router 的区别？
 
-直接竞品 —— 同一个问题（每轮任务交给哪个 model tier），不同实现路线。完整差异见 [对比一览](#对比一览)。选哪个取决于你接受哪套取舍：要零依赖 + JSON Judge + 运行时 failover + 小到一晚上能读完的面，还是三层 + USD 预算上限 + 关键词规则 + 跨会话状态。
+直接竞品 —— 同一个问题（每轮任务交给哪个 model tier），不同实现路线。完整差异见 [对比一览](#对比一览)。选哪个取决于你接受哪套取舍：要零依赖 + JSON Judge + 运行时 failover + 一晚上能读完的小体量，还是 3 档 + USD 预算上限 + 关键词规则 + 跨会话状态。
 
 ### 能不能临时禁用而不卸载？
 
@@ -412,7 +433,7 @@ v0.6.0 起指数退避冷却：primary 标记冷却（1m → 2m → 4m … 封�
 
 ### Judge 有额外费用吗？
 
-Judge 用的是 Fast 层模型（通常是你最便宜的）。一次分类几千 token，相对避免误调 Smart 的节省完全忽略不计。
+Judge 用的是 Fast 档模型（通常最便宜）。一次分类不过几千 token，相比避免误调 Smart 省下的钱，这点开销完全可以忽略。
 
 ---
 
@@ -425,9 +446,9 @@ Judge 用的是 Fast 层模型（通常是你最便宜的）。一次分类几�
 | 很多例行任务（CRUD、测试、文档）；架构很少 | `threshold: 0.5`, `minConfidence: 0.7` | 激进降级 —— 减少误调 Smart 的次数 |
 | 重架构 / 规划 / 代码审查 | `threshold: 0.8`, `minConfidence: 0.4` | 保守降级 —— 多留在 Smart |
 | 混合 —— 有时连续 20 轮快任务，有时规划 | 默认值（`threshold: 0.6`, `minConfidence: 0.5`） | 平衡 |
-| Judge 倾向过度自信（多数投票 ≥0.9） | `minConfidence: 0.7` | 剥离过度自信投票 |
+| Judge 倾向过度自信（多数投票 ≥0.9） | `minConfidence: 0.7` | 剔除过度自信投票 |
 | Judge 倾向不确定（许多投票 0.3–0.6） | `minConfidence: 0.3` | 不丢弃不确定投票 |
-| Primary fast 模型频繁 429 | `tiers.fast.models[1]` 加 Provider | 加 fallback 伙伴，v0.6.0 接管运行时 |
+| Primary fast 模型频繁 429 | 在 `tiers.fast.models[1]` 加一个 Provider | 多一个备用，v0.6.0 运行时 failover 自动接管 |
 | 重 streaming / 长 agent 运行 | 监控 `/router stats` tokens/sec | 查看每轮实际吞吐 |
 
 ### 旋钮详解
@@ -460,7 +481,7 @@ Cooldowns: none
 
 - **`high` / `mid` / `low` / `none`** — 窗口置信度分布。如果 `none` 多，说明 Judge 没返回 confidence（旧版本或 prompt 没刷新）。重跑 `/router config` 刷新。
 - **`avg tok/s`** — 最近几轮吞吐。用于发现 Provider 降速。
-- **`upgrade` / `downgrade`** — 层级切换次数。降级太频繁 → 提高 threshold；太少 → 降低。
+- **`upgrade` / `downgrade`** — 档位切换次数。降级太频繁 → 提高 threshold；太少 → 降低。
 
 ---
 
@@ -502,7 +523,7 @@ Judge 误分类（`/router verbose` 查看）或阈值太激进。调高：
 
 - **[pi-coding-agent](https://github.com/earendil-works/pi)** by earendil-works —— host agent。
 - **[pi-tui](https://www.npmjs.com/package/@earendil-works/pi-tui)** —— TUI 原语。
-- **[pi-model-router](https://github.com/yeliu84/pi-model-router)** —— 直接路由竞品：三层、USD 预算上限、关键词 override、跨会话持久化。完整差异见 [对比一览](#对比一览)。
+- **[pi-model-router](https://github.com/yeliu84/pi-model-router)** —— 直接路由竞品：3 档、USD 预算上限、关键词 override、跨会话持久化。完整差异见 [对比一览](#对比一览)。
 
 ---
 
