@@ -18,7 +18,11 @@
     "multi-model-fallback",
     "exponential-backoff",
     "agent-failover",
-    "rate-limit-handling"
+    "rate-limit-handling",
+    "model-switching",
+    "agent-routing",
+    "auto-router",
+    "cost-optimization"
   ],
   "license": "MIT",
   "homepage": "https://github.com/green-dalii/pi-shift-router#readme",
@@ -45,8 +49,13 @@
   "engines": {
     "node": ">=24.0.0"
   },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
   "files": [
     "dist",
+    "docs",
+    "assets",
     "README.md",
     "README.zh-CN.md",
     "LICENSE",
@@ -62,11 +71,13 @@
     "pack:check": "npm pack --dry-run && node scripts/pack-check.mjs",
     "prepublishOnly": "npm run test && npm run build && npm run pack:check"
   },
-  "dependencies": {
-    "@earendil-works/pi-tui": "^0.81.1"
+  "dependencies": {},
+  "peerDependencies": {
+    "@earendil-works/pi-tui": "*"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": ">=0.80.0",
+    "@earendil-works/pi-tui": "^0.81.1",
     "@types/node": "^22.0.0",
     "typescript": "^5.8.0",
     "vitest": "^2.1.0"
