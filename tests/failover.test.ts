@@ -55,28 +55,28 @@ describe("markModelFailed exponential backoff", () => {
     expect(e!.attempts).toBe(1);
   });
 
-  it("second failure doubles to 2 minutes", () => {
+  it("second failure quadruples to 4 minutes", () => {
     const cd = createCooldowns();
     markModelFailed(cd, "minimax", "MiniMax-M3", NOW);
     markModelFailed(cd, "minimax", "MiniMax-M3", NOW + MIN + 1);
     const e = cd.get(modelKey("minimax", "MiniMax-M3"));
-    expect(e!.until).toBe(NOW + MIN + 1 + 2 * MIN);
+    expect(e!.until).toBe(NOW + MIN + 1 + 4 * MIN);
     expect(e!.attempts).toBe(2);
   });
 
-  it("grows 1m, 2m, 4m, ... exponentially", () => {
+  it("grows 1m, 4m, 16m, 64m, ... exponentially", () => {
     const cd = createCooldowns();
     markModelFailed(cd, "m", "model", NOW);
     expect(cd.get(modelKey("m", "model"))!.until - NOW).toBe(MIN);
     markModelFailed(cd, "m", "model", NOW);
-    expect(cd.get(modelKey("m", "model"))!.until - NOW).toBe(2 * MIN);
-    markModelFailed(cd, "m", "model", NOW);
     expect(cd.get(modelKey("m", "model"))!.until - NOW).toBe(4 * MIN);
     markModelFailed(cd, "m", "model", NOW);
-    expect(cd.get(modelKey("m", "model"))!.until - NOW).toBe(8 * MIN);
+    expect(cd.get(modelKey("m", "model"))!.until - NOW).toBe(16 * MIN);
+    markModelFailed(cd, "m", "model", NOW);
+    expect(cd.get(modelKey("m", "model"))!.until - NOW).toBe(64 * MIN);
   });
 
-  it("caps backoff at 30 minutes", () => {
+  it("caps backoff at 6 hours (COOLDOWN_MAX_MS)", () => {
     const cd = createCooldowns();
     // Fail 10 times — should hit the cap
     for (let i = 0; i < 10; i++) {
@@ -85,6 +85,24 @@ describe("markModelFailed exponential backoff", () => {
     const e = cd.get(modelKey("m", "model"))!;
     expect(e.until - NOW).toBeLessThanOrEqual(COOLDOWN_MAX_MS);
     expect(e.until - NOW).toBe(COOLDOWN_MAX_MS);
+  });
+
+  it("escalates after natural expiry — thawed model re-fail continues the series", () => {
+    // The user's concern: model thaws (cooldown expires naturally), fails
+    // again → attempts must continue from the previous tier, not reset.
+    const cd = createCooldowns();
+    markModelFailed(cd, "m", "model", NOW);           // attempts=1, until = NOW+1m
+    markModelFailed(cd, "m", "model", NOW);           // attempts=2, until = NOW+4m
+    markModelFailed(cd, "m", "model", NOW);           // attempts=3, until = NOW+16m
+    const before = cd.get(modelKey("m", "model"))!;
+    expect(before.attempts).toBe(3);
+
+    // Let the cooldown expire naturally (no 2xx recovery), then fail again.
+    const later = NOW + before.until - NOW + 1; // just past expiry
+    markModelFailed(cd, "m", "model", later);         // attempts=4 → 64m
+    const after = cd.get(modelKey("m", "model"))!;
+    expect(after.attempts).toBe(4);
+    expect(after.until - later).toBe(64 * MIN);
   });
 });
 

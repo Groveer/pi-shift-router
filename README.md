@@ -74,7 +74,7 @@ The judge output format is strict so small models parse it reliably: OpenAI-comp
 
 429 / 5xx / quota / token-plan exhausted? pi retries first (3× provider, 3× agent); if it still fails, the router takes over:
 
-1. The failing model enters exponential-backoff cooldown (1m → 2m → 4m… capped at 30m).
+1. The failing model enters exponential-backoff cooldown (1m → 4m → 16m → 1h → 4h… capped at 6h, sized for hour-scale coding-plan rate windows).
 2. `setModel` switches immediately to the next healthy model in the **same** tier — never across tiers.
 3. pi's pending retry lands on the fallback — same-turn failover.
 4. Later turns skip cooled models; a 2xx response clears the cooldown; a session restart resets everything.

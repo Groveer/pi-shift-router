@@ -14,8 +14,8 @@ import type { ShiftRouterConfig, Tier } from "./types.js";
 
 /** Cooldown base delay: 1 minute (SPEC §8.5.2). */
 export const COOLDOWN_BASE_MS = 60_000;
-/** Hard cap on backoff: 30 minutes. */
-export const COOLDOWN_MAX_MS = 30 * 60_000;
+/** Hard cap on backoff: 6 hours (covers coding-plan rate windows up to ~5h). */
+export const COOLDOWN_MAX_MS = 6 * 60 * 60_000;
 
 /** One cooldown entry: when it expires + how many consecutive failures. */
 export interface CooldownEntry {
@@ -38,7 +38,9 @@ export function modelKey(provider: string, model: string): string {
 
 /**
  * Record a failure and apply exponential backoff:
- * backoff = BASE * 2^(attempts-1), capped at COOLDOWN_MAX_MS.
+ * backoff = BASE * 4^(attempts-1), capped at COOLDOWN_MAX_MS.
+ * Multiplier 4 gives 1m → 4m → 16m → 1h4m → 4h16m → 6h(cap) —
+ * designed for hour-scale coding-plan rate windows, not per-minute RPM.
  */
 export function markModelFailed(
   cooldowns: CooldownMap,
@@ -49,7 +51,7 @@ export function markModelFailed(
   const key = modelKey(provider, model);
   const prev = cooldowns.get(key);
   const attempts = (prev?.attempts ?? 0) + 1;
-  const backoff = Math.min(COOLDOWN_BASE_MS * 2 ** (attempts - 1), COOLDOWN_MAX_MS);
+  const backoff = Math.min(COOLDOWN_BASE_MS * 4 ** (attempts - 1), COOLDOWN_MAX_MS);
   cooldowns.set(key, { until: now + backoff, attempts });
 }
 
