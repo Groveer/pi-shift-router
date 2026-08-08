@@ -119,7 +119,7 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
         // (b) the turn-path (`findBestModelForTier`) also avoids it.
         // Mirrors SPEC §8.5: only failover signatures cool down; classify's
         // own policy already excludes network/timeout/unparseable failures.
-        (provider, model) => markModelFailed(state.modelCooldowns, provider, model, Date.now()),
+        (provider, model, code) => markModelFailed(state.modelCooldowns, provider, model, Date.now(), code),
       );
     } finally {
       // Restore the proper status badge immediately, regardless of judge outcome.

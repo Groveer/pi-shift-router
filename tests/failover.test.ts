@@ -87,6 +87,46 @@ describe("markModelFailed exponential backoff", () => {
     expect(e.until - NOW).toBe(COOLDOWN_MAX_MS);
   });
 
+  it("4xx failures skip the first two tiers and start at 16m", () => {
+    const cd = createCooldowns();
+    // First failure is a 429 (client-side rate limit) → start at 16m.
+    markModelFailed(cd, "m", "model", NOW, "429");
+    let e = cd.get(modelKey("m", "model"))!;
+    expect(e.attempts).toBe(3);
+    expect(e.until - NOW).toBe(16 * MIN);
+
+    // Second 429 → 1h4m tier.
+    markModelFailed(cd, "m", "model", NOW + 16 * MIN + 1, "429");
+    e = cd.get(modelKey("m", "model"))!;
+    expect(e.attempts).toBe(4);
+    expect(e.until - (NOW + 16 * MIN + 1)).toBe(64 * MIN);
+  });
+
+  it("4xx start tier does not clobber a higher 5xx-evolved tier", () => {
+    const cd = createCooldowns();
+    // Evolve to 4h16m via 5xx failures (attempts=5).
+    markModelFailed(cd, "m", "model", NOW);
+    markModelFailed(cd, "m", "model", NOW);
+    markModelFailed(cd, "m", "model", NOW);
+    markModelFailed(cd, "m", "model", NOW);
+    markModelFailed(cd, "m", "model", NOW);
+    expect(cd.get(modelKey("m", "model"))!.attempts).toBe(5);
+
+    // A later 429 must not reset back down to the 4xx start tier.
+    markModelFailed(cd, "m", "model", NOW, "429");
+    const e = cd.get(modelKey("m", "model"))!;
+    expect(e.attempts).toBe(6); // monotonic: 5+1, not clamped to 3
+    expect(e.until - NOW).toBe(COOLDOWN_MAX_MS); // 6h cap
+  });
+
+  it("5xx failures keep the 1m start", () => {
+    const cd = createCooldowns();
+    markModelFailed(cd, "m", "model", NOW, "503");
+    const e = cd.get(modelKey("m", "model"))!;
+    expect(e.attempts).toBe(1);
+    expect(e.until - NOW).toBe(MIN);
+  });
+
   it("escalates after natural expiry — thawed model re-fail continues the series", () => {
     // The user's concern: model thaws (cooldown expires naturally), fails
     // again → attempts must continue from the previous tier, not reset.

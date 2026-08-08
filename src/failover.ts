@@ -16,6 +16,13 @@ import type { ShiftRouterConfig, Tier } from "./types.js";
 export const COOLDOWN_BASE_MS = 60_000;
 /** Hard cap on backoff: 6 hours (covers coding-plan rate windows up to ~5h). */
 export const COOLDOWN_MAX_MS = 6 * 60 * 60_000;
+/**
+ * Starting attempt count for 4xx failures (429 rate limits, quota).
+ * Client-side limits typically persist far longer than transient 5xx
+ * server errors, so skip the first two tiers and start at 16m instead
+ * of 1m. 5xx keeps the 1m start for fast recovery.
+ */
+export const COOLDOWN_START_ATTEMPTS_4XX = 3; // BASE * 4^2 = 16m
 
 /** One cooldown entry: when it expires + how many consecutive failures. */
 export interface CooldownEntry {
@@ -41,16 +48,27 @@ export function modelKey(provider: string, model: string): string {
  * backoff = BASE * 4^(attempts-1), capped at COOLDOWN_MAX_MS.
  * Multiplier 4 gives 1m → 4m → 16m → 1h4m → 4h16m → 6h(cap) —
  * designed for hour-scale coding-plan rate windows, not per-minute RPM.
+ *
+ * 4xx failures (429 / quota — client-side limits) skip the first two
+ * tiers and start at 16m (COOLDOWN_START_ATTEMPTS_4XX): client limits
+ * usually outlive server-side blips, so probing at 1m/4m wastes calls.
+ * `code` is the failover signature ("429", "503", …); omitted or 5xx
+ * keeps the 1m start.
  */
 export function markModelFailed(
   cooldowns: CooldownMap,
   provider: string,
   model: string,
   now: number,
+  code?: string,
 ): void {
   const key = modelKey(provider, model);
   const prev = cooldowns.get(key);
-  const attempts = (prev?.attempts ?? 0) + 1;
+  const is4xx = !!code && code.startsWith("4");
+  const attempts = Math.max(
+    (prev?.attempts ?? 0) + 1,
+    is4xx ? COOLDOWN_START_ATTEMPTS_4XX : 1,
+  );
   const backoff = Math.min(COOLDOWN_BASE_MS * 4 ** (attempts - 1), COOLDOWN_MAX_MS);
   cooldowns.set(key, { until: now + backoff, attempts });
 }
@@ -290,7 +308,7 @@ export function planTurnFailover(
   const failed = detectTurnFailure(messages);
   if (!failed) return null;
 
-  markModelFailed(state.modelCooldowns, failed.provider, failed.model, now);
+  markModelFailed(state.modelCooldowns, failed.provider, failed.model, now, failed.code);
 
   // Fail over within the tier that owns the failed model, falling back to
   // the current tier when the model is unknown or ambiguous.
