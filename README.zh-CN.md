@@ -33,6 +33,10 @@ SEO 元数据（用户不可见，供爬虫 / LLM 解析）：
 [![CI](https://img.shields.io/github/actions/workflow/status/green-dalii/pi-shift-router/ci.yml)](https://github.com/green-dalii/pi-shift-router/actions)
 [![Stars](https://img.shields.io/github/stars/green-dalii/pi-shift-router.svg)](https://github.com/green-dalii/pi-shift-router)
 
+[English](README.md) | [简体中文]
+
+[工作原理](#工作原理) | [快速开始](#快速开始) | [和 pi-model-router 的区别](#和-pi-model-router-的区别) | [常见问题](#常见问题) | [配置参考](docs/CONFIG.md) | [故障排查](docs/TROUBLESHOOTING.md)
+
 例行的活儿不该花旗舰模型的钱，要紧的活儿也不该拿便宜模型凑合。
 
 pi-shift-router 是 [pi-coding-agent](https://github.com/earendil-works/pi) 的两档模型路由器：每轮开始前，一个小型 LLM 判定把消息分到你配置的两个档位之一。被选中的模型接管整轮——思考、工具调用、改代码，全在它的水平上完成；判定只分类，不干活。
@@ -53,11 +57,9 @@ pi-shift-router 是 [pi-coding-agent](https://github.com/earendil-works/pi) 的�
 pi install npm:pi-shift-router   # 然后：/router config → /router status
 ```
 
-[English](README.md) | [简体中文]
-
 ---
 
-## 它是怎么决定的
+## 工作原理
 
 每轮开始前只做一次便宜的调用：Fast 档模型（通常是你最便宜的那个）把你的消息判为 `fast`（例行）或 `smart`（要紧）。这是路由器唯一的分类——判定之后，选中的档位整轮干活。
 

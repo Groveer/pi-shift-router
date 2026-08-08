@@ -33,6 +33,10 @@ SEO metadata (not user-visible, parsed by crawlers / LLMs):
 [![CI](https://img.shields.io/github/actions/workflow/status/green-dalii/pi-shift-router/ci.yml)](https://github.com/green-dalii/pi-shift-router/actions)
 [![Stars](https://img.shields.io/github/stars/green-dalii/pi-shift-router.svg)](https://github.com/green-dalii/pi-shift-router)
 
+[English] | [简体中文](README.zh-CN.md)
+
+[How it works](#how-it-works) | [Quick start](#quick-start) | [vs. pi-model-router](#vs-pi-model-router) | [FAQ](#faq) | [Configuration](docs/CONFIG.md) | [Troubleshooting](docs/TROUBLESHOOTING.md)
+
 Routine turns shouldn't cost flagship money. The turns that matter shouldn't be left to a cheap model.
 
 pi-shift-router is a two-tier model router for [pi-coding-agent](https://github.com/earendil-works/pi): before every turn, a small LLM judge classifies your message into one of the two tiers you configure. The tier it picks then drives the entire turn — thinking, tool calls, code edits — at that tier's level. The judge only classifies; it never does the work.
@@ -53,11 +57,9 @@ pi-shift-router is a two-tier model router for [pi-coding-agent](https://github.
 pi install npm:pi-shift-router   # then: /router config → /router status
 ```
 
-[English] | [简体中文](README.zh-CN.md)
-
 ---
 
-## How it decides
+## How it works
 
 One cheap call per turn: the fast-tier model (usually your cheapest) reads your message and marks it `fast` (routine) or `smart` (consequential). That's the router's only classification — after it, the chosen tier does the work.
 
