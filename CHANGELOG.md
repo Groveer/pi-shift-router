@@ -9,11 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > (0.1.0 – 0.3.1) were developed under the `pi-slim-router` working name and never
 > published to npm. The plugin was first published to npm as `pi-shift-router` at v0.4.0.
 
-## [Unreleased]
+## [0.8.3] — Judge cooldown sharing, packaging, README restructure
 
 ### Changed
 
 - **Judge status-bar icon: `⚖` → `🧭`** — the previous scales glyph (U+2696, BMP) rendered as a small monochrome line drawing in most terminals, visually inconsistent with `🦾` and `🧠` (both SMP color emoji). The compass (U+1F9ED, SMP) is a single-codepoint emoji that renders at the same weight as the tier icons across all modern terminals, and semantically fits the judge's job: "decide which direction (tier) this turn goes." Affected: `src/index.ts`, `README.md`, `README.zh-CN.md`, `SPEC.md` §3 ASCII diagram + §7.2. Historical CHANGELOG entries and the SPEC §10 v0.3.1 row intentionally retained the old glyph to preserve an accurate record of past releases (Keep a Changelog convention).
+- **README restructured into a landing page + `docs/` split** — `README.md` and `README.zh-CN.md` rewritten as concise landing pages (one-story opening, honest trade-offs, three-line competitor comparison, four-question FAQ). Reference material moved into `docs/CONFIG.md`, `docs/MODELS.md`, `docs/TROUBLESHOOTING.md` (and `.zh-CN.md` variants). SEO/GEO pass: definitional lead sentence ("is a two-tier model router" / "是 pi-coding-agent 的两档模型路由器") so the core entity lands in the first 100 words; FAQ items promoted to `###` headings for question/answer extraction; `last-updated` and `search-intents` (with competitor + use-case queries) added to the metadata comment blocks. `package.json` `files` array now includes `docs/`, `assets/` and `README.md` so npm pages resolve relative image + doc links.
+- **`@earendil-works/pi-tui` moved to `peerDependencies`** — previously listed in `dependencies`, which contradicted pi's official packaging rules (`packages.md` L171) and the project's own "zero runtime dependencies" claim (npm was actually installing a separate copy of pi-tui alongside the host's bundled one). Now declared as `peerDependencies: { "@earendil-works/pi-tui": "*" }` (host-provided, not bundled) and kept in `devDependencies: ^0.81.1` for local builds/typechecking. The "zero runtime dependencies" claim is now literally true again. `package-lock.json` synced.
+- **`keywords` extended (16 → 20)** — added `model-switching`, `agent-routing`, `auto-router`, `cost-optimization` (npm keyword cap is 20).
+- **`publishConfig.registry` added** — `"https://registry.npmjs.org/"` so accidental `npm publish` without `--registry` still targets the public registry; the existing release-flow `--registry` flag remains as the primary guard.
 
 ### Fixed
 
