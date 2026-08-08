@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > (0.1.0 – 0.3.1) were developed under the `pi-slim-router` working name and never
 > published to npm. The plugin was first published to npm as `pi-shift-router` at v0.4.0.
 
+## [Unreleased]
+
+### Added
+
+- **Cost telemetry — deep view.** `/router stats` now exposes per-tier spend (USD + token counts) and a hypothetical savings baseline. Each `message_end` attributes tokens + `usage.cost.total` to the active tier (`state.currentTier` at the time of the message). The baseline answers "what would this session have cost if every turn ran on your configured Smart-tier model (priority 1)?" — the natural no-router setup — and reports the difference as the savings figure. When pricing is missing for every model used (e.g. fully-local session with no `models-store.json` pricing), the baseline shows `unavailable` instead of a misleading number. New `getModelPricing()` helper in `src/config.ts`; new `computeCostTelemetry()` / `formatUsd()` / `judgeModelDisplay()` in `src/stats.ts`. `src/index.ts` now accumulates `state.tierUsage` and `state.callLog` on every assistant message; `/router config` reset clears them too. SPEC §9.1 documents the data source and baseline definition. 13 new tests in `tests/cost-telemetry.test.ts` covering attribution, smart-tier baseline (with cache tokens), fallback when pricing is missing, and `formatStats` rendering.
+
+### Changed
+
+- **Cooldown backoff rescaled for hour-scale rate windows.** `markModelFailed` now uses multiplier 4 (`BASE * 4^(attempts-1)`) and caps at **6 hours** instead of 30 minutes: 1m → 4m → 16m → 1h4m → 4h16m → 6h. The old 30m cap caused repeated 429 re-hits across hour-long coding-plan rate windows (e.g. M3 quota). Escalation persists across natural expiry — a thawed model that fails again continues from the previous `attempts` tier rather than resetting (verified by new test). `clearModelCooldown` still fully clears on 2xx recovery. SPEC §8.5.2 and README updated.
+- **`/router status` reorganized for readability.** Output is now grouped into `Tiers / Session / Stats / Detail / Config` sections: human-friendly turns/upgrades/downgrades summary at the top, raw window/counts moved to a bottom `Detail` section for power users, and the configured tier chains shown first. `formatStats` gains a `Judge: 🧭 <fast-tier chain>` line and drops its duplicate cooldown block (now shown once under Session).
+
 ## [0.8.3] — Judge cooldown sharing, packaging, README restructure
 
 ### Changed

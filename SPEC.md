@@ -388,10 +388,15 @@ retries are exhausted.
    pi's pending `agent.continue()` then retries the turn with the fallback
    model — **immediate failover within the same turn**. No cross-tier fallback.
 2. **Cooldown state**: `RouterState.modelCooldowns: Map<string, { until: number; attempts: number }>`
-   keyed by `provider/model`. `until` grows exponentially:
-   `backoffMs = BASE * 2^attempts` where `BASE = 60_000` (1 min).
-   Each new failure of the same model doubles the wait (1m, 2m, 4m, …,
-   capped at 30 min).
+   keyed by `provider/model`. `until` grows exponentially with multiplier 4:
+   `backoffMs = BASE * 4^(attempts-1)` where `BASE = 60_000` (1 min), capped at
+   **6 hours** (`COOLDOWN_MAX_MS`). Each new failure of the same model
+   quadruples the wait: 1m → 4m → 16m → 1h4m → 4h16m → 6h(cap).
+   The 6h cap is sized for hour-scale coding-plan rate windows (~5h),
+   not per-minute RPM limits — a 30m cap caused repeated 429 re-hits
+   throughout the window. Escalation persists across natural expiry: when a
+   model thaws (its `until` passes) and fails again, `attempts` continues
+   from the previous tier rather than resetting.
 3. **`before_agent_start` cooldown-aware selection**: `findBestModelForTier()`
    accepts an `isCooldown(key)` predicate and skips models currently in
    cooldown, picking the next healthy model in the chain.
@@ -431,7 +436,26 @@ On failover, show a toast notification (unless `quietMode`):
 
 ## 9. Future Direction (Optional Enhancements)
 
-- **Cache-aware routing**: when both tiers share a Provider family (e.g., both Anthropic), automatically raise the downgrade threshold to avoid cache thrashing.
-- **Multilingual Judge prompt validation**: confirm `judge.md` works correctly across Chinese, Japanese, Spanish, etc.
-- **Per-session cost statistics**: show users how much they've saved.
+- **Cache-aware routing**: when both tiers share a Provider family (e.g., both Anthropic), automatically raise the downgrade threshold to avoid cache thrashing. Pure logic, no heuristics.
 - **Tool-result classification**: classify tool calls (long shell output may indicate debugging, not a question).
+- **Multilingual Judge *prompt* translations**: with-drawn — LLMs are multilingual; the English prompt handles non-English user input. Test inputs in zh / ja / es / fr through the real `classify()` if regressions surface.
+- **Per-tier thinking level**: withdrawn — tier classification already encodes prompt complexity, so a static per-tier thinking rule rarely saves more than it complicates.
+
+### 9.1 Cost telemetry — deep view (delivered v0.8.4)
+
+`/router stats` exposes per-tier spend (USD + token counts) plus a hypothetical baseline.
+
+**Data source**: pi-agent's `message_end.usage` carries `input`, `output`, `cacheRead`, `cacheWrite`, and `cost.total` (USD) for every assistant message. The router attributes each message to whichever tier was active when it ran (`state.currentTier` at message_start).
+
+**Baseline definition**: "what would this session have cost on the most expensive model you actually used?" — across `state.callLog`, the max input / output / cacheRead / cacheWrite prices set the per-token rates; every message's tokens are priced at those rates and summed. When the most-expensive-model lookup succeeds, the difference `hypothetical - actual` is the **savings** figure.
+
+**Fallback**: when pricing is missing for every model used (e.g. fully-local session with no `models-store.json` pricing), the baseline shows `unavailable` instead of a misleading savings number.
+
+**Display** (excerpt from `/router stats`):
+
+```
+Spend: fast $0.045 (12 calls) · smart $0.42 (3 calls) · total $0.465
+  baseline: anthropic/claude-opus-5 → $3.21 (saved $2.74 by routing)
+  fast tokens: 12,400 in / 8,200 out
+  smart tokens: 4,800 in / 1,100 out
+```

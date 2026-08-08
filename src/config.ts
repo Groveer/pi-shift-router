@@ -92,6 +92,28 @@ export function flattenModels(store: ModelsStore): StoredModel[] {
   return models;
 }
 
+/**
+ * Look up pricing (USD per 1M tokens) for a model. Returns null when the
+ * model is unknown or pricing is missing. Used by the cost-telemetry
+ * hypothetical-baseline calculation (SPEC §9 “Cost telemetry — deep view”).
+ */
+export function getModelPricing(
+  store: ModelsStore,
+  provider: string,
+  modelId: string,
+): { input: number; output: number; cacheRead?: number; cacheWrite?: number } | null {
+  const provEntry = store[provider];
+  if (!provEntry) return null;
+  const model = provEntry.models.find((m) => m.id === modelId);
+  if (!model?.cost) return null;
+  return {
+    input: model.cost.input,
+    output: model.cost.output,
+    cacheRead: model.cost.cacheRead,
+    cacheWrite: model.cost.cacheWrite,
+  };
+}
+
 /** Invalidate all caches. Call after config edit. */
 export function invalidateConfigCache(): void {
   _config = null;

@@ -25,6 +25,20 @@ export function createRouterState(): RouterState {
     streamingStartTime: null,
     upgradeCount: 0,
     downgradeCount: 0,
+    tierUsage: {
+      fast: emptyTierUsage(),
+      smart: emptyTierUsage(),
+    },
+    callLog: [],
+  };
+}
+
+/** Fresh zero-valued TierUsage. */
+function emptyTierUsage(): { calls: number; tokens: { input: number; output: number; cacheRead: number; cacheWrite: number }; cost: number } {
+  return {
+    calls: 0,
+    tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    cost: 0,
   };
 }
 

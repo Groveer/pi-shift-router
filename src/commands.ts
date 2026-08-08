@@ -358,25 +358,42 @@ export function registerCommands(
           );
         }
 
-        const stats = formatStats(state, config).split("\n");
+        // Load pricing for the smart-tier baseline; null is fine —
+        // computeStats() falls back to "baseline: unavailable".
+        const store = await loadModelsStore();
+        const stats = formatStats(state, config, Date.now(), store).split("\n");
+
+        const sHeader = config.enabled ? "✅" : "⛔";
+        const sManual = state.manualOverride.active
+          ? ` ✅ ${state.manualOverride.tier ?? state.manualOverride.modelId ?? "active"}`
+          : " ✗";
+        const totalTurns = state.window.length + state.upgradeCount + state.downgradeCount;
+
+        // Grouped, human-readable status. Raw Window/Counts stay at the
+        // bottom for power users — the top is for humans.
         ctx.ui.notify(
           [
-            `Mode: ${config.routing.mode.toUpperCase()}  Enabled: ${config.enabled ? "✅" : "⛔"}  Quiet: ${config.ux.quietMode ? "🔇" : "🔊"}`,
+            `pi-shift-router — Mode: ${config.routing.mode.toUpperCase()} ${sHeader}`,
+            `Current: ${formatTierDisplay(state.currentTier, state.currentModelId)}${state.manualOverride.active ? " (manual)" : ""}`,
             ``,
-            `Current: ${formatTierDisplay(state.currentTier, state.currentModelId)}`,
-            `Window: ${formatWindow(state.window)}  (${state.window.length} entries)`,
-            `Counts: S=${counts.smart} F=${counts.fast}`,
-            `Manual: ${state.manualOverride.active ? `✅ ${state.manualOverride.tier ?? state.manualOverride.modelId ?? "active"}` : "✗ None"}`,
+            `Tiers:`,
+            formatTierList(config),
+            ``,
+            `Session:`,
+            `  Turns: ${totalTurns}   Upgrades: ↑${state.upgradeCount}   Downgrades: ↓${state.downgradeCount}`,
+            `  Manual override:${sManual}`,
             ...(cooldownLines.length > 0
-              ? [``, `Cooldowns:`, ...cooldownLines]
-              : [``, `Cooldowns: none`]),
+              ? [`  Cooldowns (${cooldownLines.length}):`, ...cooldownLines]
+              : [`  Cooldowns: none`]),
             ``,
             `Stats:`,
             ...stats.map((line) => `  ${line}`),
             ``,
-            `Config: ${getConfigPath() ?? "N/A"}`,
+            `Detail:`,
+            `  Window: ${formatWindow(state.window)}  (${state.window.length} entries)`,
+            `  Counts: S=${counts.smart} F=${counts.fast}`,
             ``,
-            formatTierList(config),
+            `Config: ${getConfigPath() ?? "N/A"}`,
           ].join("\n"),
           "info",
         );

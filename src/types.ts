@@ -185,4 +185,41 @@ export interface RouterState {
   upgradeCount: number;
   /** Cumulative count of smart→fast tier transitions. */
   downgradeCount: number;
+  /**
+   * Cumulative per-tier spend. Populated from pi-agent's
+   * `message_end.usage.cost.total` (USD) plus token counts.
+   * SPEC §9 (Cost telemetry — deep view).
+   */
+  tierUsage: Record<Tier, TierUsage>;
+  /**
+   * Per-message record of (tier, provider, modelId, tokens). Used to compute
+   * the "what it would have cost on the most expensive model you used"
+   * hypothetical baseline for the savings estimate.
+   */
+  callLog: CallRecord[];
+}
+
+/** Token counts for one assistant message. */
+export interface TokenUsage {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+}
+
+/** Cumulative spend for a single tier. */
+export interface TierUsage {
+  calls: number;
+  tokens: TokenUsage;
+  /** USD summed from pi-agent's `message_end.usage.cost.total`. */
+  cost: number;
+}
+
+/** Per-message attribution record kept for hypothetical baseline calculation. */
+export interface CallRecord {
+  tier: Tier;
+  provider: string;
+  modelId: string;
+  tokens: TokenUsage;
+  cost: number;
 }

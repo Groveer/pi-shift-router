@@ -258,6 +258,32 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
     const outputTokens: number = usage?.output ?? 0;
     state.totalOutputTokens += outputTokens;
 
+    // ── Cost telemetry (SPEC §9 "Cost telemetry — deep view") ────────
+    // Attribute this message's tokens + cost to whichever tier was active
+    // when it ran (`state.currentTier` reflects the model picked during
+    // `before_agent_start`).
+    const tokens = {
+      input: usage?.input ?? 0,
+      output: outputTokens,
+      cacheRead: usage?.cacheRead ?? 0,
+      cacheWrite: usage?.cacheWrite ?? 0,
+    };
+    const messageCost = usage?.cost?.total ?? 0;
+    const tierUsage = state.tierUsage[state.currentTier];
+    tierUsage.calls += 1;
+    tierUsage.tokens.input += tokens.input;
+    tierUsage.tokens.output += tokens.output;
+    tierUsage.tokens.cacheRead += tokens.cacheRead;
+    tierUsage.tokens.cacheWrite += tokens.cacheWrite;
+    tierUsage.cost += messageCost;
+    state.callLog.push({
+      tier: state.currentTier,
+      provider: state.currentProvider ?? "?",
+      modelId: state.currentModelId ?? "?",
+      tokens,
+      cost: messageCost,
+    });
+
     // Compute throughput from wall-clock elapsed (we used Date.now() at
     // message_start, so streamingStartTime is reliably set for any assistant
     // message that ran through streaming).
@@ -301,6 +327,9 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
       fastEndpoints = await resolveFastEndpoints(config);
       state.window = [];
       state.modelCooldowns.clear();
+      state.tierUsage.fast = { calls: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, cost: 0 };
+      state.tierUsage.smart = { calls: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, cost: 0 };
+      state.callLog = [];
       clearManualOverride(state);
     },
     (tier: Tier) => setManualOverrideTier(state, tier),
