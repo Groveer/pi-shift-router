@@ -39,7 +39,7 @@ pi-shift-router is a two-tier model router for [pi-coding-agent](https://github.
 
 ```text
 🦾 [deepseek-v4-flash] → fix the failing test
-⚖ judging…
+🧭 judging…
 🧠 [claude-opus-5]              ← "design the auth flow" → upgraded instantly
 ⚠️ deepseek-v4-flash 429 → switching to glm-5.2 — retry in 1m
 🦾 [glm-5.2]                    ← same-tier failover
@@ -66,7 +66,7 @@ Two rules govern every switch:
 - **Upgrade is instant.** One `smart` vote and the strong tier takes over on the next turn. When the work matters, you're there now.
 - **Downgrade needs a trend.** You come back down only once the last five turns weigh heavily toward `fast` (default ≥60%, low-confidence votes ignored). Dropping early throws away the strong tier's context cache for nothing.
 
-The judge output format is strict so small models parse it reliably: OpenAI-compatible endpoints get `response_format: json_object` (non-JSON is rejected at the API), Anthropic gets a `{` prefill to force JSON output. The status bar shows `⚖ judging…` while it runs. If the judge fails, the router holds its current tier — it never guesses.
+The judge output format is strict so small models parse it reliably: OpenAI-compatible endpoints get `response_format: json_object` (non-JSON is rejected at the API), Anthropic gets a `{` prefill to force JSON output. The status bar shows `🧭 judging…` while it runs. If the judge fails, the router holds its current tier — it never guesses.
 
 ### When a provider goes down
 
@@ -158,7 +158,7 @@ Want zero deps, a pure-LLM judge, and same-turn failover — pick us. Want a har
 
 ### Does the judge add latency or cost?
 
-A classification is a few thousand tokens billed at the fast tier's price (your cheapest), typically 200ms–2s round-trip; the status bar shows `⚖ judging…` while it runs. Against the cost of a missed upgrade, it's usually noise.
+A classification is a few thousand tokens billed at the fast tier's price (your cheapest), typically 200ms–2s round-trip; the status bar shows `🧭 judging…` while it runs. Against the cost of a missed upgrade, it's usually noise.
 
 ### Can tiers mix providers?
 

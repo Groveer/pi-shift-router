@@ -39,7 +39,7 @@ pi-shift-router 是 [pi-coding-agent](https://github.com/earendil-works/pi) 的�
 
 ```text
 🦾 [deepseek-v4-flash] → 修一下这个失败的测试
-⚖ judging…
+🧭 judging…
 🧠 [claude-opus-5]              ← “设计认证流程”→ 立即升级
 ⚠️ deepseek-v4-flash 429 → switching to glm-5.2 — retry in 1m
 🦾 [glm-5.2]                    ← 同档 failover
@@ -66,7 +66,7 @@ pi install npm:pi-shift-router   # 然后：/router config → /router status
 - **升级立即**。一次 `smart` 判定，下一轮就上强档。要紧的活儿，马上给最好的模型。
 - **降级要趋势**。最近 5 轮 fast 加权占比达到阈值（默认 ≥60%，低置信投票忽略）才降回来。过早降级会白白丢掉强档的上下文缓存。
 
-判定调用对输出格式很严格，小模型也能稳定解析：OpenAI 兼容端点用 `response_format: json_object`（非 JSON 直接被打回），Anthropic 用 `{` 前缀预填强制 JSON 开头。判定期间状态栏显示 `⚖ judging…`。判定失败时停在当前档位，不猜。
+判定调用对输出格式很严格，小模型也能稳定解析：OpenAI 兼容端点用 `response_format: json_object`（非 JSON 直接被打回），Anthropic 用 `{` 前缀预填强制 JSON 开头。判定期间状态栏显示 `🧭 judging…`。判定失败时停在当前档位，不猜。
 
 ### 当 Provider 挂掉时
 

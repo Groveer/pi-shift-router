@@ -104,7 +104,7 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
 
     // Show transient "judging..." badge in status bar so the user sees
     // the router is working during the Judge API call.
-    if (config.ux.statusBar) ctx.ui.setStatus("shift-router", "⚖ judging…");
+    if (config.ux.statusBar) ctx.ui.setStatus("shift-router", "🧭 judging…");
 
     let judgeResult;
     try {

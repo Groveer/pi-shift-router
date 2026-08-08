@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Judge status-bar icon: `⚖` → `🧭`** — the previous scales glyph (U+2696, BMP) rendered as a small monochrome line drawing in most terminals, visually inconsistent with `🦾` and `🧠` (both SMP color emoji). The compass (U+1F9ED, SMP) is a single-codepoint emoji that renders at the same weight as the tier icons across all modern terminals, and semantically fits the judge's job: "decide which direction (tier) this turn goes." Affected: `src/index.ts`, `README.md`, `README.zh-CN.md`, `SPEC.md` §3 ASCII diagram + §7.2. Historical CHANGELOG entries and the SPEC §10 v0.3.1 row intentionally retained the old glyph to preserve an accurate record of past releases (Keep a Changelog convention).
+
 ### Fixed
 
 - **Judge no longer wastes 429 calls on a known-broken fast model.** Before this change, the Judge walked the fast-tier chain in priority order on every `before_agent_start`, but only `agent_end` (a full turn failure) wrote into `state.modelCooldowns`. So if the fast-tier's first model was rate-limited, every Judge invocation re-hit it — burning a 429 call before falling back to the next model. If the Judge happened to pick `smart` that turn, the model stayed uncooled indefinitely and the 429-then-retry pattern repeated forever. Now `classify()` surfaces the failover signature (HTTP 429/5xx, body containing `rate_limit` / `quota` / `rate_limit_error`) via a new `onFailure` callback, and `index.ts` wires it to `markModelFailed`. Network errors, timeouts, 401/403 auth errors, and unparseable responses still do **not** cool down — they are not failover signatures and would over-block the turn path (SPEC §8.5.3). Affected files: `src/judge.ts`, `src/index.ts`, `SPEC.md` §4.6 + §8.5.2(5). 7 new tests in `tests/judge-fallback.test.ts`.

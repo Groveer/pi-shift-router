@@ -36,7 +36,7 @@ User sends message
 │                                                              │
 │  ┌─── pi-shift-router ──────────────────────────────────┐       │
 │  │                                                    │       │
-│  │  ① Status bar: "⚖ judging…" (transient)           │       │
+│  │  ① Status bar: "🧭 judging…" (transient)           │       │
 │  │      ↓                                              │       │
 │  │  ② LLM Judge (uses Fast tier's model, ~$0.0006/call) │       │
 │  │      ↓                                              │       │
@@ -306,7 +306,7 @@ Config: /project/.pi/pi-shift-router.json
 
 ### 7.3 Transient Judging Indicator
 
-While the Judge API call is in flight, the status bar shows **`⚖ judging…`** instead of the current model badge. This gives the user feedback that the router is working during the 200ms–2s Judge latency, instead of a silent delay between "press enter" and "first token streams".
+While the Judge API call is in flight, the status bar shows **`🧭 judging…`** instead of the current model badge. This gives the user feedback that the router is working during the 200ms–2s Judge latency, instead of a silent delay between "press enter" and "first token streams".
 
 The indicator is restored via `try/finally`, so even if `classify()` throws, the status bar returns to its normal state.
 
