@@ -10,7 +10,7 @@ SEO metadata (not user-visible, parsed by crawlers / LLMs):
 - repo: https://github.com/green-dalii/pi-shift-router
 - docs: README.md / README.zh-CN.md / docs/CONFIG.md / docs/MODELS.md / docs/TROUBLESHOOTING.md
 - first-published: v0.4.0
-- latest: v0.8.3
+- latest: v0.9.0
 - last-updated: 2026-08
 - alternate-names: shift router, pi extension, model router, two-tier router, auto router, tier model router, model failover router
 - search-intents: "auto-route pi agent turns", "LLM as classifier", "two-tier model routing", "model failover on 429", "cost vs quality model selection", "pi-coding-agent extension", "model cooldown exponential backoff", "JSON-mode classifier", "pi-shift-router vs pi-model-router", "auto switch models in pi agent"
@@ -74,7 +74,7 @@ The judge output format is strict so small models parse it reliably: OpenAI-comp
 
 429 / 5xx / quota / token-plan exhausted? pi retries first (3× provider, 3× agent); if it still fails, the router takes over:
 
-1. The failing model enters exponential-backoff cooldown (1m → 4m → 16m → 1h → 4h… capped at 6h, sized for hour-scale coding-plan rate windows).
+1. The failing model enters exponential-backoff cooldown — 5xx starts at 1m (1m → 4m → 16m → 1h → 4h… capped at 6h), while a failover-worthy 4xx (429 rate limit / quota) skips the first two tiers and starts at 16m, because client-side limits usually outlive server blips.
 2. `setModel` switches immediately to the next healthy model in the **same** tier — never across tiers.
 3. pi's pending retry lands on the fallback — same-turn failover.
 4. Later turns skip cooled models; a 2xx response clears the cooldown; a session restart resets everything.
@@ -141,6 +141,15 @@ You should see your current tier, scope, judge threshold, and throughput. Your n
 | `/route-force <tier>` | Pin a tier for the next turn |
 | `/route-force <provider>/<model>` | Pin a specific model for the next turn |
 | `/route-force auto` | Clear manual override |
+
+`/router status` also reports **cost telemetry** — per-tier spend and how much routing saves you:
+
+```
+Spend: fast $0.045 (9 calls) · smart $0.42 (3 calls) · total $0.465
+  baseline: all-turns-on-smart (opencode-go/deepseek-v4-flash) → $3.21 · saved $2.74
+```
+
+The baseline asks: *what would this session have cost if every turn ran on your configured Smart-tier model (priority 1) — i.e. no router?* The difference is your savings. If pricing is missing (fully-local session with no `models-store.json` pricing), it shows `baseline: unavailable` instead of a made-up number.
 
 ---
 

@@ -397,6 +397,12 @@ retries are exhausted.
    throughout the window. Escalation persists across natural expiry: when a
    model thaws (its `until` passes) and fails again, `attempts` continues
    from the previous tier rather than resetting.
+   **4xx vs 5xx**: a failover-worthy **4xx** (429 rate limit / quota — a
+   client-side limit) skips the first two tiers and starts at 16m
+   (`COOLDOWN_START_ATTEMPTS_4XX = 3`), because client limits usually
+   outlive server blips — probing at 1m/4m wastes calls. **5xx** keeps the
+   1m start for fast recovery. `markModelFailed(…, code)` derives the
+   start tier from the failover signature; both paths share the same cap.
 3. **`before_agent_start` cooldown-aware selection**: `findBestModelForTier()`
    accepts an `isCooldown(key)` predicate and skips models currently in
    cooldown, picking the next healthy model in the chain.
@@ -441,7 +447,7 @@ On failover, show a toast notification (unless `quietMode`):
 - **Multilingual Judge *prompt* translations**: with-drawn — LLMs are multilingual; the English prompt handles non-English user input. Test inputs in zh / ja / es / fr through the real `classify()` if regressions surface.
 - **Per-tier thinking level**: withdrawn — tier classification already encodes prompt complexity, so a static per-tier thinking rule rarely saves more than it complicates.
 
-### 9.1 Cost telemetry — deep view (delivered v0.8.4)
+### 9.1 Cost telemetry — deep view (delivered v0.9.0)
 
 `/router stats` exposes per-tier spend (USD + token counts) plus a hypothetical baseline.
 

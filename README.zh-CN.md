@@ -11,7 +11,7 @@ SEO 元数据（用户不可见，供爬虫 / LLM 解析）：
 - canonical: https://github.com/green-dalii/pi-shift-router/blob/main/README.zh-CN.md
 - docs: README.md / README.zh-CN.md / docs/CONFIG.zh-CN.md / docs/MODELS.zh-CN.md / docs/TROUBLESHOOTING.zh-CN.md
 - first-published: v0.4.0
-- latest: v0.8.3
+- latest: v0.9.0
 - last-updated: 2026-08
 - alternate-names: shift router, pi extension, model router, two-tier router, auto router, tier model router, model failover router
 - search-intents: "自动路由 pi agent 每轮", "LLM 作为分类器", "两层模型路由", "遇 429 模型的自动 failover", "成本与质量模型选择", "pi-coding-agent 扩展", "模型冷却指数退避", "JSON-mode 分类器", "pi-shift-router 与 pi-model-router 对比", "pi 自动切换便宜模型"
@@ -74,7 +74,7 @@ pi install npm:pi-shift-router   # 然后：/router config → /router status
 
 429 / 5xx / 配额 / Token 套餐耗尽？pi 先重试（Provider ×3 + Agent ×3），仍失败就轮到路由器：
 
-1. 失败模型进入指数退避冷却（1m → 4m → 16m → 1h → 4h … 封顶 6h，按小时级编程套餐限流窗口设计）。
+1. 失败模型进入指数退避冷却——5xx 从 1m 起步（1m → 4m → 16m → 1h → 4h … 封顶 6h）；可触发 failover 的 4xx（429 限流 / 配额）跳过前两档、直接从 16m 起步，因为客户端侧限流窗口通常比服务器瞬时故障长得多。
 2. 立即 `setModel` 到同一档的下一个健康模型（绝不跨档）。
 3. pi 待定的重试直接打到备用模型上——同轮完成接管。
 4. 后续轮次自动跳过冷却中的模型；2xx 响应立即解除冷却，会话重启全部重置。
@@ -141,6 +141,15 @@ pi install npm:pi-shift-router
 | `/route-force <档位>` | 下一轮强制走某档 |
 | `/route-force <provider>/<model>` | 下一轮强制指定模型 |
 | `/route-force auto` | 清除手动覆盖 |
+
+`/router status` 还会展示**花费统计**——各档位花费与路由替你省了多少钱：
+
+```
+Spend: fast $0.045 (9 calls) · smart $0.42 (3 calls) · total $0.465
+  baseline: all-turns-on-smart (opencode-go/deepseek-v4-flash) → $3.21 · saved $2.74
+```
+
+基线问的是：*如果每一轮都跑在你配置的 Smart 档模型（priority 1）上——也就是没装路由器——这个会话要花多少？* 差值就是你的节省。若定价缺失（纯本地会话，`models-store.json` 没有定价），显示 `baseline: unavailable`，不编数字。
 
 ---
 
