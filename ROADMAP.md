@@ -21,12 +21,15 @@ Release history and planned work for **pi-shift-router**.
 
 | Feature | Version | Notes |
 |---------|---------|-------|
-| Per-tier thinking level | v0.9.0 | `TierConfig.thinking`; `applyModelSwitch` sets `pi.setThinkingLevel`. Fast=off, Smart=high by default. Zero deps. |
-| Cost telemetry — deep view | v0.9.0 | Smart vs Fast spend breakdown; estimate savings from tier transitions. |
-| Multilingual Judge prompt validation | v0.9.0 | Test-driven: validate zh-CN / ja / es / fr prompt inputs. |
+| Cost telemetry — deep view | v0.8.4 | Smart vs Fast spend breakdown; `models-store.json` provides per-model pricing; pi-agent's `message_end.usage.cost.total` already gives per-message USD. Estimate savings as `actual_total` vs `what-it-would-have-cost-on-most-expensive-model-used`. |
+| Multilingual Judge input regression | v0.8.4 | Tiny test suite (zh-CN / ja / es /fr prompts, 5–10 each) run through the real `classify()` to confirm classification is robust on multilingual user input. Not translations of `judge.md`. If a model drifts, improve `judge.md`'s language-neutrality. |
 | Cache-aware routing | v1.0.0 | When fast/smart share provider family, raise downgrade threshold (0.6 → 0.9) to protect prompt cache. Pure logic, no heuristics. |
 | Examples directory | ongoing | Sample configs (frontend / ML / cross-provider cost-saving) for documentation. |
 | Coverage reporting | ongoing | Add `vitest --coverage` to CI; target ≥ 90% on `src/router.ts` and `src/failover.ts`. |
+
+> **Withdrawn from earlier drafts.** Per-tier thinking level was proposed but is largely redundant — tier classification already encodes prompt complexity, so a static per-tier thinking rule rarely saves more than it complicates. Adaptive (per-prompt) thinking adds machinery without a clear win because the smart tier is already gated on real complexity. Dropped from v0.8.x.
+>
+> **Multilingual Judge *prompt* translation** was also dropped — generating zh / ja / es / fr versions of `judge.md` is solving a problem that doesn't exist (LLMs are multilingual; the English prompt works on non-English user input). Replaced with the input regression test above.
 
 ## Explicitly excluded (by design)
 
