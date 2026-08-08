@@ -179,7 +179,7 @@ Only when the last five turns weigh ≥ `threshold` (default 0.6) toward `fast`;
 ## Reference
 
 - [Configuration & tuning](docs/CONFIG.md) — JSON schema, defaults, `/router stats`, threshold calibration
-- [Model pairings](docs/MODELS.md) — token plans, local quantized models, same-provider ladder, cross-provider
+- [Model pairings](docs/MODELS.md) — coding plans, local quantized models, same-provider ladder, cross-provider
 - [Troubleshooting](docs/TROUBLESHOOTING.md) — judge parse failures, missing models, repeated downgrades
 - [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 

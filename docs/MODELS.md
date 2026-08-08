@@ -8,18 +8,34 @@
 >
 > **Smart tier**: keep `smart` on a frontier cloud model. Local smart is impractical on hardware under ~80 GB of VRAM/unified memory, and even at 96 GB the cost/quality trade-off almost never beats a flat-fee token plan.
 
-## Pattern 1 — Token-plan bundles (one key, many models)
+## Pattern 1 — Coding plans (one key, many models)
 
-Candidate model IDs you can mix across the chain — not a single canonical pairing. The providers below are well-known aggregate / token-bundle gateways that proxy Anthropic, OpenAI, Google, DeepSeek, xAI, Z.AI, Qwen, Moonshot, and others under one billing account.
+Candidate model IDs you can mix across the chain — not a single canonical pairing. Two groups of providers fit the “one key, many models” pattern:
 
-| Plan | `fast` candidates 🦾 | `smart` candidates 🧠 |
-|---|---|---|
-| **Alibaba Token Plan** (intl + CN) | `qwen3.7-plus`, `qwen3.6-flash`, `deepseek-v4-flash` | `qwen3.8-max`, `qwen3.7-max`, `kimi-k3` |
-| **Vercel AI Gateway** | any of the providers below through one gateway | any of the providers below |
-| **OpenRouter** | 200+ models; `auto` is **not** a valid Judge target (opaque) | 200+ models |
-| **Hugging Face Inference** | `Qwen/Qwen3.5-9B`, `Qwen/Qwen3.6-35B-A3B` | `Qwen/Qwen3.6-27B`, `google/gemma-4-31B-it` |
-| **Nebius Token Factory** | `deepseek-ai/DeepSeek-V4-Flash`, `moonshotai/Kimi-K2.7-Code` | `Kimi-K3`, `zai-org/GLM-5.2`, `Qwen/Qwen3.7-Max` |
-| **NovitaAI** | `deepseek-ai/DeepSeek-V4-Flash`, `Qwen/Qwen3.6-27B` | `moonshotai/Kimi-K3`, `Qwen/Qwen3.7-Max` |
+1. **Subscription coding plans** — a flat monthly fee buys access to a curated model set, exposed through an OpenAI/Anthropic-compatible API key you can plug into any tool (Claude Code, Codex, OpenCode, Cline, Aider, or this router).
+2. **Pay-per-token gateways** — aggregate hundreds of models under one account; useful when you want to mix providers without juggling keys.
+
+`smart` candidates below are **frontier-class only**. Budget open-model plans (OpenCode Go, OpenCode Zen) are fast-tier material — they do not expose a model strong enough for `smart`.
+
+| Subscription coding plan | `fast` candidates 🦾 | `smart` candidates 🧠 | API access |
+|---|---|---|---|
+| **Kimi Code** (Moonshot) | `moonshotai/Kimi-K2.7-Code` | `kimi-k3` (2.8 T, 1 M ctx) | One key for Claude Code / Codex / OpenCode / Cline / Aider; $19–199/mo |
+| **GLM Coding Plan** (Z.AI) | `glm-5`, `glm-5-turbo` | `zai-org/GLM-5.2` | Z.AI devpack for Claude Code / Cline / OpenCode; ~$18/mo |
+| **Qwen Code** (Alibaba) | `qwen3.7-plus`, `qwen3.6-flash` | `qwen3.8-max`, `qwen3.7-max` | ~$50/mo; ~90k requests/mo quota |
+| **Windsurf** (Cognition) | available open + frontier models | frontier models on Pro/Max | $20–200/mo, quota-based |
+| **OpenCode Go** | popular open coding models (e.g. `Qwen/Qwen3.6-27B`, `google/gemma-4-31B-it`) | — (open models only; pair `smart` with a cloud frontier) | $10/mo flat fee; OpenAI-compatible API key |
+| **GitHub Copilot** | Copilot's available models (depends on your plan) | Copilot's available frontier models | Copilot API (`api.githubcopilot.com`); read the ToS before wiring it into a router |
+
+| Pay-per-token gateway | `fast` candidates 🦾 | `smart` candidates 🧠 | API access |
+|---|---|---|---|
+| **OpenCode Zen** | curated open models (tested by the OpenCode team; `Qwen/Qwen3.6-35B-A3B` etc.) | — (open models only; pair `smart` with a cloud frontier) | `https://opencode.ai/zen/v1/messages` (Anthropic-style) / `/v1/responses` (OpenAI-style) |
+| **Alibaba Token Plan** (intl + CN) | `qwen3.7-plus`, `qwen3.6-flash`, `deepseek-v4-flash` | `qwen3.8-max`, `qwen3.7-max`, `kimi-k3` | OpenAI-compatible |
+| **Vercel AI Gateway** | any of the providers below through one gateway | any of the providers below | OpenAI-compatible |
+| **OpenRouter** | 200+ models; `auto` is **not** a valid Judge target (opaque) | 200+ models | OpenAI-compatible |
+| **Nebius Token Factory** | `deepseek-ai/DeepSeek-V4-Flash`, `moonshotai/Kimi-K2.7-Code` | `Kimi-K3`, `zai-org/GLM-5.2`, `Qwen/Qwen3.7-Max` | OpenAI-compatible |
+| **NovitaAI** | `deepseek-ai/DeepSeek-V4-Flash`, `Qwen/Qwen3.6-27B` | `moonshotai/Kimi-K3`, `Qwen/Qwen3.7-Max` | OpenAI-compatible |
+
+> **Pricing & availability move fast.** Subscriptions change price and model lineups frequently (mixed credit/quota structures, weekly-refreshed caps, per-model overages). Confirm the current plan + endpoint on the provider's official page before wiring it into the router. For a router, the key requirement is an OpenAI-compatible endpoint with a stable `baseUrl` + `apiKey` — that's what makes a plan “router-friendly”.
 
 ## Pattern 2 — Local models by VRAM / unified memory
 
@@ -27,19 +43,17 @@ All picks below were verified against HuggingFace's `safetensors` total weight s
 
 > fp16 is a benchmark artifact, not a runtime format. Production local deployments use **q4-k-m / NVFP4 / MXFP4 / AWQ-int4 / 1–2 bit ternary**. Nothing in `fast` below runs at fp16.
 >
-> The `AxxB` suffix on a MoE model name means **active parameters per token**. `DeepSeek-V4-Flash-0731` is 83.4 B total / ~13 B active; int4 disk = 41.7 GB. Quant size scales with **active parameters**, not total.
+> The `AxxB` suffix on a MoE model name means **active parameters per token** — it affects compute speed, not disk size. A GGUF / q4 file stores **every** expert weight, so its size scales with **total** parameters. `DeepSeek-V4-Flash` is 284 B total / ~13 B active, so its UD-Q4_K_XL GGUF is ~155 GB (needs 192 GB+ of unified memory); a q4 of it cannot be "~42 GB", however many parameters the name activates.
 
-| VRAM / unified memory | Local `fast` candidates | Quant | Local `smart` candidates (64 GB+) |
+| VRAM / unified memory | Local `fast` candidates | Quant | Local `smart` candidates |
 |---|---|---|---|
-| **≤ 16 GB** (RTX 4070 12 GB, M-series 16 GB entry tiers) | `LiquidAI/LFM2.5-8B-A1B` (8.5 B total, 2026-05), `ibm-granite/granite-4.1-8b` (8.8 B, 2026-04), `ornith-ai/Ornith-1.0-9B-GGUF` (~9 B Q4_K_M ≈ 5.6 GB) | q4-k-m | — |
-| **16–32 GB** (RTX 4090 24 GB, M3 Pro 18 GB, M4 Pro 24 GB) | `Qwen/Qwen3.6-27B` (27.8 B, q4 ≈ 14 GB, current HF top), `Qwen/Qwen3.8-27B` (27 B-class, when released — watch the Qwen org page), `nvidia/Qwen3.6-27B-NVFP4` (NVFP4 ≈ 14 GB), `google/gemma-4-26b-a4b-it` (26.5 B, q4 ≈ 13 GB), `Qwen/Qwen3.6-35B-A3B` (36 B, q4 ≈ 18 GB) | q4-k-m / NVFP4 | — |
-| **32–64 GB** (M2 Ultra 64 GB, RTX 4090 48 GB) | `nvidia/NVIDIA-Nemotron-3-Nano-Omni-30B-A3B-Reasoning` (30 B q4 ≈ 15 GB), `google/gemma-4-31B-it` (31.3 B q4 ≈ 16 GB) | NVFP4 / q4-k-m | — |
-| **64–128 GB** (A100 80 GB, RTX 6000 Ada 48 GB ×2) | `poolside/Laguna-XS-2.1` (33.4 B q4 ≈ 17 GB, 2026-06), `farbodtavakkoli/OTel-2.0-LLM-31B-IT` (32.1 B q4 ≈ 16 GB, Gemma4 base, 2026-07) | q4-k-m / NVFP4 | `prism-ml/Bonsai-27B-gguf` (27 B, 1.71-bit ternary ≈ 6 GB on disk, runs on a phone; on 64 GB use the 2-bit MLX/GGUF for quality, 2026-07), `ornith-ai/Ornith-1.0-35B-GGUF` (35 B MoE multimodal, 2026-06), `InternScience/Agents-A1` (35.1 B MoE agentic, q4-k-m ≈ 18 GB, 2026-06) |
-| **≥ 128 GB** (M3 Ultra 192 GB, M2 Ultra 192 GB, **NVIDIA DGX Spark 128 GB GB10 unified**, RTX 4090 ×4) | `poolside/Laguna-S-2.1` (117.6 B q4 ≈ 59 GB, 2026-07), `mistralai/Mistral-Medium-3.5-128B` (127.7 B q4 ≈ 64 GB, 2026-03) | q4 / NVFP4 | `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B` (120 B, NVFP4 ≈ 60 GB), `nvidia/DeepSeek-V4-Flash-NVFP4` (83.4 B / ~13 B active, NVFP4, 2026-05-18, NVIDIA-published), `unsloth/DeepSeek-V4-Flash-GGUF` (83.4 B / ~13 B active, q4 ≈ 42 GB, 2026-07), `bartowski/DeepSeek-V4-Flash-0731-GGUF` (83.4 B / ~13 B active, q4 0731 refresh, 2026-07-31), `Qwen/Qwen3.6-27B-FP8` (NVFP4-equivalent ~14 GB) |
+| **≤ 32 GB** (RTX 4070 12 GB, RTX 4090 24 GB, M3 Pro 18 GB, M4 Pro 24 GB) | `LiquidAI/LFM2.5-8B-A1B` (8.5 B total, 2026-05), `ibm-granite/granite-4.1-8b` (8.8 B, 2026-04), `Qwen/Qwen3.6-27B` (27.8 B, q4 ≈ 14 GB, current HF top), `google/gemma-4-26b-a4b-it` (26.5 B, q4 ≈ 13 GB), `Qwen/Qwen3.6-35B-A3B` (36 B total / 3 B active, q4 ≈ 18 GB), `prism-ml/Ternary-Bonsai-27B-mlx-2bit` (27 B, 1.58-bit ternary ≈ 7 GB, laptop/phone class) | q4-k-m / NVFP4 | — |
+| **32–128 GB** (M2 Ultra 64 GB, A100 80 GB, RTX 6000 Ada 48 GB, RTX 4090 ×2) | `google/gemma-4-31B-it` (31.3 B, q4 ≈ 16 GB), `poolside/Laguna-XS-2.1` (33.4 B total / 3 B active, q4 ≈ 17 GB, agentic coding, 2026-06), `poolside/Laguna-S-2.1` (117.6 B, q4 ≈ 59 GB — needs 64 GB+) | q4-k-m / NVFP4 / q4 | — |
+| **≥ 128 GB** (M3 Ultra 192 GB, M2 Ultra 192 GB, NVIDIA DGX Spark 128 GB GB10) | — | — | `unsloth/DeepSeek-V4-Flash-GGUF` (284 B total / ~13 B active, UD-Q4_K_XL ≈ 155 GB — needs 192 GB+ unified memory; on 128 GB-class machines use a 1–2 bit ternary if available) |
 
 Notes:
 
-- **Quantized variants ship as separate HF repos**: `nvidia/Qwen3.6-35B-A3B-NVFP4`, `cyankiwi/Qwen3.6-27B-AWQ-INT4`, `OsaurusAI/Ornith-1.0-35B-MXFP4`, `prism-ml/Bonsai-27B-gguf`, `poolside/Laguna-S-2.1-NVFP4` — ollama / vLLM / MLX pick them up automatically.
+- **Quantized variants ship as separate HF repos under each org** (NVFP4 / AWQ-int4 / GGUF / 1–2 bit ternary) — ollama / vLLM / MLX pick them up automatically. Check the org page for the exact variant repo; don't assume a `-NVFP4` or `-GGUF` suffix exists until you see it.
 - **Any runtime exposing an OpenAI-compatible API works** — the plugin binds to none specifically. Common choices: **ollama** (`ollama run qwen3.6:27b` → server on `:11434`), **LM Studio** (MLX + GGUF), **vLLM**, **llama.cpp** / **llama-server**, **exo**, **llamafile**.
 - **The Judge also needs a JSON-mode endpoint.** Qwen 3.5+ and Gemma 4 expose `tool_call=true`, so they satisfy the constraint — but a local Judge adds ~0.5–2 s per turn. Recommended: local `fast` + local-or-cloud `smart` + Judge on whichever `smart` you trust most.
 

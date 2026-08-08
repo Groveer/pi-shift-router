@@ -179,7 +179,7 @@ pi install npm:pi-shift-router
 ## 参考手册
 
 - [配置参考 & 调参指南](docs/CONFIG.zh-CN.md) —— JSON schema、字段默认值、`/router stats` 解读、阈值怎么调
-- [模型选型目录](docs/MODELS.zh-CN.md) —— Token 套餐、本地量化、同 Provider 阶梯、跨 Provider 拼装
+- [模型选型目录](docs/MODELS.zh-CN.md) —— 编程套餐、本地量化、同 Provider 阶梯、跨 Provider 拼装
 - [故障排查](docs/TROUBLESHOOTING.zh-CN.md) —— 判定解析失败、模型找不到、反复降级等问题
 - [路线图](ROADMAP.md) · [贡献指南](CONTRIBUTING.md)
 
