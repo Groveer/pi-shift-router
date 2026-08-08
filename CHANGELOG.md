@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > (0.1.0 – 0.3.1) were developed under the `pi-slim-router` working name and never
 > published to npm. The plugin was first published to npm as `pi-shift-router` at v0.4.0.
 
+## [Unreleased]
+
+### Fixed
+
+- **Judge no longer wastes 429 calls on a known-broken fast model.** Before this change, the Judge walked the fast-tier chain in priority order on every `before_agent_start`, but only `agent_end` (a full turn failure) wrote into `state.modelCooldowns`. So if the fast-tier's first model was rate-limited, every Judge invocation re-hit it — burning a 429 call before falling back to the next model. If the Judge happened to pick `smart` that turn, the model stayed uncooled indefinitely and the 429-then-retry pattern repeated forever. Now `classify()` surfaces the failover signature (HTTP 429/5xx, body containing `rate_limit` / `quota` / `rate_limit_error`) via a new `onFailure` callback, and `index.ts` wires it to `markModelFailed`. Network errors, timeouts, 401/403 auth errors, and unparseable responses still do **not** cool down — they are not failover signatures and would over-block the turn path (SPEC §8.5.3). Affected files: `src/judge.ts`, `src/index.ts`, `SPEC.md` §4.6 + §8.5.2(5). 7 new tests in `tests/judge-fallback.test.ts`.
+
 ## [0.8.2] — Docs + Judge prompt clarity
 
 ### Changed

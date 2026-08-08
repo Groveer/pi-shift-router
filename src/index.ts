@@ -20,6 +20,7 @@ import {
 } from "./router.js";
 import {
   planTurnFailover,
+  markModelFailed,
   clearModelCooldown,
   isModelInCooldown,
   cooldownPredicate,
@@ -113,6 +114,12 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
         config.routing.judgeTimeout,
         verbose,
         cooldownPredicate(state.modelCooldowns, Date.now()),
+        // Judge-side failure → mark the model into the shared cooldown map so
+        // (a) the next judge call skips it without re-burning a 429, and
+        // (b) the turn-path (`findBestModelForTier`) also avoids it.
+        // Mirrors SPEC §8.5: only failover signatures cool down; classify's
+        // own policy already excludes network/timeout/unparseable failures.
+        (provider, model) => markModelFailed(state.modelCooldowns, provider, model, Date.now()),
       );
     } finally {
       // Restore the proper status badge immediately, regardless of judge outcome.

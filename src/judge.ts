@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import type { JudgeResult, Tier, ProviderEndpoint } from "./types.js";
+import { detectFailoverError } from "./failover.js";
 
 // ─── Judge system prompt ──────────────────────────────────────────
 
@@ -36,6 +37,30 @@ function loadJudgePrompt(): string {
 const JUDGE_PROMPT = loadJudgePrompt();
 
 // ─── LLM Judge ────────────────────────────────────────────────────
+
+/**
+ * Discriminated result of a single Judge model call.
+ * On HTTP failure with a failover signature (429/5xx/quota), `code` carries
+ * the signature so the caller can mark the model into the shared cooldown
+ * map (SPEC §8.5) — preventing the same model from being retried on
+ * subsequent turns / judge calls. Non-failover failures (network, timeout,
+ * auth, unparseable) leave `code` null and never cool the model down.
+ */
+export type JudgeCallOutcome =
+  | { ok: true; result: JudgeResult }
+  | { ok: false; code: string | null };
+
+/** Derive a failover signature from an HTTP error. Returns null when not failover-worthy. */
+function judgeFailureCode(status: number, bodyText: string): string | null {
+  // Body signature first — catches rate_limit_error / quota / 限流 / etc.
+  const fromBody = detectFailoverError(bodyText);
+  if (fromBody) return fromBody.code;
+  // Status-based: 429 and 5xx are transient; everything else (400/401/403…)
+  // is a config error and must NOT trigger cooldown.
+  if (status === 429) return "429";
+  if (status >= 500 && status < 600) return String(status);
+  return null;
+}
 
 function judgeApiUrl(baseUrl: string, apiType: string): string {
   const base = baseUrl.replace(/\/+$/, "");
@@ -81,7 +106,7 @@ async function classifyLLM(
   endpoint: ProviderEndpoint,
   signal: AbortSignal | undefined,
   verbose: boolean,
-): Promise<JudgeResult | null> {
+): Promise<JudgeCallOutcome> {
   try {
     const body = buildRequestBody(endpoint, prompt);
     const url = judgeApiUrl(endpoint.baseUrl, endpoint.apiType);
@@ -106,7 +131,7 @@ async function classifyLLM(
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       console.warn(`[ShiftRouter] Judge API error ${res.status} from ${url}: ${text.slice(0, 200)}`);
-      return null;
+      return { ok: false, code: judgeFailureCode(res.status, text) };
     }
 
     const raw = await res.json();
@@ -130,7 +155,9 @@ async function classifyLLM(
         `[ShiftRouter] Judge unparseable from ${url}: ` +
         `content=${content.slice(0, 100)}, reasoning=${reasoning.slice(0, 100)}, finish=${finish}`,
       );
-      return null;
+      // 200-but-unparseable: model is responding, just not with valid JSON.
+      // Do NOT cool it down — that would block real turns on the model too.
+      return { ok: false, code: null };
     }
     if (verbose) {
       console.log(
@@ -138,12 +165,14 @@ async function classifyLLM(
         (answer.confidence !== undefined ? ` (confidence ${answer.confidence.toFixed(2)})` : ""),
       );
     }
-    return answer.confidence !== undefined
+    const result: JudgeResult = answer.confidence !== undefined
       ? { tier: answer.tier, source: "llm", confidence: answer.confidence }
       : { tier: answer.tier, source: "llm" };
+    return { ok: true, result };
   } catch (err) {
+    // Network / abort / DNS failure — not a failover signature, do not cool down.
     console.warn(`[ShiftRouter] Judge fetch failed for ${endpoint.baseUrl}: ${err}`);
-    return null;
+    return { ok: false, code: null };
   }
 }
 
@@ -243,6 +272,14 @@ function parseConfidenceFromText(text: string): number | undefined {
  * `endpoints` is the fast tier's model list (priority order). The Judge
  * walks it: each failed call (429/5xx/network/timeout/unparseable) tries
  * the next model. `isCooldown` (if provided) skips models in cooldown.
+ * `onFailure` (if provided) is invoked with a failover signature code
+ * (429/5xx) on each failed model, so the caller can mark it into the
+ * shared `modelCooldowns` map (SPEC §8.5). Without this hook, the Judge
+ * would re-hit a rate-limited model on every turn — because nothing
+ * remembers "A just429'd the Judge" until a full turn failure triggers
+ * `agent_end`. Network errors, timeouts, and unparseable responses do
+ * NOT call `onFailure` — they are not failover signatures.
+ *
  * Only when ALL fast-tier models fail do we hold position (fallback).
  */
 export async function classify(
@@ -251,6 +288,7 @@ export async function classify(
   timeout = 5000,
   verbose = false,
   isCooldown?: (provider: string, model: string) => boolean,
+  onFailure?: (provider: string, model: string, code: string) => void,
 ): Promise<JudgeResult> {
   const list = endpoints ?? [];
 
@@ -259,9 +297,15 @@ export async function classify(
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout);
-    const result = await classifyLLM(prompt, endpoint, controller.signal, verbose);
+    const outcome = await classifyLLM(prompt, endpoint, controller.signal, verbose);
     clearTimeout(timer);
-    if (result) return result;
+
+    if (outcome.ok) return outcome.result;
+    // Failover-worthy failure (429/5xx/quota) → let caller cool the model.
+    // Other failures (network/timeout/unparseable) intentionally skipped.
+    if (outcome.code && onFailure) {
+      onFailure(endpoint.provider, endpoint.modelId, outcome.code);
+    }
   }
 
   console.warn("[ShiftRouter] Judge LLM unavailable — holding position on current tier");

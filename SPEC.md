@@ -192,6 +192,8 @@ For CoT models (e.g., DeepSeek Reasoner) that emit a separate `reasoning_content
 
 There is **no heuristic rule** as a fallback. When the LLM Judge is unavailable (network error, auth error, malformed response), the Judge returns `{ tier: "fast", source: "fallback" }`. The router treats this as `stay` (no model switch) and only logs a warning. The user is not interrupted.
 
+Additionally, when a Judge call fails with a **failover signature** (HTTP 429/5xx, or a body containing rate-limit / quota / `rate_limit_error`), the failed model is written into the shared `modelCooldowns` map via the `onFailure` callback. This means a rate-limited fast model is **not retried on subsequent Judge calls** — the next Judge invocation skips it via `isCooldown` and moves straight to the next fast-tier model. See §8.5.5 for the shared-map mechanism.
+
 ---
 
 ## 5. Configuration System
@@ -396,6 +398,15 @@ retries are exhausted.
 4. **Recovery**: `after_provider_response` with `status` 2xx clears the
    cooldown for the responding model (it works again). Cooldowns are
    session-scoped; a session restart resets all.
+5. **Judge-side writes**: the Judge's `classify()` loop writes failed
+   models into the same map via an `onFailure` callback, so the next
+   Judge call (and the next turn-path `findBestModelForTier`) skips them.
+   Without this, a rate-limited fast model would be re-hit by every Judge
+   invocation until a full turn failed — and if the Judge happens to pick
+   `smart` that turn, the failure never happens and the model stays
+   uncooled indefinitely. Only failover signatures (429/5xx/quota) write
+   to the map; network errors, timeouts, auth errors, and unparseable
+   responses do not cool down (they are not failover signatures, see §8.5.3).
 
 ### 8.5.3 Failover signatures
 

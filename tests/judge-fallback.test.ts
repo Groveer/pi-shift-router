@@ -277,3 +277,170 @@ describe("classify handles error-shaped 200 responses without crashing", () => {
     vi.unstubAllGlobals();
   });
 });
+
+// ─── Judge-side cooldown writes (SPEC §8.5) ──────────────────────
+// Without this, every judge call re-hits the first fast model even when
+// it just 429'd the previous judge call — because the shared cooldown map
+// was only written by `agent_end` turn failures. Now classify surfaces
+// the failure signature via onFailure so the caller can cool the model.
+describe("classify surfaces failover failures via onFailure", () => {
+  function errorResponseWith(status: number, body: unknown): Response {
+    return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  }
+
+  it("calls onFailure with '429' when the first model returns HTTP 429", async () => {
+    mockFetch(async (_url, init) => {
+      if (modelFromRequest(init) === "model-a") return errorResponse(429);
+      return okResponse("model-b", "fast");
+    });
+
+    const failures: Array<{ provider: string; model: string; code: string }> = [];
+    await classify(
+      "task",
+      [endpoint("model-a"), endpoint("model-b")],
+      5000,
+      false,
+      undefined,
+      (provider, model, code) => failures.push({ provider, model, code }),
+    );
+
+    expect(failures).toEqual([{ provider: "p", model: "model-a", code: "429" }]);
+  });
+
+  it("calls onFailure with the 5xx status when the model returns 503", async () => {
+    mockFetch(async (_url, init) => {
+      if (modelFromRequest(init) === "model-a") return errorResponse(503);
+      return okResponse("model-b", "smart");
+    });
+
+    const failures: Array<{ provider: string; model: string; code: string }> = [];
+    await classify(
+      "task",
+      [endpoint("model-a"), endpoint("model-b")],
+      5000,
+      false,
+      undefined,
+      (provider, model, code) => failures.push({ provider, model, code }),
+    );
+
+    expect(failures).toEqual([{ provider: "p", model: "model-a", code: "503" }]);
+  });
+
+  it("detects rate-limit signature in the body even when status is 400", async () => {
+    mockFetch(async (_url, init) => {
+      if (modelFromRequest(init) === "model-a") {
+        return errorResponseWith(400, { error: { message: "rate limit exceeded" } });
+      }
+      return okResponse("model-b", "fast");
+    });
+
+    const failures: Array<{ provider: string; model: string; code: string }> = [];
+    await classify(
+      "task",
+      [endpoint("model-a"), endpoint("model-b")],
+      5000,
+      false,
+      undefined,
+      (provider, model, code) => failures.push({ provider, model, code }),
+    );
+
+    // Body signature takes precedence — "rate limit" → code "429".
+    expect(failures).toEqual([{ provider: "p", model: "model-a", code: "429" }]);
+  });
+
+  it("does NOT call onFailure on an unparseable 200 response (model is responding)", async () => {
+    mockFetch(async (_url, init) => {
+      if (modelFromRequest(init) === "model-a") return okResponse("model-a", "garbage");
+      return okResponse("model-b", "smart");
+    });
+
+    const failures: Array<{ provider: string; model: string; code: string }> = [];
+    await classify(
+      "task",
+      [endpoint("model-a"), endpoint("model-b")],
+      5000,
+      false,
+      undefined,
+      (provider, model, code) => failures.push({ provider, model, code }),
+    );
+
+    expect(failures).toEqual([]);
+  });
+
+  it("does NOT call onFailure on a network throw (not a failover signature)", async () => {
+    mockFetch(async (_url, init) => {
+      if (modelFromRequest(init) === "model-a") throw new Error("ECONNRESET");
+      return okResponse("model-b", "fast");
+    });
+
+    const failures: Array<{ provider: string; model: string; code: string }> = [];
+    await classify(
+      "task",
+      [endpoint("model-a"), endpoint("model-b")],
+      5000,
+      false,
+      undefined,
+      (provider, model, code) => failures.push({ provider, model, code }),
+    );
+
+    expect(failures).toEqual([]);
+  });
+
+  it("does NOT call onFailure on a 401 auth error (config, not transient)", async () => {
+    mockFetch(async (_url, init) => {
+      if (modelFromRequest(init) === "model-a") return errorResponse(401);
+      return okResponse("model-b", "fast");
+    });
+
+    const failures: Array<{ provider: string; model: string; code: string }> = [];
+    await classify(
+      "task",
+      [endpoint("model-a"), endpoint("model-b")],
+      5000,
+      false,
+      undefined,
+      (provider, model, code) => failures.push({ provider, model, code }),
+    );
+
+    expect(failures).toEqual([]);
+  });
+
+  it("end-to-end: model cooled by an earlier call is skipped in the next call", async () => {
+    // The exact UX bug: judge call N hits model-a → 429, marks it cooldown
+    // via onFailure; judge call N+1 receives the shared cooldown predicate
+    // and skips model-a without burning another 429.
+    const { markModelFailed, isModelInCooldown, createCooldowns } = await import("../src/failover.js");
+    const cooldowns = createCooldowns();
+
+    let calls = 0;
+    mockFetch(async (_url, init) => {
+      calls++;
+      const m = modelFromRequest(init);
+      if (m === "model-a") return errorResponse(429);
+      return okResponse("model-b", "smart");
+    });
+
+    const now = Date.now();
+    // Call 1: model-a 429 → onFailure marks it; falls to model-b.
+    await classify(
+      "task",
+      [endpoint("model-a"), endpoint("model-b")],
+      5000,
+      false,
+      undefined,
+      (provider, model) => markModelFailed(cooldowns, provider, model, now),
+    );
+    expect(calls).toBe(2);
+    expect(isModelInCooldown(cooldowns, "p", "model-a", now)).toBe(true);
+
+    // Call 2: model-a is cooled → only model-b is called (no wasted 429).
+    await classify(
+      "task",
+      [endpoint("model-a"), endpoint("model-b")],
+      5000,
+      false,
+      (provider, model) => isModelInCooldown(cooldowns, provider, model, now),
+    );
+    expect(calls).toBe(3); // +1 for model-b only
+  });
+});
