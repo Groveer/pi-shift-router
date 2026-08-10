@@ -15,7 +15,7 @@ Candidate model IDs you can mix across the chain — not a single canonical pair
 1. **Subscription coding plans** — a flat monthly fee buys access to a curated model set, exposed through an OpenAI/Anthropic-compatible API key you can plug into any tool (Claude Code, Codex, OpenCode, Cline, Aider, or this router).
 2. **Pay-per-token gateways** — aggregate hundreds of models under one account; useful when you want to mix providers without juggling keys.
 
-`smart` candidates below are **frontier-class only**. Budget open-model plans (OpenCode Go, OpenCode Zen) are fast-tier material — they do not expose a model strong enough for `smart`.
+`smart` candidates below are **frontier-class only**. Lightweight subscription plans (OpenCode Go) and gateways (OpenCode Zen) are included when they actually expose a model strong enough for `smart` — both now do.
 
 | Subscription coding plan | `fast` candidates 🦾 | `smart` candidates 🧠 | API access |
 |---|---|---|---|
@@ -23,12 +23,12 @@ Candidate model IDs you can mix across the chain — not a single canonical pair
 | **GLM Coding Plan** (Z.AI) | `glm-5`, `glm-5-turbo` | `zai-org/GLM-5.2` | Z.AI devpack for Claude Code / Cline / OpenCode; ~$18/mo |
 | **Qwen Code** (Alibaba) | `qwen3.7-plus`, `qwen3.6-flash` | `qwen3.8-max`, `qwen3.7-max` | ~$50/mo; ~90k requests/mo quota |
 | **Windsurf** (Cognition) | available open + frontier models | frontier models on Pro/Max | $20–200/mo, quota-based |
-| **OpenCode Go** | popular open coding models (e.g. `Qwen/Qwen3.6-27B`, `google/gemma-4-31B-it`) | — (open models only; pair `smart` with a cloud frontier) | $10/mo flat fee; OpenAI-compatible API key |
+| **OpenCode Go** | `DeepSeek V4 Flash`, `Qwen3.6 Plus`, `MiMo-V2.5` | `Grok 4.5`, `GPT 5.6 Luna`, `Kimi K3`, `GLM-5.2`, `Qwen3.8 Max` | $5 first month, then $10/mo flat; OpenAI-compatible API key |
 | **GitHub Copilot** | Copilot's available models (depends on your plan) | Copilot's available frontier models | Copilot API (`api.githubcopilot.com`); read the ToS before wiring it into a router |
 
 | Pay-per-token gateway | `fast` candidates 🦾 | `smart` candidates 🧠 | API access |
 |---|---|---|---|
-| **OpenCode Zen** | curated open models (tested by the OpenCode team; `Qwen/Qwen3.6-35B-A3B` etc.) | — (open models only; pair `smart` with a cloud frontier) | `https://opencode.ai/zen/v1/messages` (Anthropic-style) / `/v1/responses` (OpenAI-style) |
+| **OpenCode Zen** | `DeepSeek V4 Flash`, `Qwen3.7 Plus`, `GPT 5.6 Luna` | `Claude Opus 5`, `GPT 5.6 Sol`, `Kimi K3`, `Gemini 3.1 Pro`, `Grok 4.5` | `https://opencode.ai/zen/v1/messages` (Anthropic-style) / `/v1/responses` (OpenAI-style) |
 | **Alibaba Token Plan** (intl + CN) | `qwen3.7-plus`, `qwen3.6-flash`, `deepseek-v4-flash` | `qwen3.8-max`, `qwen3.7-max`, `kimi-k3` | OpenAI-compatible |
 | **Vercel AI Gateway** | any of the providers below through one gateway | any of the providers below | OpenAI-compatible |
 | **OpenRouter** | 200+ models; `auto` is **not** a valid Judge target (opaque) | 200+ models | OpenAI-compatible |
@@ -47,9 +47,9 @@ All picks below were verified against HuggingFace's `safetensors` total weight s
 
 | VRAM / unified memory | Local `fast` candidates | Quant | Local `smart` candidates |
 |---|---|---|---|
-| **≤ 32 GB** (RTX 4070 12 GB, RTX 4090 24 GB, M3 Pro 18 GB, M4 Pro 24 GB) | `LiquidAI/LFM2.5-8B-A1B` (8.5 B total, 2026-05), `ibm-granite/granite-4.1-8b` (8.8 B, 2026-04), `Qwen/Qwen3.6-27B` (27.8 B, q4 ≈ 14 GB, current HF top), `google/gemma-4-26b-a4b-it` (26.5 B, q4 ≈ 13 GB), `Qwen/Qwen3.6-35B-A3B` (36 B total / 3 B active, q4 ≈ 18 GB), `prism-ml/Ternary-Bonsai-27B-mlx-2bit` (27 B, 1.58-bit ternary ≈ 7 GB, laptop/phone class) | q4-k-m / NVFP4 | — |
-| **32–128 GB** (M2 Ultra 64 GB, A100 80 GB, RTX 6000 Ada 48 GB, RTX 4090 ×2) | `google/gemma-4-31B-it` (31.3 B, q4 ≈ 16 GB), `poolside/Laguna-XS-2.1` (33.4 B total / 3 B active, q4 ≈ 17 GB, agentic coding, 2026-06), `poolside/Laguna-S-2.1` (117.6 B, q4 ≈ 59 GB — needs 64 GB+) | q4-k-m / NVFP4 / q4 | — |
-| **≥ 128 GB** (M3 Ultra 192 GB, M2 Ultra 192 GB, NVIDIA DGX Spark 128 GB GB10) | — | — | `unsloth/DeepSeek-V4-Flash-GGUF` (284 B total / ~13 B active, UD-Q4_K_XL ≈ 155 GB — needs 192 GB+ unified memory; on 128 GB-class machines use a 1–2 bit ternary if available) |
+| **≤ 32 GB** (RTX 4070 12 GB, RTX 4090 24 GB, M3 Pro 18 GB, M4 Pro 24 GB) | `LiquidAI/LFM2.5-8B-A1B` (8.5 B total, 2026-05), `ibm-granite/granite-4.1-8b` (8.8 B, 2026-04), `Qwen/Qwen3.6-27B` (27.8 B, q4 ≈ 14 GB, current HF top), `google/gemma-4-26b-a4b-it` (26.5 B, q4 ≈ 13 GB), `Qwen/Qwen3.6-35B-A3B` (36 B total / 3 B active, q4 ≈ 18 GB), `poolside/Laguna-XS-2.1` (33.4 B total / 3 B active, q4 ≈ 17 GB, agentic coding, 2026-06), `prism-ml/Ternary-Bonsai-27B-mlx-2bit` (27 B, 1.58-bit ternary ≈ 7 GB, laptop/phone class) | q4-k-m / NVFP4 | cloud frontier model |
+| **32–128 GB** (M2 Ultra 64 GB, A100 80 GB, RTX 6000 Ada 48 GB, RTX 4090 ×2) | `DavidAU/Qwen3.6-27B-Fable-Fusion-711-Uncensored-Heretic-NM-DAU-NEO-MAX-MTP-GGUF` (27 B, MTP + NEO-MAX post-training, 2.4 M HF downloads, 2026-07 — the best-post-trained pick in this class), `google/gemma-4-31B-it` (31.3 B, q4 ≈ 16 GB), `poolside/Laguna-S-2.1` (117.6 B, q4 ≈ 59 GB — needs 64 GB+) | q4-k-m / NVFP4 / q4 | `DavidAU/Qwen3.6-27B-Fable-Fusion-711-Uncensored-Heretic-NM-DAU-MTP` (base weights) or a cloud frontier model |
+| **≥ 128 GB** (M3 Ultra 192 GB, M2 Ultra 192 GB, NVIDIA DGX Spark 128 GB GB10) | `DavidAU/Qwen3.6-27B-Fable-Fusion-711-Uncensored-Heretic-NM-DAU-NEO-MAX-MTP-GGUF` (same pick — post-training quality beats raw size for `fast`) | q4-k-m / NVFP4 / q4 | `unsloth/DeepSeek-V4-Flash-GGUF` (284 B total / ~13 B active, UD-Q4_K_XL ≈ 155 GB — needs 192 GB+ unified memory; on 128 GB-class machines use a 1–2 bit ternary if available) |
 
 Notes:
 

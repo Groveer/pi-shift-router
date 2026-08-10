@@ -15,7 +15,7 @@
 1. **订阅型编程套餐** —— 每月固定费用买到一批精选模型，通过 OpenAI/Anthropic 兼容的 API key 接入任意工具（Claude Code、Codex、OpenCode、Cline、Aider，或本路由器）。
 2. **按量付费网关** —— 一个账号聚合数百模型，想混用多家 Provider 又不想管理一堆 key 时最方便。
 
-下面 `smart` 候选**只放旗舰级**。预算型开源模型套餐（OpenCode Go、OpenCode Zen）只够 fast 档——没有能撑起 `smart` 的模型。
+下面 `smart` 候选**只放旗舰级**。轻量订阅套餐（OpenCode Go）和网关（OpenCode Zen）只要能真正提供配得上 `smart` 的模型，也一并收录——这两家现在都有了。
 
 | 订阅型编程套餐 | fast 🦾 候选 | smart 🧠 候选 | API 接入方式 |
 |---|---|---|---|
@@ -23,12 +23,12 @@
 | **GLM 编程套餐**（Z.AI） | `glm-5`、`glm-5-turbo` | `zai-org/GLM-5.2` | Z.AI devpack 支持 Claude Code / Cline / OpenCode；约 $18/月 |
 | **Qwen Code**（阿里） | `qwen3.7-plus`、`qwen3.6-flash` | `qwen3.8-max`、`qwen3.7-max` | 约 $50/月；约 9 万请求/月配额 |
 | **Windsurf**（Cognition） | 可选开源 + 前沿模型 | Pro/Max 档的前沿模型 | $20–200/月，quota 制 |
-| **OpenCode Go** | 主流开源编程模型（如 `Qwen/Qwen3.6-27B`、`google/gemma-4-31B-it`） | —（只有开源模型；`smart` 配云端旗舰） | 每月 $10 固定费；OpenAI-compatible API key |
+| **OpenCode Go** | `DeepSeek V4 Flash`、`Qwen3.6 Plus`、`MiMo-V2.5` | `Grok 4.5`、`GPT 5.6 Luna`、`Kimi K3`、`GLM-5.2`、`Qwen3.8 Max` | 首月 $5，之后 $10/月固定费；OpenAI-compatible API key |
 | **GitHub Copilot** | 视你的套餐可用的模型 | 视你的套餐可用的前沿模型 | Copilot API（`api.githubcopilot.com`）；接进路由器前先读条款 |
 
 | 按量付费网关 | fast 🦾 候选 | smart 🧠 候选 | API 接入方式 |
 |---|---|---|---|
-| **OpenCode Zen** | OpenCode 团队验证过的开源模型（如 `Qwen/Qwen3.6-35B-A3B`） | —（只有开源模型；`smart` 配云端旗舰） | `https://opencode.ai/zen/v1/messages`（Anthropic 风格）/ `/v1/responses`（OpenAI 风格） |
+| **OpenCode Zen** | `DeepSeek V4 Flash`、`Qwen3.7 Plus`、`GPT 5.6 Luna` | `Claude Opus 5`、`GPT 5.6 Sol`、`Kimi K3`、`Gemini 3.1 Pro`、`Grok 4.5` | `https://opencode.ai/zen/v1/messages`（Anthropic 风格）/ `/v1/responses`（OpenAI 风格） |
 | **Alibaba Token Plan**（intl + CN） | `qwen3.7-plus`、`qwen3.6-flash`、`deepseek-v4-flash` | `qwen3.8-max`、`qwen3.7-max`、`kimi-k3` | OpenAI-compatible |
 | **Vercel AI Gateway** | 上述任意走同一网关 | 上述任意 | OpenAI-compatible |
 | **OpenRouter** | 200+ 个模型；`auto` **不能**当 Judge target（不透明） | 200+ 个模型 | OpenAI-compatible |
@@ -47,9 +47,9 @@
 
 | 显存 / 统一内存 | 本地 fast 🦾 候选 | 量化 | 本地 smart 🧠 候选 |
 |---|---|---|---|
-| **≤ 32 GB**（RTX 4070 12 GB、RTX 4090 24 GB、M3 Pro 18 GB、M4 Pro 24 GB） | `LiquidAI/LFM2.5-8B-A1B`（8.5 B、2026-05）、`ibm-granite/granite-4.1-8b`（8.8 B、2026-04）、`Qwen/Qwen3.6-27B`（27.8 B、q4 ≈ 14 GB、当前 HF top）、`google/gemma-4-26b-a4b-it`（26.5 B、q4 ≈ 13 GB）、`Qwen/Qwen3.6-35B-A3B`（36 B 总量 / 3 B 激活、q4 ≈ 18 GB）、`prism-ml/Ternary-Bonsai-27B-mlx-2bit`（27 B、1.58-bit ternary ≈ 7 GB、笔记本/手机级） | q4-k-m / NVFP4 | — |
-| **32–128 GB**（M2 Ultra 64 GB、A100 80 GB、RTX 6000 Ada 48 GB、RTX 4090 ×2） | `google/gemma-4-31B-it`（31.3 B、q4 ≈ 16 GB）、`poolside/Laguna-XS-2.1`（33.4 B 总量 / 3 B 激活、q4 ≈ 17 GB、agentic coding、2026-06）、`poolside/Laguna-S-2.1`（117.6 B、q4 ≈ 59 GB — 需要 64 GB+） | q4-k-m / NVFP4 / q4 | — |
-| **≥ 128 GB**（M3 Ultra 192 GB、M2 Ultra 192 GB、NVIDIA DGX Spark 128 GB GB10） | — | — | `unsloth/DeepSeek-V4-Flash-GGUF`（284 B 总量 / 激活 ~13 B、UD-Q4_K_XL ≈ 155 GB — 需要 192 GB+ 统一内存；128 GB 级机器用 1–2 bit ternary 备选） |
+| **≤ 32 GB**（RTX 4070 12 GB、RTX 4090 24 GB、M3 Pro 18 GB、M4 Pro 24 GB） | `LiquidAI/LFM2.5-8B-A1B`（8.5 B、2026-05）、`ibm-granite/granite-4.1-8b`（8.8 B、2026-04）、`Qwen/Qwen3.6-27B`（27.8 B、q4 ≈ 14 GB、当前 HF top）、`google/gemma-4-26b-a4b-it`（26.5 B、q4 ≈ 13 GB）、`Qwen/Qwen3.6-35B-A3B`（36 B 总量 / 3 B 激活、q4 ≈ 18 GB）、`poolside/Laguna-XS-2.1`（33.4 B 总量 / 3 B 激活、q4 ≈ 17 GB、agentic coding、2026-06）、`prism-ml/Ternary-Bonsai-27B-mlx-2bit`（27 B、1.58-bit ternary ≈ 7 GB、笔记本/手机级） | q4-k-m / NVFP4 | 云端前沿模型 |
+| **32–128 GB**（M2 Ultra 64 GB、A100 80 GB、RTX 6000 Ada 48 GB、RTX 4090 ×2） | `DavidAU/Qwen3.6-27B-Fable-Fusion-711-Uncensored-Heretic-NM-DAU-NEO-MAX-MTP-GGUF`（27 B、MTP + NEO-MAX 后训练、HF 243 万下载、2026-07 —— 这一档后训练最出色的 pick）、`google/gemma-4-31B-it`（31.3 B、q4 ≈ 16 GB）、`poolside/Laguna-S-2.1`（117.6 B、q4 ≈ 59 GB — 需要 64 GB+） | q4-k-m / NVFP4 / q4 | `DavidAU/Qwen3.6-27B-Fable-Fusion-711-Uncensored-Heretic-NM-DAU-MTP`（base 权重）或云端前沿模型 |
+| **≥ 128 GB**（M3 Ultra 192 GB、M2 Ultra 192 GB、NVIDIA DGX Spark 128 GB GB10） | `DavidAU/Qwen3.6-27B-Fable-Fusion-711-Uncensored-Heretic-NM-DAU-NEO-MAX-MTP-GGUF`（同一 pick —— fast 档后训练质量胜过拼体积） | q4-k-m / NVFP4 / q4 | `unsloth/DeepSeek-V4-Flash-GGUF`（284 B 总量 / 激活 ~13 B、UD-Q4_K_XL ≈ 155 GB — 需要 192 GB+ 统一内存；128 GB 级机器用 1–2 bit ternary 备选） |
 
 说明：
 
