@@ -1,7 +1,7 @@
 /**
  * pi-shift-router — Type definitions
  *
- * Two-tier routing: Fast (programmer) ↔ Smart (CTO).
+ * Two-tier routing: Fast (engineer) ↔ Smart (CTO).
  * Fast: execution-heavy tasks, daily coding, following patterns.
  * Smart: judgment-heavy tasks, architecture, planning, code review.
  */

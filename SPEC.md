@@ -13,11 +13,11 @@
 - **Speed**: cheap models respond faster on execution tasks; strong models think more carefully on complex tasks.
 - **Zero interference by default**: both tiers start empty. The router does nothing until you assign models via `/router config`.
 
-### The CTO / Programmer Role
+### The CTO / Engineer Role
 
-> **Smart = CTO** (small workload, critically important): when the task is complex or high-stakes, the smart model acts as the CTO who drives the whole turn — architecture, evaluation, code review, security audit, multi-step planning, irrecoverable actions. It does not merely "judge"; it executes the entire turn at high intelligence.
+> **Smart = CTO** (small workload, critically important): when the work matters — direction-setting, course correction, result review, security audit, or a hard problem that needs doing right — the smart model acts as the CTO who drives the whole turn: it writes the code, calls the tools, runs the loop, at a higher intelligence level. High-stakes turns don't get dropped. It does not merely "judge"; it executes the entire turn at high intelligence.
 >
-> **Fast = Programmer** (large workload, well-defined patterns): when the path is clear, the fast model acts as the senior engineer who executes the whole turn — writing code, fixing bugs, adding tests, writing comments.
+> **Fast = Engineer** (large workload, well-defined patterns): when the path is clear, the fast model acts as the engineer who executes the whole turn — writing code, fixing bugs, adding tests, writing comments — cheap, fast, and accurate.
 
 Not every task needs CTO-level intelligence. But projects without CTO oversight don't sustain quality. The LLM Judge is a small, one-shot classification call — the chosen tier then drives the entire agent run, including all thinking, tool calls, and message content.
 
@@ -63,8 +63,8 @@ User sends message
 
 | Tier | Role | What it does for the whole turn | Use Cases |
 |------|------|------------------------------|-----------|
-| **🧠 Smart (CTO)** | Complex-work driver: evaluation, planning, review, direction-setting — and when chosen, executes the entire turn at high intelligence | Architecture design, technology selection, code review, security audit, performance optimization, multi-step planning, any irrecoverable action. **Small workload, critically important.** |
-| **🦾 Fast (Programmer)** | Execution driver: follows known patterns, drives the whole turn with the simpler model | Writing code, fixing bugs, adding tests, writing docs, adding comments, small refactors. **Large workload, well-defined patterns.** |
+| **🧠 Smart (CTO)** | Judgment driver: direction-setting, correction, review, and hard problems handled personally — and when chosen, executes the entire turn at high intelligence | Architecture design, technology selection, code review, security audit, performance optimization, multi-step planning, any irrecoverable action. **Small workload, critically important.** |
+| **🦾 Fast (Engineer)** | Execution driver: follows known patterns, drives the whole turn with the simpler model | Writing code, fixing bugs, adding tests, writing docs, adding comments, small refactors. **Large workload, well-defined patterns.** |
 
 ### 2.3 Transition Rules
 

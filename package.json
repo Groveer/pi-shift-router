@@ -1,6 +1,6 @@
 {
   "name": "pi-shift-router",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Two-tier model router for pi-coding-agent — automatic execution/judgment routing with LLM Judge, multi-model fallback chains, and exponential-backoff runtime failover. Zero runtime dependencies.",
   "keywords": [
     "pi-package",
@@ -25,7 +25,7 @@
     "cost-optimization"
   ],
   "license": "MIT",
-  "homepage": "https://github.com/green-dalii/pi-shift-router#readme",
+  "homepage": "https://shiftrouter.greenerai.top",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/green-dalii/pi-shift-router.git"

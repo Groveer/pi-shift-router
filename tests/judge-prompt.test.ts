@@ -46,7 +46,7 @@ describe("Judge prompt structure", () => {
   });
 
   it("defines both tiers with role metaphor", () => {
-    expect(prompt).toMatch(/fast.*programmer mode/is);
+    expect(prompt).toMatch(/fast.*engineer mode/is);
     expect(prompt).toMatch(/smart.*cto mode/is);
   });
 

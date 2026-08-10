@@ -10,7 +10,7 @@ SEO metadata (not user-visible, parsed by crawlers / LLMs):
 - repo: https://github.com/green-dalii/pi-shift-router
 - docs: README.md / README.zh-CN.md / docs/CONFIG.md / docs/MODELS.md / docs/TROUBLESHOOTING.md
 - first-published: v0.4.0
-- latest: v0.9.0
+- latest: v0.9.1
 - last-updated: 2026-08
 - alternate-names: shift router, pi extension, model router, two-tier router, auto router, tier model router, model failover router
 - search-intents: "auto-route pi agent turns", "LLM as classifier", "two-tier model routing", "model failover on 429", "cost vs quality model selection", "pi-coding-agent extension", "model cooldown exponential backoff", "JSON-mode classifier", "pi-shift-router vs pi-model-router", "auto switch models in pi agent"
@@ -20,22 +20,25 @@ SEO metadata (not user-visible, parsed by crawlers / LLMs):
 - canonical: https://github.com/green-dalii/pi-shift-router/blob/main/README.md
 -->
 
+![pi-shift-router hero — routine turns stay on the cheap tier, a judge moment upgrades the work that matters to the strong tier](assets/hero.jpeg)
+
 # pi-shift-router
 
-![pi-shift-router hero — routine turns stay on the cheap tier, a judge moment upgrades the turn that matters to the strong tier](assets/hero.jpeg)
+> It's a CTO for the work that matters, an engineer for the workload.
 
 [![npm](https://img.shields.io/npm/v/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
 [![Downloads](https://img.shields.io/npm/dm/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
 [![Pi Agent](https://img.shields.io/badge/pi--agent-extension-purple)](https://github.com/earendil-works/pi)
 [![Node](https://img.shields.io/badge/node-%E2%89%A524-green)](https://nodejs.org)
+[![deps](https://img.shields.io/badge/dependencies-zero-brightgreen)](package.json)
+[![size](https://img.shields.io/badge/install%20size-~196kB-blue)](https://packagephobia.com/package/pi-shift-router)
 [![CI](https://img.shields.io/github/actions/workflow/status/green-dalii/pi-shift-router/ci.yml)](https://github.com/green-dalii/pi-shift-router/actions)
 [![Stars](https://img.shields.io/github/stars/green-dalii/pi-shift-router.svg)](https://github.com/green-dalii/pi-shift-router)
 
 [English] | [简体中文](README.zh-CN.md)
 
-[How it works](#how-it-works) | [Quick start](#quick-start) | [vs. pi-model-router](#vs-pi-model-router) | [FAQ](#faq) | [Configuration](docs/CONFIG.md) | [Troubleshooting](docs/TROUBLESHOOTING.md)
+[🌐 Project site](https://shiftrouter.greenerai.top) | [⚙️ How it works](#how-it-works) | [🚀 Quick start](#quick-start) | [⚖️ vs. pi-model-router](#vs-pi-model-router) | [❓ FAQ](#faq) | [🔧 Configuration](docs/CONFIG.md) | [🩺 Troubleshooting](docs/TROUBLESHOOTING.md)
 
 Routine turns shouldn't cost flagship money. The turns that matter shouldn't be left to a cheap model.
 
@@ -191,6 +194,12 @@ Only when the last five turns weigh ≥ `threshold` (default 0.6) toward `fast`;
 - [Model pairings](docs/MODELS.md) — coding plans, local quantized models, same-provider ladder, cross-provider
 - [Troubleshooting](docs/TROUBLESHOOTING.md) — judge parse failures, missing models, repeated downgrades
 - [Roadmap](ROADMAP.md) · [Contributing](CONTRIBUTING.md)
+
+---
+
+## See also
+
+- **[obsidian-llm-wiki](https://github.com/green-dalii/obsidian-llm-wiki)** — an Obsidian plugin that turns your notes into a connected, queryable knowledge base. The Karpathy LLM Wiki idea, built into the editor where you already write. Graph retrieval works without embeddings; ten interface languages; works with every LLM provider. Local-first, no backend, GDPR-friendly. By the same author.
 
 ---
 

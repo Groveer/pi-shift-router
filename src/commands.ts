@@ -86,8 +86,8 @@ async function routeConfigWizard(
 
   async function menu(): Promise<MenuChoice> {
     const choice = await ctx.ui.select("pi-shift-router — Configuration", [
-      `🦾 Fast — ${config.tiers.fast.models.length} model(s)  (programmer: execution, daily coding)`,
-      `🧠 Smart — ${config.tiers.smart.models.length} model(s)  (CTO: architecture, review, planning)`,
+      `🦾 Fast — ${config.tiers.fast.models.length} model(s)  (engineer: execution, daily coding)`,
+      `🧠 Smart — ${config.tiers.smart.models.length} model(s)  (CTO: direction, review, hard problems)`,
       "---",
       "🎨 UX settings",
       "---",

@@ -25,11 +25,11 @@ The classification word (`fast` or `smart`) and the `confidence` value must appe
 
 ## What each tier means — the role that drives the whole turn
 
-**fast** (programmer mode) — **execution driver**. When you pick `fast`, the cheap model takes over and runs the whole turn: writes code, runs tests, fixes the bug, follows the established pattern. The task follows known patterns and can be completed efficiently by a competent engineer without deep architectural decisions. "Make it work — the path is clear."
+**fast** (engineer mode) — **execution driver**. When you pick `fast`, the cheap, fast, and reliable engineer takes over and runs the whole turn: writes code, runs tests, fixes the bug, follows the established pattern. The task follows known patterns and can be completed accurately by a competent engineer without deep architectural decisions. "Make it work — the path is clear."
 
-**smart** (CTO mode) — **complex-work driver**. When you pick `smart`, the strong model takes over and runs the whole turn at high intelligence: it does the architecture, writes the code, calls the tools, makes the multi-step plan, runs the review. The task requires evaluating trade-offs, making decisions, or setting direction **and then executing the resulting work**. "Is this the right approach — and if so, do it now — the path is not yet clear."
+**smart** (CTO mode) — **judgment driver**. When you pick `smart`, the strong model acts as the CTO and runs the whole turn at high intelligence: it sets direction, corrects course, reviews the result, and personally takes on the hard problems — architecture, trade-off decisions, multi-step planning, security review. The task requires evaluating trade-offs, making decisions, or setting direction **and then executing the resulting work**. High-stakes work does not get dropped. "Is this the right approach — and if so, do it now — the path is not yet clear."
 
-The smart model is not a judge that hands off. It is the model that actually does the complex work. When `smart` is chosen, the entire turn — thinking, tool calls, code edits, follow-up — happens at that tier.
+The smart model is not a judge that hands off. It is the model that actually does the important work. When `smart` is chosen, the entire turn — thinking, tool calls, code edits, follow-up — happens at that tier.
 
 ## Classification signals — weigh all four
 
@@ -40,7 +40,8 @@ A user's message can carry several signals. Consider each before deciding.
 | Signal | Tier |
 |--------|------|
 | Architecture, design decisions, technology selection — the model needs to set direction | smart |
-| Code review, design review, security audit, quality assessment | smart |
+| Course correction: the current approach is wrong, needs rethinking, or a decision must be reversed | smart |
+| Code review, design review, security audit, quality assessment — checking work already done | smart |
 | Multi-step planning, ambiguous requirements, open-ended strategy | smart |
 | Performance / correctness investigation where the cause is unknown | smart |
 | Routine code: writing functions, fixing bugs, adding tests, well-defined tasks | fast |

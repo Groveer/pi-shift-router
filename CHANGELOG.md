@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > (0.1.0 – 0.3.1) were developed under the `pi-slim-router` working name and never
 > published to npm. The plugin was first published to npm as `pi-shift-router` at v0.4.0.
 
+## [0.9.1] — Slogan philosophy unified across docs and judge prompt
+
+### Changed
+
+- **Slogan philosophy pinned down.** Both READMEs now open with a single tagline: *"It's a CTO for the work that matters, an engineer for the workload"* (EN) / *"重要的事它是CTO，跑量的活它是工程师"* (ZH). All body copy — hero alt text, leads, "How it works", "When it pays off" — was rewritten to use the same vocabulary (`important work` / `重要的事` instead of `matters` / `consequential` / `judgment call`), removing the ambiguous scope-shrinking phrasing.
+- **Role terminology unified: Programmer → Engineer.** SPEC, AGENTS, `src/types.ts` comments, the `/router config` menu, and the judge prompt now all name the fast tier "engineer" (`engineer mode`), matching the slogan. The smart tier is consistently "CTO" across the same files.
+- **CTO role description sharpened in SPEC.** Smart = CTO now explicitly covers direction-setting, course correction, result review, security audit, and hard problems done personally — "high-stakes turns don't get dropped" — instead of the narrower "complex-work driver".
+- **`judge.md` audited against the philosophy.** Fast tier described as the cheap, fast, reliable engineer; smart tier as judgment driver that sets direction, corrects course, reviews results, and takes on hard problems itself. Two new signal rows: course correction (wrong approach / reversal) and code review of already-done work. "Complex work" → "important work". Prompt tests updated (`engineer mode` assertion).
+- **Project website + See also sections.** README TOC now leads with the project site (🌐) and all 7 TOC items are emoji-prefixed; a new "See also" / "关联项目" section links `obsidian-llm-wiki` (same author). `package.json` `homepage` points at the project site.
+
+### Removed
+
+- **`PLAN.md` deleted as redundant.** Its phase history, file structure, and roadmap were fully superseded by ROADMAP.md + CHANGELOG.md + SPEC.md; its "next step" (npm publish) was already done as of v0.9.0, and the doc had no remaining references.
+
 ## [0.9.0] — Cost telemetry, smart-tier savings baseline, cooldown rescale
 
 ### Added

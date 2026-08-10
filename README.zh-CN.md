@@ -11,7 +11,7 @@ SEO 元数据（用户不可见，供爬虫 / LLM 解析）：
 - canonical: https://github.com/green-dalii/pi-shift-router/blob/main/README.zh-CN.md
 - docs: README.md / README.zh-CN.md / docs/CONFIG.zh-CN.md / docs/MODELS.zh-CN.md / docs/TROUBLESHOOTING.zh-CN.md
 - first-published: v0.4.0
-- latest: v0.9.0
+- latest: v0.9.1
 - last-updated: 2026-08
 - alternate-names: shift router, pi extension, model router, two-tier router, auto router, tier model router, model failover router
 - search-intents: "自动路由 pi agent 每轮", "LLM 作为分类器", "两层模型路由", "遇 429 模型的自动 failover", "成本与质量模型选择", "pi-coding-agent 扩展", "模型冷却指数退避", "JSON-mode 分类器", "pi-shift-router 与 pi-model-router 对比", "pi 自动切换便宜模型"
@@ -20,24 +20,27 @@ SEO 元数据（用户不可见，供爬虫 / LLM 解析）：
 - author: green-dalii（https://github.com/green-dalii）
 -->
 
+![pi-shift-router 首图 —— 例行的轮次留在便宜档，判定时刻把重要的一轮升级到强档](assets/hero.jpeg)
+
 # pi-shift-router
 
-![pi-shift-router 首图 —— 例行的轮次留在便宜档，判定时刻把要紧的一轮升级到强档](assets/hero.jpeg)
+> 重要的事它是CTO，跑量的活它是工程师。
 
 [![npm](https://img.shields.io/npm/v/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
 [![Downloads](https://img.shields.io/npm/dm/pi-shift-router.svg)](https://www.npmjs.com/package/pi-shift-router)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
 [![Pi Agent](https://img.shields.io/badge/pi--agent-extension-purple)](https://github.com/earendil-works/pi)
 [![Node](https://img.shields.io/badge/node-%E2%89%A524-green)](https://nodejs.org)
+[![deps](https://img.shields.io/badge/dependencies-zero-brightgreen)](package.json)
+[![size](https://img.shields.io/badge/install%20size-~196kB-blue)](https://packagephobia.com/package/pi-shift-router)
 [![CI](https://img.shields.io/github/actions/workflow/status/green-dalii/pi-shift-router/ci.yml)](https://github.com/green-dalii/pi-shift-router/actions)
 [![Stars](https://img.shields.io/github/stars/green-dalii/pi-shift-router.svg)](https://github.com/green-dalii/pi-shift-router)
 
 [English](README.md) | [简体中文]
 
-[工作原理](#工作原理) | [快速开始](#快速开始) | [和 pi-model-router 的区别](#和-pi-model-router-的区别) | [常见问题](#常见问题) | [配置参考](docs/CONFIG.md) | [故障排查](docs/TROUBLESHOOTING.md)
+[🌐 项目官网](https://shiftrouter.greenerai.top) | [⚙️ 工作原理](#工作原理) | [🚀 快速开始](#快速开始) | [⚖️ 和 pi-model-router 的区别](#和-pi-model-router-的区别) | [❓ 常见问题](#常见问题) | [🔧 配置参考](docs/CONFIG.zh-CN.md) | [🩺 故障排查](docs/TROUBLESHOOTING.zh-CN.md)
 
-例行的活儿不该花旗舰模型的钱，要紧的活儿也不该拿便宜模型凑合。
+例行的活儿不该花旗舰模型的钱，重要的事也不该拿便宜模型凑合。
 
 pi-shift-router 是 [pi-coding-agent](https://github.com/earendil-works/pi) 的两档模型路由器：每轮开始前，一个小型 LLM 判定把消息分到你配置的两个档位之一。被选中的模型接管整轮——思考、工具调用、改代码，全在它的水平上完成；判定只分类，不干活。
 
@@ -61,11 +64,11 @@ pi install npm:pi-shift-router   # 然后：/router config → /router status
 
 ## 工作原理
 
-每轮开始前只做一次便宜的调用：Fast 档模型（通常是你最便宜的那个）把你的消息判为 `fast`（例行）或 `smart`（要紧）。这是路由器唯一的分类——判定之后，选中的档位整轮干活。
+每轮开始前只做一次便宜的调用：Fast 档模型（通常是你最便宜的那个）把你的消息判为 `fast`（例行）或 `smart`（重要）。这是路由器唯一的分类——判定之后，选中的档位整轮干活。
 
 两条规则管住所有切换：
 
-- **升级立即**。一次 `smart` 判定，下一轮就上强档。要紧的活儿，马上给最好的模型。
+- **升级立即**。一次 `smart` 判定，下一轮就上强档。重要的事，马上交给最强的模型。
 - **降级要趋势**。最近 5 轮 fast 加权占比达到阈值（默认 ≥60%，低置信投票忽略）才降回来。过早降级会白白丢掉强档的上下文缓存。
 
 判定调用对输出格式很严格，小模型也能稳定解析：OpenAI 兼容端点用 `response_format: json_object`（非 JSON 直接被打回），Anthropic 用 `{` 前缀预填强制 JSON 开头。判定期间状态栏显示 `🧭 judging…`。判定失败时停在当前档位，不猜。
@@ -87,13 +90,13 @@ Judge 与路由共用同一张冷却表（判定失败也会走完整条 fast �
 
 **值得用**
 
-- **长会话、难度不均**：几十轮例行 + 偶尔要事。例行的留在便宜档，要紧的自动升级，全程不用手动切模型。
+- **长会话、难度不均**：几十轮例行 + 偶尔重要的事。例行的留在便宜档，重要的事自动升级到强档，全程不用手动切模型。
 - **想要“粘住”的深度模式**：规划会话自动停在强档，动手改文件后再降回来。
 - **担心 Provider 限流**：每档配 2–3 个模型，429/5xx 自动同档接管。
 
 **不值得用**
 
-- **难度均匀的会话**：全是例行或全是要事——每次判定都是纯开销（约 200ms–2s，加几千 token）。
+- **难度均匀的会话**：全是例行或全是重要的事——每次判定都是纯开销（约 200ms–2s，加几千 token）。
 - **从不配置档位**：两档皆空，路由器是 no-op。
 - **不信任 Fast 档模型的判断力**：判定质量 = 你给它的模型；判错时它只会保守地停在当前档位。
 
@@ -191,6 +194,12 @@ Spend: fast $0.045 (9 calls) · smart $0.42 (3 calls) · total $0.465
 - [模型选型目录](docs/MODELS.zh-CN.md) —— 编程套餐、本地量化、同 Provider 阶梯、跨 Provider 拼装
 - [故障排查](docs/TROUBLESHOOTING.zh-CN.md) —— 判定解析失败、模型找不到、反复降级等问题
 - [路线图](ROADMAP.md) · [贡献指南](CONTRIBUTING.md)
+
+---
+
+## 关联项目
+
+- **[obsidian-llm-wiki](https://github.com/green-dalii/obsidian-llm-wiki)** —— 一款 Obsidian 插件，把笔记变成可关联、可查询的知识库：Karpathy LLM Wiki 理念，直接内建在你写笔记的编辑器里。图检索无需 embedding、界面支持十种语言、适配各类 LLM provider。本地优先、无后端服务、GDPR-friendly。同作者作品。
 
 ---
 
