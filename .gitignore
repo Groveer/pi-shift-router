@@ -1,6 +1,7 @@
 .pi/
 node_modules/
 dist/
+coverage/
 *.log
 .env
 .pnpm-store

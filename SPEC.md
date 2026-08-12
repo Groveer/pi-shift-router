@@ -357,7 +357,14 @@ For advanced users debugging routing decisions:
 | Runtime `Cannot find package` fix + `pack:check` guard | ✅ | v0.4.1 | npm install path |
 | Multi-model fallback chain editor (TUI) | ✅ | v0.5.0 | Hotkey add/remove/reorder |
 | Judge respects user explicit intent | ✅ | v0.5.0 | 4-signal prompt |
-| **Runtime failover (exponential backoff)** | ⏳ In progress | v0.6.0 | See §8.5 |
+| **Runtime failover (exponential backoff)** | ✅ | v0.6.0 | See §8.5; 4xx/5xx split + 6h cap refined in v0.9.0 |
+| Confidence-weighted sliding window | ✅ | v0.7.0 | `minConfidence` gate, weighted downgrade ratio |
+| Token throughput + `/router stats` + Tuning Guide | ✅ | v0.8.0 | `src/stats.ts`, 5-sample speed window |
+| Judge cooldown sharing (429 no longer re-hit) | ✅ | v0.8.3 | `classify()` `onFailure` callback → `markModelFailed` |
+| **Cost telemetry — deep view** | ✅ | v0.9.0 | Per-tier spend + savings baseline; SPEC §9.1 |
+| Cooldown backoff rescale (4×, 6h cap, 4xx/5xx split) | ✅ | v0.9.0 | §8.5.2; 4xx starts at 16m, 5xx at 1m |
+| Slogan + CTO/Engineer terminology unification | ✅ | v0.9.1 | Docs, SPEC, judge prompt, tests |
+| **Coverage reporting (≥90% on router/failover)** | ✅ | v0.9.x (dev) | `vitest --coverage` in CI; router 100% / failover 95.5% |
 
 ## 8.5 Runtime Failover (Exponential Backoff)
 
@@ -442,7 +449,7 @@ On failover, show a toast notification (unless `quietMode`):
 
 ## 9. Future Direction (Optional Enhancements)
 
-- **Cache-aware routing**: when both tiers share a Provider family (e.g., both Anthropic), automatically raise the downgrade threshold to avoid cache thrashing. Pure logic, no heuristics.
+- **Cache-aware routing (v1.0.0)**: when both tiers share a Provider family (e.g., both Anthropic), automatically raise the downgrade threshold to avoid cache thrashing. Pure logic, no heuristics. See §9.2 for the mechanism, the motivating data, and the cost model.
 - **Tool-result classification**: classify tool calls (long shell output may indicate debugging, not a question).
 - **Multilingual Judge *prompt* translations**: with-drawn — LLMs are multilingual; the English prompt handles non-English user input. Test inputs in zh / ja / es / fr through the real `classify()` if regressions surface.
 - **Per-tier thinking level**: withdrawn — tier classification already encodes prompt complexity, so a static per-tier thinking rule rarely saves more than it complicates.
@@ -465,3 +472,56 @@ Spend: fast $0.045 (12 calls) · smart $0.42 (3 calls) · total $0.465
   fast tokens: 12,400 in / 8,200 out
   smart tokens: 4,800 in / 1,100 out
 ```
+
+### 9.2 Cache-aware routing (planned v1.0.0)
+
+**Problem**: a prompt cache belongs to a model — it is the model's own key-value state,
+addressed by a byte-identical prefix. Crossing a model boundary is therefore a
+guaranteed cache miss. When a router downgrades mid-session (smart → fast on a
+different model), the new model re-reads the entire conversation at full input
+price, forfeiting the accumulated cache discount on every subsequent turn until
+the new cache warms.
+
+**Motivating data** (industry measurements, 2026):
+
+- Cache reads bill at **0.1x–0.5x** of base input (Anthropic 0.1x, OpenAI 0.5x).
+  Anthropic's first write costs 1.25x; a 1-hour TTL write costs 2x.
+- Agentic sessions are cache-dominated: **by Turn 3, cached tokens are the vast
+  majority of the payload**; tool-result steps hit **97.9% prefix-cache hit rates**
+  (Claude) vs 86.9% on user-initiated steps; overall 95.8% (Claude) / 95.7%
+  (Codex) across sessions averaging 9.2 requests and 73.6 tool steps.
+- A worked TraceLab-style example: a 126k-token prefix staying on a warm cache
+  costs **$0.0631/step**; routing one step to a model that is 2.5x cheaper on list
+  price but cold-cache costs **$0.2541** for the same prefix — **3.5x more**, not
+  less. Break-even rule: a downgrade target only wins if its base input price is
+  **> 10x cheaper** than the model you leave (Anthropic's 0.1x cache discount
+  makes the threshold 1/0.1). GPT-5.6 Luna at $0.20/MTok qualifies (25x); Claude
+  Haiku 4.5 at $1/MTok does not (1.7x more than staying).
+- RouteLLM-style validation (85% cost reduction) was measured on MT Bench —
+  short, independent, single-turn prompts with no reusable prefix. Agentic
+  workloads are the exact inverse; the cache discount is the bigger lever.
+
+**Design** (pure logic, no heuristics):
+
+1. Detect whether both tiers resolve to the **same provider family**
+   (`resolved.provider` family, e.g. both `anthropic` — same provider = same
+   cache domain; different providers never share a cache).
+2. When they do, raise the downgrade threshold for the session:
+   `routing.window.threshold` 0.6 → **0.9** (fewer mid-session downgrades →
+   fewer cache forfeits). Threshold is the *downgrade* gate only — upgrades
+   (fast → smart) stay immediate, because the smart tier's superior output
+   quality is the point of the upgrade.
+3. **Session-boundary routing**: downgrades only apply when the cache is
+   naturally cold anyway — after a session break (>5 min idle kills the cache;
+   >1 hour almost all steps miss it), or after `/compact`. Implement by
+   checking `state.lastMessageAt` age; if the gap exceeds the provider's cache
+   TTL window, the cache is already gone and downgrading costs nothing extra.
+4. Config: `routing.cacheAware` (`boolean`, default `true` when same-family
+   detected; user can force-off). No new magic numbers — the 0.9 threshold
+   reuses the existing `window.threshold` semantics.
+
+**Expected effect**: in same-family setups (e.g. Anthropic fast+smart, or
+OpenAI fast+smart) the router stops trading a 10x discount for a 2.5x one.
+Downgrades still happen, but only when the cache is already cold or the window
+majority is unambiguous. Cross-family setups are untouched (cache domains
+already distinct).

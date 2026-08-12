@@ -8,7 +8,7 @@
  *   - Fallback when judge unavailable
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   createRouterState,
   processRoute,
@@ -202,5 +202,106 @@ describe("Manual override", () => {
     expect(d.action).toBe("manual");
     expect(d.switchTo?.provider).toBe("anthropic");
     expect(d.switchTo?.modelId).toBe("claude-opus-4");
+  });
+});
+
+// ─── applyModelSwitch / manual override helpers ──────────────────
+import {
+  applyModelSwitch,
+  clearManualOverride,
+  setManualOverrideTier,
+  setManualOverrideModel,
+} from "../src/router.js";
+
+describe("applyModelSwitch", () => {
+  it("finds the model and updates state on success", async () => {
+    const state = createRouterState();
+    const registry = { find: (p: string, m: string) => ({ provider: p, modelId: m }) };
+    const setModel = async () => true;
+
+    const ok = await applyModelSwitch(
+      { provider: "p", modelId: "fast-model", tier: "fast" },
+      state,
+      registry,
+      setModel,
+    );
+
+    expect(ok).toBe(true);
+    expect(state.currentTier).toBe("fast");
+    expect(state.currentModelId).toBe("fast-model");
+    expect(state.currentProvider).toBe("p");
+  });
+
+  it("returns false and warns when model is not in the registry", async () => {
+    const state = createRouterState();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const ok = await applyModelSwitch(
+      { provider: "missing", modelId: "nope", tier: "smart" },
+      state,
+      { find: () => undefined },
+      async () => true,
+    );
+
+    expect(ok).toBe(false);
+    expect(state.currentTier).toBe("fast"); // unchanged default
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("Model not found: missing/nope"),
+    );
+    warn.mockRestore();
+  });
+
+  it("does not update state when setModel returns false", async () => {
+    const state = createRouterState();
+    const ok = await applyModelSwitch(
+      { provider: "p", modelId: "smart-model", tier: "smart" },
+      state,
+      makeRegistry(),
+      async () => false,
+    );
+
+    expect(ok).toBe(false);
+    expect(state.currentModelId).toBeNull();
+  });
+
+  it("catches a setModel throw and returns false", async () => {
+    const state = createRouterState();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const ok = await applyModelSwitch(
+      { provider: "p", modelId: "x", tier: "fast" },
+      state,
+      makeRegistry(),
+      async () => {
+        throw new Error("boom");
+      },
+    );
+
+    expect(ok).toBe(false);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("Model switch failed"));
+    warn.mockRestore();
+  });
+});
+
+describe("manual override helpers", () => {
+  it("clearManualOverride resets to inactive", () => {
+    const state = createRouterState();
+    state.manualOverride = { active: true, tier: "smart" };
+    clearManualOverride(state);
+    expect(state.manualOverride).toEqual({ active: false });
+  });
+
+  it("setManualOverrideTier pins a tier", () => {
+    const state = createRouterState();
+    setManualOverrideTier(state, "fast");
+    expect(state.manualOverride).toEqual({ active: true, tier: "fast" });
+  });
+
+  it("setManualOverrideModel pins an exact model", () => {
+    const state = createRouterState();
+    setManualOverrideModel(state, "anthropic", "claude-opus-4");
+    expect(state.manualOverride).toEqual({
+      active: true,
+      provider: "anthropic",
+      modelId: "claude-opus-4",
+    });
   });
 });
