@@ -33,7 +33,7 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Coverage (thresholds: router/failover ≥90%)
+      - name: "Coverage (thresholds: router/failover ≥90%)"
         run: npm run test:coverage
 
       - name: Build
