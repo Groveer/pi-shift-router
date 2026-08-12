@@ -31,6 +31,7 @@ Release history and planned work for **pi-shift-router**.
 | Cooldown backoff rescale | v0.9.0 ✅ done | 4× multiplier, 6h cap, **4xx starts at 16m** (client-side rate limits outlive 5xx blips), 5xx keeps 1m. |
 | Examples directory | ongoing | Sample configs (frontend / ML / cross-provider cost-saving) for documentation. |
 | Tool-result classification | TBD | SPEC §9: classify tool calls (long shell output may indicate debugging, not a question). |
+| Verbose logs to file | TBD | `routerLogVerbose` currently writes straight to stdout, which interleaves with pi's TUI frame render and can leave the working spinner on screen after a turn (reported + root-caused in v0.10.0). Plan: route verbose diagnostics to a log file (e.g. `~/.pi/logs/shift-router.log`) instead of stdout, or expose a pi logging channel if one ships. |
 | Coverage reporting | ✅ done | `vitest --coverage` in CI (v8 provider, thresholds ≥90% lines/functions/statements, ≥85% branches on `src/router.ts` + `src/failover.ts`). Current: router 100% / failover 95.5%. |
 
 > **Withdrawn from earlier drafts.** Per-tier thinking level was proposed but is largely redundant — tier classification already encodes prompt complexity, so a static per-tier thinking rule rarely saves more than it complicates. Adaptive (per-prompt) thinking adds machinery without a clear win because the smart tier is already gated on real complexity. Dropped from v0.8.x.

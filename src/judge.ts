@@ -130,7 +130,9 @@ async function classifyLLM(
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      console.warn(`[ShiftRouter] Judge API error ${res.status} from ${url}: ${text.slice(0, 200)}`);
+      if (verbose) {
+        console.warn(`[ShiftRouter] Judge API error ${res.status} from ${url}: ${text.slice(0, 200)}`);
+      }
       return { ok: false, code: judgeFailureCode(res.status, text) };
     }
 
@@ -142,10 +144,12 @@ async function classifyLLM(
       const content = jsonStr(choice?.message?.content);
       const reasoning = jsonStr(choice?.message?.reasoning_content);
       const finish = choice?.finish_reason ?? "?";
-      console.warn(
-        `[ShiftRouter] Judge unparseable from ${url}: ` +
-        `content=${content.slice(0, 100)}, reasoning=${reasoning.slice(0, 100)}, finish=${finish}`,
-      );
+      if (verbose) {
+        console.warn(
+          `[ShiftRouter] Judge unparseable from ${url}: ` +
+          `content=${content.slice(0, 100)}, reasoning=${reasoning.slice(0, 100)}, finish=${finish}`,
+        );
+      }
       // 200-but-unparseable: model is responding, just not with valid JSON.
       // Do NOT cool it down — that would block real turns on the model too.
       return { ok: false, code: null };
@@ -159,7 +163,9 @@ async function classifyLLM(
     return { ok: true, result };
   } catch (err) {
     // Network / abort / DNS failure — not a failover signature, do not cool down.
-    console.warn(`[ShiftRouter] Judge fetch failed for ${endpoint.baseUrl}: ${err}`);
+    if (verbose) {
+      console.warn(`[ShiftRouter] Judge fetch failed for ${endpoint.baseUrl}: ${err}`);
+    }
     return { ok: false, code: null };
   }
 }
@@ -319,6 +325,8 @@ export async function classify(
     }
   }
 
-  console.warn("[ShiftRouter] Judge LLM unavailable — holding position on current tier");
+  if (verbose) {
+    console.warn("[ShiftRouter] Judge LLM unavailable — holding position on current tier");
+  }
   return { tier: "fast", source: "fallback" };
 }

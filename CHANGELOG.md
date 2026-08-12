@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > (0.1.0 – 0.3.1) were developed under the `pi-slim-router` working name and never
 > published to npm. The plugin was first published to npm as `pi-shift-router` at v0.4.0.
 
+## [0.10.0] — Cache-aware routing, judge reason, coverage reporting
+
+### Added
+
+- **Cache-aware routing (default on).** When Fast and Smart tiers share the same provider family, the judge threshold auto-raises from 0.6 to 0.9 so borderline prompts stay on the warm-cache model instead of churning providers; downgrades to a different family are suppressed while the prompt cache is warm (default 5 min idle boundary, configurable). Upgrades are always instant; cross-family setups are untouched. Pure-logic helpers (`shareProviderFamily`, `effectiveThreshold`, `downgradeAllowedAt`) with zero heuristics; `RouterState.lastActivityAt` tracks cache warmth from `message_end`. 20 new tests.
+- **Judge `reason` field.** The judge prompt now emits a short `reason` phrase naming the deciding signal; parsed with a 120-char cap and `reason`/`why` aliases, shown in verbose logs and `/router status`. Debug/observation only — never read by the routing algorithm.
+- **Coverage reporting.** `@vitest/coverage-v8` + `test:coverage` script; CI runs `vitest --coverage` with thresholds ≥90% lines/functions/statements and ≥85% branches on `src/router.ts` + `src/failover.ts`.
+- **Working-spinner fix for TUI stdout pollution.** All judge diagnostics (`Judge fetch failed`, API errors, unparseable responses, LLM-unavailable) are now gated behind `routerLogVerbose` — previously they wrote to stdout even with verbose off, interleaving with pi's TUI frame render and leaving the spinner stuck on screen. `before_agent_start` also restores pi's `workingVisible` flag after the defensive `agent_end` clear, so every turn still shows the spinner normally.
+
+### Changed
+
+- **`/router config` UX fixes.** Cache-aware toggle was unreachable because its emoji prefix collided with the Smart editor match — menu matching refactored to stable text keywords (`Cache-aware > Fast > Smart > UX > Save`) with regression tests; decorative `---` items removed from all panels (pi-tui `SelectList` has no separator concept and treated them as cancel). Cache-aware wizard copy rewritten user-facing (no internal SPEC cross-references). `/router status` now shows cache-aware state (`same-family threshold 0.9, warm-cache guarded`).
+- **`judge.md` refined + compressed.** Review-task row added (small well-defined flaw with a routine fix → fast; review as deliverable → smart), with guardrails: security review never downgraded, user explicit intent wins, decision question prompts critical thinking. Prompt compressed from 7509 → 5822 chars (below the pre-reasoning baseline) with all 100 functional phrases verified preserved.
+- **Verbose log cleanup.** Single `judge: tier conf=N reason=X window=[..]` line; removed duplicate `Judge → tier` and dead `Judge raw: undefined` debug.
+
+### Fixed
+
+- **Menu-matching emoji collision.** `🧠 Cache-aware routing` matched the Smart editor first, silently making the cache-aware config unreachable. Now matched by text keyword `Cache-aware`.
+
+### Removed
+
+- **`---` menu separators** (unsupported by pi-tui `SelectList`; selecting one exited the wizard silently).
+
 ## [0.9.1] — Slogan philosophy unified across docs and judge prompt
 
 ### Changed

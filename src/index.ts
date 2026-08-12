@@ -94,13 +94,26 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
     if (!initialized) await init(ctx);
     if (!config?.enabled || !event.prompt?.trim()) return;
 
+    const tDiag = Date.now();
     const verbose = config.ux.routerLogVerbose;
     const promptPreview = event.prompt.slice(0, 80).replace(/\n/g, " ");
     if (verbose) {
       console.log(`\n[ShiftRouter] ─── Turn start ───`);
       console.log(`[ShiftRouter] prompt: "${promptPreview}${event.prompt.length > 80 ? "…" : ""}"`);
       console.log(`[ShiftRouter] current: ${formatTierDisplay(state.currentTier, state.currentModelId)}`);
+      console.log(`[ShiftRouter][diag] before_agent_start entered @${tDiag}`);
     }
+
+    // Restore the working indicator flag. pi's `agent_start` only shows the
+    // spinner when `workingVisible` is true (interactive-mode.js ~L2501); our
+    // defensive clear in `agent_end` sets it false, and without restoring it
+    // here every later turn would silently skip the spinner. Clearing then
+    // re-setting also sweeps away any spinner frame that survived an aborted
+    // `agent_end` delivery.
+    try {
+      ctx.ui.setWorkingVisible(false);
+      ctx.ui.setWorkingVisible(true);
+    } catch { /* ignore */ }
 
     // Show transient "judging..." badge in status bar so the user sees
     // the router is working during the Judge API call.
@@ -141,6 +154,7 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
     const result = processRoute(judgeResult, state, config, ctx.modelRegistry as any);
 
     if (verbose) {
+      console.log(`[ShiftRouter][diag] before_agent_start classify done in ${Date.now() - tDiag}ms`);
       console.log(`[ShiftRouter] decision: ${result.action}${result.switchTo ? ` → ${result.switchTo.provider}/${result.switchTo.modelId}` : ""}`);
     }
 
@@ -175,19 +189,36 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
   // agent.continue() retry then runs with the fallback model.
 
   pi.on("agent_end", async (event, ctx) => {
+    const tEnd0 = Date.now();
+    if (config.ux.routerLogVerbose) {
+      console.log(`[ShiftRouter][diag] agent_end handler ENTER @${tEnd0}`);
+    }
+    // Defensive: explicitly clear the working spinner. If anything in this
+    // handler (or pi's own agent_end → UI emit chain) hangs and prevents
+    // the UI from clearing it, this guarantees it goes away.
+    try { ctx.ui.setWorkingVisible(false); } catch { /* ignore */ }
     if (!initialized) await init(ctx);
     if (!config?.enabled) return;
     if (state.manualOverride.active) return; // user forced a model — don't override
 
-    const now = Date.now();
+    const t0 = Date.now();
+    const msgCount = (event as any).messages?.length ?? 0;
     const plan = planTurnFailover(
       (event as any).messages ?? [],
       state,
       config,
       (ctx as any).modelRegistry as any,
-      now,
+      t0,
     );
-    if (!plan) return; // healthy turn or non-failover error
+    if (config.ux.routerLogVerbose) {
+      console.log(`[ShiftRouter][diag] agent_end entered: messages=${msgCount} plan=${plan ? "failover" : "none"} elapsed=${Date.now() - t0}ms`);
+    }
+    if (!plan) {
+      if (config.ux.routerLogVerbose) {
+        console.log(`[ShiftRouter][diag] agent_end exiting (no failover) @${Date.now()} total=${Date.now() - tEnd0}ms`);
+      }
+      return; // healthy turn or non-failover error
+    }
 
     if (config.ux.routerLogVerbose) {
       console.log(
@@ -222,6 +253,19 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
 
   // after_provider_response: a 2xx response means the model works again —
   // clear its cooldown immediately (SPEC §8.5.2(4) recovery).
+
+  pi.on("agent_settled", async () => {
+    if (config.ux.routerLogVerbose) {
+      console.log(`[ShiftRouter][diag] agent_settled handler @${Date.now()}`);
+    }
+  });
+
+  pi.on("turn_end", async (event) => {
+    if (config.ux.routerLogVerbose) {
+      const msg: any = (event as any).message;
+      console.log(`[ShiftRouter][diag] turn_end handler @${Date.now()} role=${msg?.role} stop=${msg?.stopReason ?? ""} err=${msg?.errorMessage ?? ""}`);
+    }
+  });
 
   pi.on("after_provider_response", async (event, ctx) => {
     if (!initialized) await init(ctx);
@@ -320,6 +364,9 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
     // etc.).
     state.streamingStartTime = null;
     updateBar(ctx.ui, config, state);
+    if (config.ux.routerLogVerbose) {
+      console.log(`[ShiftRouter][diag] message_end handler done (role=assistant)`);
+    }
   });
 
   // ── Commands ────────────────────────────────────────────────
