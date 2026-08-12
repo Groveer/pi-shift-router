@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { extractTier } from "../src/judge.js";
+import { extractTier, parseJudgeAnswer } from "../src/judge.js";
 
 // ─── extractTier: primary JSON path ─────────────────────────────────
 describe("extractTier — JSON", () => {
@@ -100,7 +100,48 @@ describe("extractTier — edge cases", () => {
     expect(extractTier('{"foo":1}')).toBeNull();
   });
 
+  it("tolerates a reason field alongside tier (JSON path)", () => {
+    expect(
+      extractTier('{"tier":"smart","confidence":0.85,"reason":"user asked for depth"}'),
+    ).toBe("smart");
+  });
   it("returns null for garbage text", () => {
     expect(extractTier("@#$%^&*")).toBeNull();
+  });
+});
+
+// ─── parseJudgeAnswer: reason extraction ──────────────────────────
+describe("parseJudgeAnswer — reason field", () => {
+  it("parses tier + confidence + reason from full JSON", () => {
+    expect(
+      parseJudgeAnswer('{"tier":"smart","confidence":0.85,"reason":"user asked for depth"}'),
+    ).toEqual({ tier: "smart", confidence: 0.85, reason: "user asked for depth" });
+  });
+
+  it("parses reason even when confidence is absent", () => {
+    expect(
+      parseJudgeAnswer('{"tier":"fast","reason":"routine bug fix, path clear"}'),
+    ).toEqual({ tier: "fast", reason: "routine bug fix, path clear" });
+  });
+
+  it("accepts 'why' as an alias for reason", () => {
+    expect(
+      parseJudgeAnswer('{"tier":"smart","confidence":0.7,"why":"architecture direction"}'),
+    ).toEqual({ tier: "smart", confidence: 0.7, reason: "architecture direction" });
+  });
+
+  it("omits reason when absent", () => {
+    expect(parseJudgeAnswer('{"tier":"fast","confidence":0.9}')).toEqual({ tier: "fast", confidence: 0.9 });
+  });
+
+  it("trims and caps an overlong reason", () => {
+    const long = "x".repeat(300);
+    const r = parseJudgeAnswer(`{"tier":"fast","reason":"${long}"}`);
+    expect(r?.reason?.length).toBeLessThanOrEqual(120);
+    expect(r?.reason?.length).toBe(120);
+  });
+
+  it("returns null for unparseable text", () => {
+    expect(parseJudgeAnswer("@#$%")).toBeNull();
   });
 });

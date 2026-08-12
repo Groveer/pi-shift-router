@@ -37,12 +37,12 @@ describe("Judge prompt structure", () => {
 
   it("specifies the strict 'no extra prose' wording", () => {
     // The original prompt used 'no extra prose' to forbid any additional
-    // output beyond the classification word. A weaker rewrite that only
-    // requires the word to 'appear' allows models to emit extra fields
-    // like {"tier":"smart","reason":"..."} which our extractTier regex
-    // does not handle. Keep the strict wording.
+    // output beyond the classification JSON. A weaker rewrite that only
+    // requires the word to 'appear' allows models to emit prose around or
+    // instead of the JSON. Keep the strict wording — fields must stay inside
+    // the JSON object (tier/confidence/reason), never as surrounding text.
     expect(prompt).toMatch(/no extra prose/i);
-    expect(prompt).toMatch(/must appear on its own/i);
+    expect(prompt).toMatch(/inside the JSON object/i);
   });
 
   it("defines both tiers with role metaphor", () => {

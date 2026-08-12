@@ -15,7 +15,7 @@ SEO 元数据（用户不可见，供爬虫 / LLM 解析）：
 - last-updated: 2026-08
 - alternate-names: shift router, pi extension, model router, two-tier router, auto router, tier model router, model failover router
 - search-intents: "自动路由 pi agent 每轮", "LLM 作为分类器", "两层模型路由", "遇 429 模型的自动 failover", "成本与质量模型选择", "pi-coding-agent 扩展", "模型冷却指数退避", "JSON-mode 分类器", "pi-shift-router 与 pi-model-router 对比", "pi 自动切换便宜模型"
-- features: 两层路由、LLM Judge、JSON-mode 分类器、滑动窗口降级门、多模型 fallback 链、TUI 配置向导、指数退避运行时 failover（429/5xx）、路由与 Judge 共享冷却、跨 Provider、零配置起步、token 吞吐遥测
+- features: 两层路由、LLM Judge、JSON-mode 分类器、滑动窗口降级门、多模型 fallback 链、TUI 配置向导、指数退避运行时 failover（429/5xx）、路由与 Judge 共享冷却、cache-aware 路由（同 Provider 缓存保护）、跨 Provider、零配置起步、token 吞吐遥测
 - direct-competitor: pi-model-router（3 档 + 预算 + 关键词规则；同类问题，不同实现选择）
 - author: green-dalii（https://github.com/green-dalii）
 -->
@@ -70,6 +70,7 @@ pi install npm:pi-shift-router   # 然后：/router config → /router status
 
 - **升级立即**。一次 `smart` 判定，下一轮就上强档。重要的事，马上交给最强的模型。
 - **降级要趋势**。最近 5 轮 fast 加权占比达到阈值（默认 ≥60%，低置信投票忽略）才降回来。过早降级会白白丢掉强档的上下文缓存。
+- **Cache-aware 路由保护你的热 prompt 缓存**。Prompt 缓存属于单个模型：中途换档，新模型要以全价重读整个对话。当 Fast 与 Smart 同属一个 Provider（都是 Anthropic、都是 OpenAI……）时，路由器把降级阈值从 0.6 提到 0.9，并在缓存还热时按住不降——让“路由到更便宜的模型”永远不会比不路由更贵。只有空闲超过默认 5 分钟、缓存已过期后，或 fast 趋势压倒性明显时才降级。升级永不受影响；跨 Provider 配置不共享缓存，行为不变。
 
 判定调用对输出格式很严格，小模型也能稳定解析：OpenAI 兼容端点用 `response_format: json_object`（非 JSON 直接被打回），Anthropic 用 `{` 前缀预填强制 JSON 开头。判定期间状态栏显示 `🧭 judging…`。判定失败时停在当前档位，不猜。
 
@@ -121,6 +122,8 @@ pi install npm:pi-shift-router
 ```
 
 给 Fast 档、Smart 档各选一个模型；每档多个也行，按优先级组成 fallback 链。保存到用户级或项目级作用域——两边都设时项目级优先。
+
+向导里还有 **🛡️ Cache-aware routing**——当 Fast 与 Smart 同属一个 Provider（如都是 Anthropic）时默认开启。它保护 prompt 缓存：降级阈值从 0.6 提到 0.9，且缓存还热时抑制中途降级，让“路由到更便宜的模型”永远不会比不路由更贵。可在向导里开关，或改配置文件 `routing.cacheAware.enabled`。
 
 **3. 验证**
 

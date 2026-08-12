@@ -25,6 +25,7 @@ export function createRouterState(): RouterState {
     streamingStartTime: null,
     upgradeCount: 0,
     downgradeCount: 0,
+    lastActivityAt: 0,
     tierUsage: {
       fast: emptyTierUsage(),
       smart: emptyTierUsage(),
@@ -50,15 +51,78 @@ function shouldUpgrade(current: Tier, target: Tier): boolean {
   return tierIndex(target) > tierIndex(current);
 }
 
+/**
+ * Cache-aware routing (SPEC §9.2).
+ *
+ * Detect whether the fast and smart tiers resolve to the same provider
+ * family. A prompt cache belongs to a model (byte-identical prefix on one
+ * model's KV state); crossing a model boundary is a guaranteed cache miss.
+ * When both tiers live under the same provider, a mid-session downgrade
+ * forfeits the warm cache (reads bill 0.1x–0.5x of base input), so routing
+ * to a cheaper model can cost more, not less.
+ *
+ * Returns true when both tiers have at least one model on the same provider
+ * (and the router is configured to care). Pure config inspection — no IO.
+ */
+export function shareProviderFamily(config: ShiftRouterConfig): boolean {
+  const fast = config.tiers.fast?.models ?? [];
+  const smart = config.tiers.smart?.models ?? [];
+  if (fast.length === 0 || smart.length === 0) return false;
+  const fastProviders = new Set(fast.map((m) => m.provider));
+  return smart.some((m) => fastProviders.has(m.provider));
+}
+
+/**
+ * The downgrade threshold to use at this moment. When cache-aware routing is
+ * active (same provider family), the threshold is raised to
+ * `cacheAware.sameFamilyThreshold` so fewer mid-session downgrades fire and
+ * the warm prompt cache survives longer. Otherwise the user's configured
+ * `window.threshold` applies unchanged.
+ */
+export function effectiveThreshold(
+  config: ShiftRouterConfig,
+  cacheAware: boolean = shareProviderFamily(config),
+): number {
+  if (cacheAware && config.routing.cacheAware?.enabled) {
+    return config.routing.cacheAware.sameFamilyThreshold;
+  }
+  return config.routing.window.threshold;
+}
+
+/**
+ * Session-boundary gate for cache-aware downgrades. A downgrade to another
+ * model only forfeits the cache while the cache is warm — i.e. within
+ * `idleBoundaryMs` of the last message. After an idle gap longer than the
+ * provider's cache TTL, the cache is already cold and switching costs
+ * nothing extra.
+ *
+ * Returns true when a downgrade should be allowed right now (cache is cold
+ * or cache-aware routing is off / not applicable).
+ */
+export function downgradeAllowedAt(
+  state: RouterState,
+  config: ShiftRouterConfig,
+  now: number,
+  cacheAware: boolean = shareProviderFamily(config),
+): boolean {
+  if (!cacheAware || !config.routing.cacheAware?.enabled) return true;
+  const boundary = config.routing.cacheAware.idleBoundaryMs;
+  // lastActivityAt == 0 → no message has completed yet; nothing cached to lose.
+  if (state.lastActivityAt === 0) return true;
+  return now - state.lastActivityAt > boundary;
+}
+
 export function analyzeDowngrade(
   window: WindowEntry[],
   currentTier: Tier,
   config: ShiftRouterConfig,
+  thresholdOverride?: number,
 ): { shouldDowngrade: boolean; targetTier: Tier | null } {
   // Can't downgrade further from fast
   if (currentTier !== "smart") return { shouldDowngrade: false, targetTier: null };
 
-  const { size, threshold, minConfidence } = config.routing.window;
+  const { size, minConfidence } = config.routing.window;
+  const threshold = thresholdOverride ?? config.routing.window.threshold;
   const minConf = minConfidence ?? 0.5;
   if (window.length === 0) return { shouldDowngrade: false, targetTier: null };
 
@@ -144,9 +208,16 @@ export function processRoute(
     state.window = state.window.slice(-maxSize);
   }
 
-  // 4. Check downgrade
-  const down = analyzeDowngrade(state.window, state.currentTier, config);
-  if (down.shouldDowngrade && down.targetTier) {
+  // 4. Check downgrade. Cache-aware routing (SPEC §9.2):
+  //    - same provider family → raised threshold (fewer mid-session switches)
+  //    - warm cache → suppress downgrade entirely until an idle boundary
+  const down = analyzeDowngrade(
+    state.window,
+    state.currentTier,
+    config,
+    effectiveThreshold(config),
+  );
+  if (down.shouldDowngrade && down.targetTier && downgradeAllowedAt(state, config, now)) {
     const m = findBestModelForTier(down.targetTier, config, modelRegistry, cooldownPredicate(state.modelCooldowns, now));
     if (m) {
       state.downgradeCount += 1;

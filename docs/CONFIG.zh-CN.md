@@ -39,10 +39,14 @@ pi-shift-router.json
 ├── routing
 │   ├── mode                   "auto" | "manual"；默认 "auto"
 │   ├── judgeTimeout           ms；默认 5000
-│   └── window
-│       ├── size               滑动窗口长度；默认 5
-│       ├── threshold          fast 档加权占比阈值，触发降级；默认 0.6
-│       └── minConfidence      低于该置信度的投票被忽略；默认 0.5
+│   ├── window
+│   │   ├── size               滑动窗口长度；默认 5
+│   │   ├── threshold          fast 档加权占比阈值，触发降级；默认 0.6
+│   │   └── minConfidence      低于该置信度的投票被忽略；默认 0.5
+│   └── cacheAware
+│       ├── enabled            提高降级阈值 + 保护热缓存；默认 true（仅同家族生效）
+│       ├── sameFamilyThreshold  启用后的降级阈值；默认 0.9
+│       └── idleBoundaryMs     视为“缓存已过期”的空闲间隔；默认 300000（5 分钟）
 └── ux
     ├── quietMode              关闭 inline toast；默认 false
     ├── statusBar              显示 🦾 / 🧠 徽章；默认 true
@@ -83,6 +87,9 @@ tiers:
 | `routing.judgeTimeout` | `5000` | ms。Judge 调用超时。 |
 | `routing.window.size` / `threshold` | `5` / `0.6` | 滑动窗口降级门。 |
 | `routing.window.minConfidence` | `0.5` | 低于该置信度的投票被忽略。 |
+| `routing.cacheAware.enabled` | `true` | fast 与 smart 同 Provider 时，提高降级阈值并在 prompt 缓存仍热时抑制中途切换（SPEC §9.2）。跨家族配置不生效（无共享缓存）。 |
+| `routing.cacheAware.sameFamilyThreshold` | `0.9` | 启用 cache-aware 时使用的降级阈值（替代 `window.threshold`）。 |
+| `routing.cacheAware.idleBoundaryMs` | `300000` | 空闲超过该时长视为 prompt 缓存已过期，恢复允许降级。 |
 | `ux.quietMode` / `statusBar` / `inlineToast` / `routerLogVerbose` | 各自 | 界面 / 日志开关。 |
 
 ## 调参指南
@@ -112,6 +119,11 @@ tiers:
 - `1.0`：永不降级（禁用滑动窗口）
 
 **`routing.window.minConfidence`** (0–1) — 低于此置信度的投票被丢弃。默认 `0.5`。设为 `0` 恢复 v0.6.0 的等权计数；设为 `0.7+` 仅计清晰投票。
+
+**`routing.cacheAware`** — cache-aware 路由（SPEC §9.2）。Prompt 缓存属于单个模型：会话中途换 tier 会丢掉热缓存（缓存读按基础输入价 0.1x–0.5x 计费），所以路由到更便宜模型可能反而更贵。当 `enabled: true` **且** fast 与 smart 共享 Provider 家族（自动检测）时：
+- 降级阈值提高到 `sameFamilyThreshold`（0.6 → 0.9）——减少中途降级，以及
+- 距最后一条消息 `idleBoundaryMs`（默认 5 分钟）内抑制降级——缓存仍热；只有空闲超过缓存 TTL 后才恢复降级。
+升级（fast → smart）永不受影响。跨家族配置不受影响。开关：`/router config → 🧠 Cache-aware routing`。
 
 **`tiers.<tier>.models[]`** — 按优先级排序。第一项是 primary，后续项是运行时 fallback（v0.6.0）。最便宜的健康模型放第一。
 

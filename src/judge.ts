@@ -136,15 +136,6 @@ async function classifyLLM(
 
     const raw = await res.json();
 
-    if (verbose) {
-      const choice = (raw as any).choices?.[0];
-      console.log(
-        `[ShiftRouter] Judge raw: content=${jsonStr(choice?.message?.content)}, ` +
-        `reasoning=${jsonStr(choice?.message?.reasoning_content).slice(0, 150)}, ` +
-        `finish=${choice?.finish_reason}`,
-      );
-    }
-
     const answer = parseResponse(raw, endpoint.apiType);
     if (!answer) {
       const choice = (raw as any).choices?.[0];
@@ -159,15 +150,12 @@ async function classifyLLM(
       // Do NOT cool it down — that would block real turns on the model too.
       return { ok: false, code: null };
     }
-    if (verbose) {
-      console.log(
-        `[ShiftRouter] Judge → ${answer.tier}` +
-        (answer.confidence !== undefined ? ` (confidence ${answer.confidence.toFixed(2)})` : ""),
-      );
-    }
-    const result: JudgeResult = answer.confidence !== undefined
-      ? { tier: answer.tier, source: "llm", confidence: answer.confidence }
-      : { tier: answer.tier, source: "llm" };
+    const result: JudgeResult = {
+      tier: answer.tier,
+      source: "llm",
+      ...(answer.confidence !== undefined ? { confidence: answer.confidence } : {}),
+      ...(answer.reason !== undefined ? { reason: answer.reason } : {}),
+    };
     return { ok: true, result };
   } catch (err) {
     // Network / abort / DNS failure — not a failover signature, do not cool down.
@@ -212,6 +200,8 @@ function buildRequestBody(endpoint: ProviderEndpoint, prompt: string): Record<st
 export interface ParsedJudgeResponse {
   tier: Tier;
   confidence?: number;
+  /** Ultra-short classification reason (one phrase); absent when not emitted. */
+  reason?: string;
 }
 
 function parseResponse(raw: Record<string, unknown>, apiType: string): ParsedJudgeResponse | null {
@@ -238,12 +228,33 @@ function parseResponse(raw: Record<string, unknown>, apiType: string): ParsedJud
   }
 }
 
-/** Parse a Judge answer string (JSON or loose) for tier + confidence. */
-function parseJudgeAnswer(text: string): ParsedJudgeResponse | null {
+/** Parse a Judge answer string (JSON or loose) for tier + confidence + reason. */
+export function parseJudgeAnswer(text: string): ParsedJudgeResponse | null {
   const tier = extractTier(text);
   if (!tier) return null;
   const confidence = parseConfidenceFromText(text);
-  return confidence === undefined ? { tier } : { tier, confidence };
+  const reason = parseReasonFromText(text);
+  const out: ParsedJudgeResponse = { tier };
+  if (confidence !== undefined) out.confidence = confidence;
+  if (reason !== undefined) out.reason = reason;
+  return out;
+}
+
+/**
+ * Extract the short classification reason from a Judge answer string.
+ * Picks the JSON `reason`/`why` field value if present (a quoted string);
+ * returns undefined when absent or unparseable. The routing algorithm never
+ * reads this — it exists for verbose logs and `/router status` detail.
+ */
+function parseReasonFromText(text: string): string | undefined {
+  // Match the `reason`/`why` field anywhere in the JSON object
+  // (tier/confidence may appear before or after it).
+  const jsonMatch = text.match(/"\s*(?:reason|why)"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  if (jsonMatch) {
+    const s = jsonMatch[1]!.replace(/\\n/g, " ").replace(/\\"/g, "\"").trim();
+    return s.length > 0 ? s.slice(0, 120) : undefined;
+  }
+  return undefined;
 }
 
 /** Extract confidence (0-1) from a Judge answer string. Returns undefined when absent/invalid. */

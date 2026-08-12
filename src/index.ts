@@ -131,8 +131,10 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
         ? "0/0"
         : `${state.window.filter((e) => e.tier === "fast").length}/${state.window.length}`;
       console.log(
-        `[ShiftRouter] judge: ${judgeResult.tier} (${judgeResult.source}), ` +
-        `window=[${state.window.map((e) => e.tier[0]).join("")}] (${ratio} fast)`,
+        `[ShiftRouter] judge: ${judgeResult.tier} (${judgeResult.source})` +
+          (judgeResult.confidence !== undefined ? ` conf=${judgeResult.confidence.toFixed(2)}` : "") +
+          (judgeResult.reason !== undefined ? ` reason=${judgeResult.reason}` : "") +
+          `, window=[${state.window.map((e) => e.tier[0]).join("")}] (${ratio} fast)`,
       );
     }
 
@@ -257,6 +259,9 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
     const usage = msg.usage;
     const outputTokens: number = usage?.output ?? 0;
     state.totalOutputTokens += outputTokens;
+    // Cache-aware routing (SPEC §9.2): record the last activity so the
+    // session-boundary gate knows whether the prompt cache is still warm.
+    state.lastActivityAt = Date.now();
 
     // ── Cost telemetry (SPEC §9 "Cost telemetry — deep view") ────────
     // Attribute this message's tokens + cost to whichever tier was active

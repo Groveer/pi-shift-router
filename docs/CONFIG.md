@@ -39,10 +39,14 @@ pi-shift-router.json
 ├── routing
 │   ├── mode                   "auto" | "manual"; default "auto"
 │   ├── judgeTimeout           ms; default 5000
-│   └── window
-│       ├── size               sliding-window length; default 5
-│       ├── threshold          fast-share weight that triggers downgrade; default 0.6
-│       └── minConfidence      votes below this are ignored; default 0.5
+│   ├── window
+│   │   ├── size               sliding-window length; default 5
+│   │   ├── threshold          fast-share weight that triggers downgrade; default 0.6
+│   │   └── minConfidence      votes below this are ignored; default 0.5
+│   └── cacheAware
+│       ├── enabled            raise downgrade threshold + guard warm cache; default true (same-family only)
+│       ├── sameFamilyThreshold  downgrade threshold when enabled; default 0.9
+│       └── idleBoundaryMs     idle gap that means "cache expired"; default 300000 (5 min)
 └── ux
     ├── quietMode              suppress inline toasts; default false
     ├── statusBar              show 🦾 / 🧠 badge; default true
@@ -83,6 +87,9 @@ tiers:
 | `routing.judgeTimeout` | `5000` | ms. Judge API call timeout. |
 | `routing.window.size` / `threshold` | `5` / `0.6` | Sliding-window downgrade gate. |
 | `routing.window.minConfidence` | `0.5` | Votes below this confidence are ignored. |
+| `routing.cacheAware.enabled` | `true` | When fast & smart share a provider, raise the downgrade threshold and suppress mid-session switches while the prompt cache is warm (SPEC §9.2). Off for cross-family setups (no shared cache). |
+| `routing.cacheAware.sameFamilyThreshold` | `0.9` | Downgrade threshold used when cache-aware is enabled (replaces `window.threshold`). |
+| `routing.cacheAware.idleBoundaryMs` | `300000` | Idle gap after which the prompt cache is considered expired; downgrades are allowed again. |
 | `ux.quietMode` / `statusBar` / `inlineToast` / `routerLogVerbose` | various | Display / logging controls. |
 
 ## Tuning guide
@@ -112,6 +119,11 @@ Every knob is a trade-off. Pick by workload:
 - `1.0`: never downgrade (sliding window disabled)
 
 **`routing.window.minConfidence`** (0–1) — votes below this confidence are discarded. Default `0.5`. Set `0` to restore v0.6.0's equal-weight counting; `0.7+` counts only confident votes.
+
+**`routing.cacheAware`** — cache-aware routing (SPEC §9.2). Prompt caches belong to a model: switching tiers mid-session forfeits the warm cache (cache reads bill 0.1x–0.5x of base input), so routing to a cheaper model can cost more, not less. When `enabled: true` **and** fast & smart share a provider family (auto-detected):
+- the downgrade threshold is raised to `sameFamilyThreshold` (0.6 → 0.9) — fewer mid-session downgrades, and
+- downgrades are suppressed within `idleBoundaryMs` (default 5 min) of the last message — the cache is warm; they only fire after the idle gap long enough that the cache has already expired.
+Upgrades (fast → smart) are never affected. Cross-family setups are untouched. Toggle with `/router config → 🧠 Cache-aware routing`.
 
 **`tiers.<tier>.models[]`** — ordered by priority. First is primary; rest are runtime fallbacks (v0.6.0). Put the cheapest healthy model first.
 

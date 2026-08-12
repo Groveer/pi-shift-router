@@ -19,6 +19,7 @@ import {
 import {
   clearManualOverride,
   setManualOverrideModel,
+  shareProviderFamily,
 } from "./router.js";
 import { formatStats } from "./stats.js";
 import { formatRemaining } from "./failover.js";
@@ -57,6 +58,39 @@ function formatTierList(config: ShiftRouterConfig): string {
 
 // ─── `/route-config` wizard ──────────────────────────────────────
 
+type MenuChoice = "fast" | "smart" | "ux" | "cache" | "done" | "cancel";
+
+/**
+ * Map a wizard option label to its menu action.
+ *
+ * Labels carry decorative emoji prefixes (🦾 🧠 🛡️ …); matching on those is
+ * collision-prone — both "🧠 Smart" and "🧠 Cache-aware" start with 🧠, so a
+ * `startsWith` on the emoji silently routes Cache-aware into Smart. Instead we
+ * match on stable English keywords that are unique across the fixed option
+ * labels. Pure + unit-tested so a future label edit can't reintroduce a
+ * routing bug. Also used for the provider/UX sub-menus where labels are fixed
+ * strings too.
+ */
+export function matchMenuChoice(label: string): MenuChoice {
+  if (label.includes("Cache-aware")) return "cache";
+  if (label.includes("Fast")) return "fast";
+  if (label.includes("Smart")) return "smart";
+  if (label.includes("UX")) return "ux";
+  if (label.includes("Save")) return "done";
+  return "cancel";
+}
+
+/**
+ * Map the "Save configuration to…" option label to its scope.
+ * Same rationale as `matchMenuChoice`: emoji prefixes are decorative;
+ * match on stable text keywords.
+ */
+export function matchSaveScope(label: string): "user" | "project" | null {
+  if (label.includes("Project")) return "project";
+  if (label.includes("User")) return "user";
+  return null;
+}
+
 async function routeConfigWizard(
   config: ShiftRouterConfig,
   cwd: string,
@@ -70,8 +104,7 @@ async function routeConfigWizard(
     return false;
   }
 
-  type MenuChoice = "fast" | "smart" | "ux" | "done" | "cancel";
-
+  type MenuChoice = "fast" | "smart" | "ux" | "cache" | "done" | "cancel";
   async function saveDestination(): Promise<"user" | "project" | null> {
     const choice = await ctx.ui.select("Save configuration to…", [
       "📁 Project — <cwd>/.pi/pi-shift-router.json (shareable with team)",
@@ -79,28 +112,21 @@ async function routeConfigWizard(
       "🚫 Cancel save",
     ]);
     if (!choice) return null;
-    if (choice.startsWith("📁")) return "project";
-    if (choice.startsWith("👤")) return "user";
-    return null;
+    return matchSaveScope(choice);
   }
 
   async function menu(): Promise<MenuChoice> {
     const choice = await ctx.ui.select("pi-shift-router — Configuration", [
       `🦾 Fast — ${config.tiers.fast.models.length} model(s)  (engineer: execution, daily coding)`,
       `🧠 Smart — ${config.tiers.smart.models.length} model(s)  (CTO: direction, review, hard problems)`,
-      "---",
       "🎨 UX settings",
-      "---",
+      "🛡️ Cache-aware routing",
       "💾 Save & exit",
       "🚫 Discard & exit",
     ]);
 
     if (!choice) return "cancel";
-    if (choice.startsWith("🦾")) return "fast";
-    if (choice.startsWith("🧠")) return "smart";
-    if (choice.startsWith("🎨")) return "ux";
-    if (choice.startsWith("💾")) return "done";
-    return "cancel";
+    return matchMenuChoice(choice);
   }
 
   async function editTier(tier: Tier): Promise<void> {
@@ -153,17 +179,17 @@ async function routeConfigWizard(
           return `${mark} ${p}  (${count})`;
         }),
       );
-      provOpts.push("---", "🔍 Search all models", "✅ Done");
+      provOpts.push("🔍 Search all models", "✅ Done");
 
       const provPick = await ctx.ui.select(
         `Select ${tierEmoji(tier)} ${cfg.label} — pick provider first`,
         provOpts,
       );
-      if (!provPick || provPick.startsWith("✅")) return;
-      if (provPick.startsWith("❌")) { cfg.models = []; return; }
+      if (!provPick || provPick.includes("Done")) return;
+      if (provPick.includes("Clear selection")) { cfg.models = []; return; }
 
       // Search
-      if (provPick.startsWith("🔍")) {
+      if (provPick.includes("Search all models")) {
         const query = await ctx.ui.input("Search model by name or provider…");
         if (!query?.trim()) continue;
         const q = query.trim().toLowerCase();
@@ -230,9 +256,9 @@ async function routeConfigWizard(
         return `${prefix} ${key.padEnd(35)} $${m.cost!.input.toFixed(3)}/M`;
       });
 
-      labels.push("---", "✅ Back");
+      labels.push("✅ Back");
       const pick = await ctx.ui.select(header, labels);
-      if (!pick || pick.startsWith("✅")) return null;
+      if (!pick || pick.includes("Back")) return null;
       for (const m of models) {
         if (pick.includes(`${m.provider}/${m.id}`)) {
           return { provider: m.provider, model: m.id, priority: 1 };
@@ -248,16 +274,33 @@ async function routeConfigWizard(
       `${ux.statusBar ? "☑" : "☐"} Status bar — show current tier/model in footer`,
       `${ux.inlineToast ? "☑" : "☐"} Inline toast — notify on tier change`,
       `${ux.routerLogVerbose ? "☑" : "☐"} Verbose log — print router decisions to console (debug)`,
-      "---",
       "✅ Done",
     ];
 
     const pick = await ctx.ui.select("🎨 UX Settings", lines);
-    if (!pick || pick.includes("✅")) return;
+    if (!pick || pick.includes("Done")) return;
     if (pick.includes("Quiet")) ux.quietMode = !ux.quietMode;
     if (pick.includes("Status bar")) ux.statusBar = !ux.statusBar;
     if (pick.includes("Inline toast")) ux.inlineToast = !ux.inlineToast;
     if (pick.includes("Verbose log")) ux.routerLogVerbose = !ux.routerLogVerbose;
+  }
+
+  async function editCacheAware(): Promise<void> {
+    const cache = config.routing.cacheAware ?? {
+      enabled: true,
+      sameFamilyThreshold: 0.9,
+      idleBoundaryMs: 5 * 60_000,
+    };
+    const lines = [
+      `${cache.enabled ? "☑" : "☐"} Cache-aware routing — avoid paying full price for repeated context: when Fast and Smart use the same provider, the router keeps the warm prompt cache by switching models less often (you can toggle this on/off here)`,
+      "✅ Done",
+    ];
+
+    const pick = await ctx.ui.select("🛡️ Cache-aware Routing", lines);
+    if (!pick || pick.includes("Done")) return;
+    if (pick.includes("Cache-aware routing")) {
+      config.routing.cacheAware = { ...cache, enabled: !cache.enabled };
+    }
   }
 
   // Main loop
@@ -270,6 +313,8 @@ async function routeConfigWizard(
       await editTier(choice);
     } else if (choice === "ux") {
       await editUX();
+    } else if (choice === "cache") {
+      await editCacheAware();
     }
   }
 
@@ -382,6 +427,7 @@ export function registerCommands(
             `Session:`,
             `  Turns: ${totalTurns}   Upgrades: ↑${state.upgradeCount}   Downgrades: ↓${state.downgradeCount}`,
             `  Manual override:${sManual}`,
+            `  Cache-aware: ${shareProviderFamily(config) ? "🎯 same-family (threshold " + (config.routing.cacheAware?.enabled ? config.routing.cacheAware.sameFamilyThreshold : config.routing.window.threshold) + ", " + (config.routing.cacheAware?.enabled ? "warm-cache guarded" : "inactive — enable in /router config") + ")" : "— (cross-family)"}`,
             ...(cooldownLines.length > 0
               ? [`  Cooldowns (${cooldownLines.length}):`, ...cooldownLines]
               : [`  Cooldowns: none`]),

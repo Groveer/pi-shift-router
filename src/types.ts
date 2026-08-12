@@ -23,6 +23,13 @@ export interface JudgeResult {
    * Defaults to 1.0 when the Judge doesn't emit it (backward-compat).
    */
   confidence?: number;
+  /**
+   * Ultra-short human-readable reason for the classification (one phrase,
+   * e.g. "user asked for depth" / "routine bug fix"). Emitted by the Judge
+   * as a JSON field and surfaced in verbose logs + `/router status` detail
+   * — a debugging aid, never used by the routing algorithm itself.
+   */
+  reason?: string;
 }
 
 /** A reference to a specific model in a specific provider */
@@ -59,6 +66,24 @@ export interface RoutingConfig {
    * `Σ confidence_for_fast / window_size` ≥ `threshold`.
    */
   window: { size: number; threshold: number; minConfidence?: number };
+  /**
+   * Cache-aware routing (SPEC §9.2). When fast and smart resolve to the
+   * same provider family, a mid-session model switch forfeits the prompt
+   * cache (cache reads bill at 0.1x–0.5x base input) — downgrading to a
+   * cheaper model can cost 3.5x more, not less. When enabled:
+   *   - the downgrade threshold is raised to `sameFamilyThreshold` so
+   *     fewer mid-session downgrades fire, and
+   *   - downgrades are suppressed within `idleBoundaryMs` of the last
+   *     message (the cache is warm); they only fire after an idle gap
+   *     long enough that the cache has already expired.
+   * Default disabled; `shareProviderFamily()` auto-detection turns it on
+   * when both tiers use the same provider.
+   */
+  cacheAware?: {
+    enabled: boolean;
+    sameFamilyThreshold: number;
+    idleBoundaryMs: number;
+  };
 }
 
 /** Full SLIM Router configuration */
@@ -91,6 +116,11 @@ export const DEFAULT_CONFIG: ShiftRouterConfig = {
     mode: "auto",
     judgeTimeout: 5000,
     window: { size: 5, threshold: 0.6, minConfidence: 0.5 },
+    cacheAware: {
+      enabled: true,
+      sameFamilyThreshold: 0.9,
+      idleBoundaryMs: 5 * 60_000,
+    },
   },
   ux: {
     quietMode: false,
@@ -185,6 +215,14 @@ export interface RouterState {
   upgradeCount: number;
   /** Cumulative count of smart→fast tier transitions. */
   downgradeCount: number;
+  /**
+   * Epoch ms of the most recent assistant message end (any tier). Used by
+   * cache-aware routing (SPEC §9.2) to detect whether a session boundary
+   * has passed — a gap longer than the provider's cache TTL means the
+   * prompt cache is already cold, so downgrading costs nothing extra.
+   * 0 when no message has completed yet.
+   */
+  lastActivityAt: number;
   /**
    * Cumulative per-tier spend. Populated from pi-agent's
    * `message_end.usage.cost.total` (USD) plus token counts.

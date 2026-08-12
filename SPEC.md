@@ -152,6 +152,8 @@ The prompt explicitly requests JSON-only output, and the API call adds a hard co
 - **OpenAI-compatible** (DeepSeek, OpenAI, etc.): `response_format: { type: "json_object" }` — the API rejects non-JSON completions.
 - **Anthropic**: assistant message prefill of `{` — forces the model to start its response with the JSON opener.
 
+The prompt classifies by **task shape**, not topic. Review-type tasks are split by what the turn actually does: a review whose findings set direction or drive rework is `smart`; a quick observation that leads straight into a routine fix with a clear path ("this separator is selectable, remove it") is `fast`. Security review is never downgraded, and explicit user intent for depth (signal 2) always wins.
+
 ### 4.3 Judge Model Selection
 
 The Judge uses the **Fast tier's first model**:
@@ -365,6 +367,7 @@ For advanced users debugging routing decisions:
 | Cooldown backoff rescale (4×, 6h cap, 4xx/5xx split) | ✅ | v0.9.0 | §8.5.2; 4xx starts at 16m, 5xx at 1m |
 | Slogan + CTO/Engineer terminology unification | ✅ | v0.9.1 | Docs, SPEC, judge prompt, tests |
 | **Coverage reporting (≥90% on router/failover)** | ✅ | v0.9.x (dev) | `vitest --coverage` in CI; router 100% / failover 95.5% |
+| **Cache-aware routing** | ✅ | v0.10.0 | §9.2: same-family threshold raise + warm-cache downgrade suppression |
 
 ## 8.5 Runtime Failover (Exponential Backoff)
 
@@ -449,7 +452,7 @@ On failover, show a toast notification (unless `quietMode`):
 
 ## 9. Future Direction (Optional Enhancements)
 
-- **Cache-aware routing (v1.0.0)**: when both tiers share a Provider family (e.g., both Anthropic), automatically raise the downgrade threshold to avoid cache thrashing. Pure logic, no heuristics. See §9.2 for the mechanism, the motivating data, and the cost model.
+- **Cache-aware routing (v0.10.0)**: delivered — same-family threshold raise + warm-cache downgrade suppression, see §9.2.
 - **Tool-result classification**: classify tool calls (long shell output may indicate debugging, not a question).
 - **Multilingual Judge *prompt* translations**: with-drawn — LLMs are multilingual; the English prompt handles non-English user input. Test inputs in zh / ja / es / fr through the real `classify()` if regressions surface.
 - **Per-tier thinking level**: withdrawn — tier classification already encodes prompt complexity, so a static per-tier thinking rule rarely saves more than it complicates.

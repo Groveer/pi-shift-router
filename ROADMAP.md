@@ -21,6 +21,7 @@ Release history and planned work for **pi-shift-router**.
 | v0.8.3 | Judge cooldown sharing + README restructure + packaging | ✅ |
 | v0.9.0 | Cost telemetry + `/router status` restructure + cooldown rescale (4xx/5xx split) | ✅ |
 | v0.9.1 | Slogan philosophy + CTO/Engineer terminology unification | ✅ |
+| v0.10.0 | Cache-aware routing (same-family threshold + warm-cache guard) + coverage reporting | ✅ |
 
 ## Planned
 
@@ -28,8 +29,8 @@ Release history and planned work for **pi-shift-router**.
 |---------|---------|-------|
 | Cost telemetry — deep view | v0.9.0 ✅ done | Smart vs Fast spend breakdown + savings vs **all-turns-on-smart** baseline (`config.tiers.smart.models[0]` pricing × session tokens). Data: pi-agent `message_end.usage.cost.total` + `models-store.json`. |
 | Cooldown backoff rescale | v0.9.0 ✅ done | 4× multiplier, 6h cap, **4xx starts at 16m** (client-side rate limits outlive 5xx blips), 5xx keeps 1m. |
-| Cache-aware routing | v1.0.0 | When fast/smart share a provider family, raise downgrade threshold (0.6 → 0.9) to protect prompt cache; downgrades defer to session boundaries (>5min idle / after /compact). Motivated by cache reads billing at 0.1x–0.5x base input (Anthropic 0.1x, OpenAI 0.5x) — routing a step to a 2.5x-cheaper cold model costs 3.5x more; break-even needs >10x cheaper target. Design in SPEC §9.2. |
 | Examples directory | ongoing | Sample configs (frontend / ML / cross-provider cost-saving) for documentation. |
+| Tool-result classification | TBD | SPEC §9: classify tool calls (long shell output may indicate debugging, not a question). |
 | Coverage reporting | ✅ done | `vitest --coverage` in CI (v8 provider, thresholds ≥90% lines/functions/statements, ≥85% branches on `src/router.ts` + `src/failover.ts`). Current: router 100% / failover 95.5%. |
 
 > **Withdrawn from earlier drafts.** Per-tier thinking level was proposed but is largely redundant — tier classification already encodes prompt complexity, so a static per-tier thinking rule rarely saves more than it complicates. Adaptive (per-prompt) thinking adds machinery without a clear win because the smart tier is already gated on real complexity. Dropped from v0.8.x.
