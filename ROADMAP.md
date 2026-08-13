@@ -44,16 +44,16 @@ Release history and planned work for **pi-shift-router**.
 - [ ] Manually run `/review-loop` with a real task; verify worker/reviewer model behavior against the Fast/Smart tiers (worker override + reviewer Smart pin).
 - [ ] Verify cooldown-state rendering (tier chain with current cooldowns filtered) can be expressed in the orchestrator prompt.
 
-**Phase 1 — Orchestration entry (plugin):**
-- [ ] Judge verdict `complex` → switch main agent to Smart model (existing `applyModelSwitch` path) + inject orchestrator instruction.
-- [ ] Orchestrator instruction template (`src/prompts/orchestrator.md`): "you are the CTO — plan, delegate to `worker` subagents (Fast tier chain with priority/cooldown filtered), review with `reviewer` (Smart tier), loop until clean (cap N), take over yourself if a worker fails ≥N times, final acceptance pass".
-- [ ] Tier injection: render `config.tiers.fast` / `config.tiers.smart` (healthy-only, priority order) into the instruction; per-run `model` override guidance.
-- [ ] **Worker task-prompt design principles** (SPEC §9.3): task-contract structure (goal/constraints/acceptance/out-of-scope), reference-don't-paste for large files, signal density, executable acceptance criteria, per-phase boundaries, budget-aware self-check. These shape the orchestrator template's delegation guidance.
-- [ ] **Hard-control state machine** (plugin code): `currentPhase`, `attempts`, `maxRounds` cap, escalation threshold N, elapsed/cost budget — the loop stops when code says stop, not just when Smart says so.
-- [ ] Simple tasks unchanged (fast direct run — degraded default).
-- [ ] `/router orchestrate on|off` toggle; default **off** (opt-in). Status bar `🧭 orchestrating` indicator.
-- [ ] Abort semantics: user message / `/router orchestrate off` mid-loop cancels and resets.
-- [ ] **Backward-compat tests** (SPEC §9.3 contract): orchestration-off byte-identical behavior; simple task never orchestrates; config without `orchestration.*` parses unchanged; pi-subagents missing → prompt injection skipped, smart-tier run proceeds; abort mid-loop → clean reset; existing features (failover/telemetry/cache-aware) unaffected.
+**Phase 1 — Orchestration entry (plugin):** ✅ implemented (local commit, pending user e2e)
+- [x] Judge verdict `complex` → switch main agent to Smart model (existing `applyModelSwitch` path) + inject orchestrator instruction.
+- [x] Orchestrator instruction template (`src/prompts/orchestrator.md`): "you are the CTO — plan, delegate to `worker` subagents (Fast tier chain with priority/cooldown filtered), review with `reviewer` (Smart tier), loop until clean (cap N), take over yourself if a worker fails ≥N times, final acceptance pass".
+- [x] Tier injection: render `config.tiers.fast` / `config.tiers.smart` (healthy-only, priority order) into the instruction; per-run `model` override guidance.
+- [x] **Worker task-prompt design principles** (SPEC §9.3): task-contract structure (goal/constraints/acceptance/out-of-scope), reference-don't-paste for large files, signal density, executable acceptance criteria, per-phase boundaries, budget-aware self-check. These shape the orchestrator template's delegation guidance.
+- [x] **Hard-control state machine** (plugin code): `currentPhase`, `attempts`, `maxRounds` cap, escalation threshold N, elapsed/cost budget — the loop stops when code says stop, not just when Smart says so.
+- [x] Simple tasks unchanged (fast direct run — degraded default).
+- [x] `/router orchestrate on|off` toggle; default **off** (opt-in). Status bar `🧭 orchestrating` indicator.
+- [x] Abort semantics: user message / `/router orchestrate off` mid-loop cancels and resets.
+- [x] **Backward-compat tests** (SPEC §9.3 contract): orchestration-off byte-identical behavior; simple task never orchestrates; config without `orchestration.*` parses unchanged; pi-subagents missing → prompt injection skipped, smart-tier run proceeds; abort mid-loop → clean reset; existing features (failover/telemetry/cache-aware) unaffected.
 
 **Phase 2 — Loop hardening:**
 - [ ] Review-loop convergence: only-blocking-issues rule in the orchestrator prompt; verify re-delegation carries concrete feedback.

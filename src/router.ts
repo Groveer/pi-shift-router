@@ -31,6 +31,13 @@ export function createRouterState(): RouterState {
       smart: emptyTierUsage(),
     },
     callLog: [],
+    orchestration: {
+      active: false,
+      rounds: 0,
+      escalations: 0,
+      startedAt: null,
+      spend: 0,
+    },
   };
 }
 

@@ -95,6 +95,43 @@ export interface ShiftRouterConfig {
   };
   routing: RoutingConfig;
   ux: UXConfig;
+  /** Task-level orchestration (SPEC §9.3, planned v1.0.0). Default off — opt-in. */
+  orchestration: OrchestrationConfig;
+}
+
+/**
+ * Task-level orchestration (SPEC §9.3). When enabled AND Judge says complex,
+ * the main agent runs the Smart model with an orchestrator instruction: it
+ * plans, delegates implementation to Fast subagents (via the subagent tool),
+ * reviews each result, and loops until clean — with plugin-side hard caps.
+ *
+ * Default off (opt-in via `/router orchestrate on`). All fields optional —
+ * an existing config without `orchestration.*` parses unchanged (deepMerge
+ * from DEFAULT_CONFIG).
+ */
+export interface OrchestrationConfig {
+  /** Master switch. When false, behavior is byte-for-byte today's router. */
+  enabled: boolean;
+  /** Max review/delegate rounds before Smart takes over (hard cap). */
+  maxRounds: number;
+  /** A worker failing ≥N times → Smart takes over the phase itself. */
+  escalationThreshold: number;
+  /** Skip orchestration when the Smart tier model can't be resolved. */
+  requireSmartModel: boolean;
+}
+
+/** Orchestration lifecycle state (session-scoped, not persisted). */
+export interface OrchestrationState {
+  /** Is the main agent currently running as an orchestrator? */
+  active: boolean;
+  /** Rounds consumed this task (hard cap: maxRounds). */
+  rounds: number;
+  /** Workers escalated this task (hard cap: escalationThreshold). */
+  escalations: number;
+  /** Epoch ms when the current orchestration task started. */
+  startedAt: number | null;
+  /** Estimated spend so far (USD) — hard budget guard. */
+  spend: number;
 }
 
 /** Default configuration */
@@ -127,6 +164,12 @@ export const DEFAULT_CONFIG: ShiftRouterConfig = {
     statusBar: true,
     inlineToast: true,
     routerLogVerbose: false,
+  },
+  orchestration: {
+    enabled: false,
+    maxRounds: 3,
+    escalationThreshold: 2,
+    requireSmartModel: true,
   },
 };
 
@@ -235,6 +278,8 @@ export interface RouterState {
    * hypothetical baseline for the savings estimate.
    */
   callLog: CallRecord[];
+  /** Task-level orchestration lifecycle (SPEC §9.3). */
+  orchestration: OrchestrationState;
 }
 
 /** Token counts for one assistant message. */

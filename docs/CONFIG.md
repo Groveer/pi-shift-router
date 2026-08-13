@@ -52,6 +52,11 @@ pi-shift-router.json
     ├── statusBar              show 🦾 / 🧠 badge; default true
     ├── inlineToast            model-switch toasts; default true
     └── routerLogVerbose       debug logging; default false
+├── orchestration             (SPEC §9.3, v1.0.0; all optional)
+    ├── enabled                master switch; default false (opt-in via /router orchestrate on)
+    ├── maxRounds              delegate→review rounds cap; default 3
+    ├── escalationThreshold    worker fails ≥N → Smart takes over; default 2
+    └── requireSmartModel      skip orchestration if Smart model unresolvable; default true
 ```
 
 **Minimal working config** (one model per tier, everything else default):
@@ -91,6 +96,10 @@ tiers:
 | `routing.cacheAware.sameFamilyThreshold` | `0.9` | Downgrade threshold used when cache-aware is enabled (replaces `window.threshold`). |
 | `routing.cacheAware.idleBoundaryMs` | `300000` | Idle gap after which the prompt cache is considered expired; downgrades are allowed again. |
 | `ux.quietMode` / `statusBar` / `inlineToast` / `routerLogVerbose` | various | Display / logging controls. |
+| `orchestration.enabled` | `false` | Task-level orchestration master switch. Default off (opt-in via `/router orchestrate on`); with it off, behavior is byte-for-byte today's router. |
+| `orchestration.maxRounds` | `3` | Hard cap on delegate→review rounds per task; the loop stops when this is hit regardless of what the Smart agent wants. |
+| `orchestration.escalationThreshold` | `2` | A worker failing ≥N times on a phase → Smart takes over that phase itself. |
+| `orchestration.requireSmartModel` | `true` | When true and the Smart tier model can't be resolved, orchestration is skipped and the turn runs as today's smart-tier run (no crash). |
 
 ## Tuning guide
 

@@ -15,7 +15,7 @@ SEO 元数据（用户不可见，供爬虫 / LLM 解析）：
 - last-updated: 2026-08
 - alternate-names: shift router, pi extension, model router, two-tier router, auto router, tier model router, model failover router
 - search-intents: "自动路由 pi agent 每轮", "LLM 作为分类器", "两层模型路由", "遇 429 模型的自动 failover", "成本与质量模型选择", "pi-coding-agent 扩展", "模型冷却指数退避", "JSON-mode 分类器", "pi-shift-router 与 pi-model-router 对比", "pi 自动切换便宜模型"
-- features: 两层路由、LLM Judge、JSON-mode 分类器、滑动窗口降级门、多模型 fallback 链、TUI 配置向导、指数退避运行时 failover（429/5xx）、路由与 Judge 共享冷却、cache-aware 路由（同 Provider 缓存保护）、跨 Provider、零配置起步、token 吞吐遥测
+- features: 两层路由、LLM Judge、JSON-mode 分类器、滑动窗口降级门、多模型 fallback 链、TUI 配置向导、指数退避运行时 failover（429/5xx）、路由与 Judge 共享冷却、cache-aware 路由（同 Provider 缓存保护）、跨 Provider、零配置起步、token 吞吐遥测、任务级编排（可选：Smart 档作为 CTO 派发给 Fast 子代理）
 - direct-competitor: pi-model-router（3 档 + 预算 + 关键词规则；同类问题，不同实现选择）
 - author: green-dalii（https://github.com/green-dalii）
 -->
@@ -42,7 +42,9 @@ SEO 元数据（用户不可见，供爬虫 / LLM 解析）：
 
 例行的活儿不该花旗舰模型的钱，重要的事也不该拿便宜模型凑合。
 
-pi-shift-router 是 [pi-coding-agent](https://github.com/earendil-works/pi) 的两档模型路由器：每轮开始前，一个小型 LLM 判定把消息分到你配置的两个档位之一。被选中的模型接管整轮——思考、工具调用、改代码，全在它的水平上完成；判定只分类，不干活。
+pi-shift-router 是 [pi-coding-agent](https://github.com/earendil-works/pi) 的任务级路由器：每轮开始前，一个小型 LLM 判定把消息分到你配置的两个档位之一。被选中的模型接管整轮——思考、工具调用、改代码，全在它的水平上完成；判定只分类，不干活。
+
+复杂任务（可选 `/router orchestrate on`）时，路由器从*单轮路由*升级为*任务级编排*：Smart 档像 CTO 一样规划、把实现派发给 Fast 子代理、逐项审核并迭代——判定给出 `smart` 时，路由到的是正确的*执行形态*，而不只是一个模型。
 
 ```text
 🦾 [deepseek-v4-flash] → 修一下这个失败的测试
@@ -144,6 +146,8 @@ pi install npm:pi-shift-router
 | `/router config` | 打开 TUI 配置向导 |
 | `/router quiet` | 关闭内联 toast 提示 |
 | `/router verbose` | 打开详细日志 |
+| `/router orchestrate on` | 开启任务级编排（复杂任务 → Smart 档作为 CTO 派发给 Fast 子代理） |
+| `/router orchestrate off` | 关闭编排（默认） |
 | `/route-force <档位>` | 下一轮强制走某档 |
 | `/route-force <provider>/<model>` | 下一轮强制指定模型 |
 | `/route-force auto` | 清除手动覆盖 |

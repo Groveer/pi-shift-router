@@ -44,7 +44,8 @@
     "extensions": [
       "./dist/index.js"
     ],
-    "minPiVersion": "0.80.0"
+    "minPiVersion": "0.80.0",
+    "image": "https://raw.githubusercontent.com/green-dalii/pi-shift-router/main/assets/hero.jpeg"
   },
   "engines": {
     "node": ">=24.0.0"

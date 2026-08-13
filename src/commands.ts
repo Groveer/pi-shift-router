@@ -21,6 +21,7 @@ import {
   setManualOverrideModel,
   shareProviderFamily,
 } from "./router.js";
+import { resetOrchestration } from "./orchestrate.js";
 import { formatStats } from "./stats.js";
 import { formatRemaining } from "./failover.js";
 import {
@@ -346,13 +347,34 @@ export function registerCommands(
   pi.registerCommand("router", {
     description: "pi-shift-router: show status, enable/disable",
     getArgumentCompletions: (prefix: string) => {
-      const cmds = ["on", "off", "status", "stats", "quiet", "verbose", "config"].filter((c) => c.startsWith(prefix));
+      const cmds = ["on", "off", "status", "stats", "quiet", "verbose", "config", "orchestrate"].filter((c) => c.startsWith(prefix));
       return cmds.length > 0 ? cmds.map((c) => ({ value: c, label: c })) : null;
     },
     handler: async (args, ctx) => {
       const config = getConfig();
       const state = getState();
       const arg = args.trim().toLowerCase();
+
+      if (arg === "orchestrate") {
+        ctx.ui.notify(
+          `pi-shift-router: 🧭 Usage: /router orchestrate on|off — task-level orchestration (complex tasks → Smart CTO delegates to Fast subagents)`,
+          "info",
+        );
+        return;
+      }
+      if (arg === "orchestrate on") {
+        config.orchestration.enabled = true;
+        onConfigChanged();
+        ctx.ui.notify("pi-shift-router: 🧭 Orchestration ON — complex tasks will run as Smart-orchestrated loops", "info");
+        return;
+      }
+      if (arg === "orchestrate off") {
+        config.orchestration.enabled = false;
+        resetOrchestration(state);
+        onConfigChanged();
+        ctx.ui.notify("pi-shift-router: 🧭 Orchestration OFF — back to plain tier routing", "info");
+        return;
+      }
 
       if (arg === "on") {
         config.enabled = true;
@@ -412,6 +434,11 @@ export function registerCommands(
         const sManual = state.manualOverride.active
           ? ` ✅ ${state.manualOverride.tier ?? state.manualOverride.modelId ?? "active"}`
           : " ✗";
+        const sOrch = config.orchestration.enabled
+          ? (state.orchestration.active
+              ? ` ✅ active (round ${state.orchestration.rounds}/${config.orchestration.maxRounds}, esc ${state.orchestration.escalations}/${config.orchestration.escalationThreshold})`
+              : ` ✅ enabled (idle)`)
+          : " ✗ (off)";
         const totalTurns = state.window.length + state.upgradeCount + state.downgradeCount;
 
         // Grouped, human-readable status. Raw Window/Counts stay at the
@@ -427,6 +454,7 @@ export function registerCommands(
             `Session:`,
             `  Turns: ${totalTurns}   Upgrades: ↑${state.upgradeCount}   Downgrades: ↓${state.downgradeCount}`,
             `  Manual override:${sManual}`,
+            `  Orchestration:${sOrch}`,
             `  Cache-aware: ${shareProviderFamily(config) ? "🎯 same-family (threshold " + (config.routing.cacheAware?.enabled ? config.routing.cacheAware.sameFamilyThreshold : config.routing.window.threshold) + ", " + (config.routing.cacheAware?.enabled ? "warm-cache guarded" : "inactive — enable in /router config") + ")" : "— (cross-family)"}`,
             ...(cooldownLines.length > 0
               ? [`  Cooldowns (${cooldownLines.length}):`, ...cooldownLines]

@@ -19,6 +19,13 @@ import {
   setManualOverrideTier,
 } from "./router.js";
 import {
+  shouldOrchestrate,
+  buildOrchestratorPrompt,
+  enterOrchestration,
+  exitOrchestration,
+  resetOrchestration,
+} from "./orchestrate.js";
+import {
   planTurnFailover,
   markModelFailed,
   clearModelCooldown,
@@ -158,6 +165,55 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
       console.log(`[ShiftRouter] decision: ${result.action}${result.switchTo ? ` → ${result.switchTo.provider}/${result.switchTo.modelId}` : ""}`);
     }
 
+    // ── Task-level orchestration (SPEC §9.3) ──────────────────────
+    // Judge said "smart" + orchestration enabled + smart model resolvable +
+    // subagent tool available → inject the orchestrator instruction.
+    // The Smart main agent then plans/delegates/reviews itself.
+    //
+    // Backward-compat: all conditions gated by config.orchestration.enabled
+    // (default false); with it off this block is inert.
+    const smartResolvable =
+      (() => {
+        try {
+          return findBestModelForTier(
+            "smart",
+            config,
+            ctx.modelRegistry as any,
+            cooldownPredicate(state.modelCooldowns, Date.now()),
+          ) != null;
+        } catch {
+          return false;
+        }
+      })();
+    const subagentAvailable = typeof (pi as any).tools?.subagent !== "undefined"
+      || typeof (ctx as any).tools?.subagent !== "undefined"
+      || typeof (pi as any).toolManager?.get?.("subagent") !== "undefined";
+    if (shouldOrchestrate(config, judgeResult.tier, smartResolvable, subagentAvailable)) {
+      enterOrchestration(state);
+      const orchPrompt = buildOrchestratorPrompt(config, cooldownPredicate(state.modelCooldowns, Date.now()));
+      if (config.ux.routerLogVerbose) {
+        console.log(
+          `[ShiftRouter] 🧭 orchestrating: judge=${judgeResult.tier}, injecting orchestrator prompt (${orchPrompt.length} chars)`,
+        );
+      }
+      // Inject the orchestrator instruction into this turn's system prompt.
+      // Chained across extensions — later handlers can still modify it.
+      const systemPrompt = (event as any).systemPrompt;
+      if (typeof systemPrompt === "string") {
+        (event as any).systemPrompt = systemPrompt + "\n\n" + orchPrompt;
+      } else {
+        // No chained system prompt available — inject as an inline message
+        // instead (fallback path, still reaches the LLM this turn).
+        return {
+          message: {
+            customType: "shift-router-orchestrator",
+            content: orchPrompt,
+            display: false,
+          },
+        };
+      }
+    }
+
     if (result.switchTo) {
       const ok = await applyModelSwitch(
         result.switchTo, state,
@@ -213,6 +269,21 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
     if (config.ux.routerLogVerbose) {
       console.log(`[ShiftRouter][diag] agent_end entered: messages=${msgCount} plan=${plan ? "failover" : "none"} elapsed=${Date.now() - t0}ms`);
     }
+
+    // ── Orchestration lifecycle (SPEC §9.3) ────────────────────────
+    // MVP is single-turn orchestration: the Smart turn that got the
+    // orchestrator prompt is the whole loop (plan + delegate + review inside
+    // that turn). On agent_end that turn is done → exit orchestration so the
+    // next turn routes normally. Placed BEFORE the `!plan` early return so a
+    // healthy orchestration turn still releases its state. (Cross-turn
+    // lifecycle is Phase 3.)
+    if (state.orchestration.active) {
+      exitOrchestration(state);
+      if (config.ux.routerLogVerbose) {
+        console.log(`[ShiftRouter] 🧭 orchestration turn ended — exited orchestrator state`);
+      }
+    }
+
     if (!plan) {
       if (config.ux.routerLogVerbose) {
         console.log(`[ShiftRouter][diag] agent_end exiting (no failover) @${Date.now()} total=${Date.now() - tEnd0}ms`);
@@ -247,11 +318,7 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
         "warning",
       );
     }
-
-    updateBar(ctx.ui, config, state);
   });
-
-  // after_provider_response: a 2xx response means the model works again —
   // clear its cooldown immediately (SPEC §8.5.2(4) recovery).
 
   pi.on("agent_settled", async () => {
@@ -383,6 +450,7 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
       state.tierUsage.smart = { calls: 0, tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, cost: 0 };
       state.callLog = [];
       clearManualOverride(state);
+      resetOrchestration(state);
     },
     (tier: Tier) => setManualOverrideTier(state, tier),
     (ui: any) => updateBar(ui, config, state),
