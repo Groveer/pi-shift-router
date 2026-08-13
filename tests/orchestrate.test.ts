@@ -2,7 +2,7 @@
  * pi-shift-router — Orchestration (SPEC §9.3) tests
  *
  * Backward-compatibility contract:
- * 1. Default off — orchestration.enabled=false is byte-for-byte today's router.
+ * 1. Default off — orchestration.mode="off" is byte-for-byte today's router.
  * 2. Simple tasks (Judge "fast") never orchestrate.
  * 3. Config without orchestration.* parses unchanged (deepMerge defaults).
  * 4. Missing subagent tool / unresolvable Smart model → no injection, no crash.
@@ -53,7 +53,7 @@ function noCooldown(_provider: string, _model: string): boolean {
 
 describe("orchestration: default config", () => {
   it("is disabled by default (backward-compat #1)", () => {
-    expect(DEFAULT_CONFIG.orchestration.enabled).toBe(false);
+    expect(DEFAULT_CONFIG.orchestration.mode).toBe("off");
   });
 
   it("config without orchestration.* parses unchanged (backward-compat #3)", () => {
@@ -62,7 +62,7 @@ describe("orchestration: default config", () => {
     // the default shape is present and complete.
     const cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as ShiftRouterConfig;
     expect(cfg.orchestration).toEqual({
-      enabled: false,
+      mode: "off",
       maxRounds: 3,
       escalationThreshold: 2,
       requireSmartModel: true,
@@ -77,34 +77,34 @@ describe("shouldOrchestrate", () => {
   });
 
   it("returns false for simple tasks even when enabled (backward-compat #2)", () => {
-    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, enabled: true } });
+    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, mode: "auto" } });
     expect(shouldOrchestrate(cfg, "fast", true, true)).toBe(false);
   });
 
   it("returns false when router disabled", () => {
-    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, enabled: true }, enabled: false });
+    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, mode: "auto" }, enabled: false });
     expect(shouldOrchestrate(cfg, "smart", true, true)).toBe(false);
   });
 
   it("returns true for smart verdict when everything available", () => {
-    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, enabled: true } });
+    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, mode: "auto" } });
     expect(shouldOrchestrate(cfg, "smart", true, true)).toBe(true);
   });
 
   it("returns false when Smart model unresolvable and requireSmartModel (backward-compat #4)", () => {
-    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, enabled: true } });
+    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, mode: "auto" } });
     expect(shouldOrchestrate(cfg, "smart", false, true)).toBe(false);
   });
 
   it("returns true when Smart model unresolvable but requireSmartModel=false", () => {
     const cfg = makeConfig({
-      orchestration: { ...DEFAULT_CONFIG.orchestration, enabled: true, requireSmartModel: false },
+      orchestration: { ...DEFAULT_CONFIG.orchestration, mode: "auto", requireSmartModel: false },
     });
     expect(shouldOrchestrate(cfg, "smart", false, true)).toBe(true);
   });
 
   it("returns false when subagent tool unavailable (backward-compat #4)", () => {
-    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, enabled: true } });
+    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, mode: "auto" } });
     expect(shouldOrchestrate(cfg, "smart", true, false)).toBe(false);
   });
 });
@@ -156,7 +156,7 @@ describe("renderTierChain", () => {
 describe("buildOrchestratorPrompt", () => {
   it("injects fast/smart chains and caps into the template", () => {
     const cfg = makeConfig({
-      orchestration: { ...DEFAULT_CONFIG.orchestration, enabled: true, maxRounds: 5, escalationThreshold: 3 },
+      orchestration: { ...DEFAULT_CONFIG.orchestration, mode: "auto", maxRounds: 5, escalationThreshold: 3 },
     });
     cfg.tiers.fast.models = [{ provider: "fastp", model: "fm", priority: 1 }];
     cfg.tiers.smart.models = [{ provider: "smartp", model: "sm", priority: 1 }];
@@ -172,7 +172,7 @@ describe("buildOrchestratorPrompt", () => {
 
   it("renders cooldown-filtered chain into the prompt", () => {
     const cfg = makeConfig({
-      orchestration: { ...DEFAULT_CONFIG.orchestration, enabled: true },
+      orchestration: { ...DEFAULT_CONFIG.orchestration, mode: "auto" },
     });
     cfg.tiers.fast.models = [
       { provider: "p", model: "down", priority: 1 },
@@ -223,7 +223,7 @@ describe("orchestration lifecycle", () => {
 
   it("capHit fires at maxRounds", () => {
     const state: RouterState = createRouterState();
-    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, enabled: true, maxRounds: 3 } });
+    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, mode: "auto", maxRounds: 3 } });
     enterOrchestration(state);
     state.orchestration.rounds = 3;
     expect(capHit(state, cfg)).toBe(true);
@@ -231,7 +231,7 @@ describe("orchestration lifecycle", () => {
 
   it("capHit fires at escalationThreshold", () => {
     const state: RouterState = createRouterState();
-    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, enabled: true, escalationThreshold: 2 } });
+    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, mode: "auto", escalationThreshold: 2 } });
     enterOrchestration(state);
     state.orchestration.escalations = 2;
     expect(capHit(state, cfg)).toBe(true);
@@ -239,7 +239,7 @@ describe("orchestration lifecycle", () => {
 
   it("capHit false below caps", () => {
     const state: RouterState = createRouterState();
-    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, enabled: true, maxRounds: 3, escalationThreshold: 2 } });
+    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, mode: "auto", maxRounds: 3, escalationThreshold: 2 } });
     enterOrchestration(state);
     state.orchestration.rounds = 1;
     state.orchestration.escalations = 1;

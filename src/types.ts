@@ -105,13 +105,18 @@ export interface ShiftRouterConfig {
  * plans, delegates implementation to Fast subagents (via the subagent tool),
  * reviews each result, and loops until clean — with plugin-side hard caps.
  *
- * Default off (opt-in via `/router orchestrate on`). All fields optional —
+ * Default off (opt-in via `/router orchestrate auto`). All fields optional —
  * an existing config without `orchestration.*` parses unchanged (deepMerge
  * from DEFAULT_CONFIG).
  */
 export interface OrchestrationConfig {
-  /** Master switch. When false, behavior is byte-for-byte today's router. */
-  enabled: boolean;
+  /**
+   * Mode. "off" (default): never orchestrate — byte-for-byte today's router.
+   * "auto": Judge-driven — simple tasks (fast verdict) keep the plain router;
+   * complex tasks (smart verdict) escalate to Smart-orchestrated execution.
+   * There is no "always" mode: orchestration is never forced on simple work.
+   */
+  mode: "auto" | "off";
   /** Max review/delegate rounds before Smart takes over (hard cap). */
   maxRounds: number;
   /** A worker failing ≥N times → Smart takes over the phase itself. */
@@ -166,7 +171,7 @@ export const DEFAULT_CONFIG: ShiftRouterConfig = {
     routerLogVerbose: false,
   },
   orchestration: {
-    enabled: false,
+    mode: "off",
     maxRounds: 3,
     escalationThreshold: 2,
     requireSmartModel: true,

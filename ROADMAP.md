@@ -51,7 +51,7 @@ Release history and planned work for **pi-shift-router**.
 - [x] **Worker task-prompt design principles** (SPEC §9.3): task-contract structure (goal/constraints/acceptance/out-of-scope), reference-don't-paste for large files, signal density, executable acceptance criteria, per-phase boundaries, budget-aware self-check. These shape the orchestrator template's delegation guidance.
 - [x] **Hard-control state machine** (plugin code): `currentPhase`, `attempts`, `maxRounds` cap, escalation threshold N, elapsed/cost budget — the loop stops when code says stop, not just when Smart says so.
 - [x] Simple tasks unchanged (fast direct run — degraded default).
-- [x] `/router orchestrate on|off` toggle; default **off** (opt-in). Status bar `🧭 orchestrating` indicator.
+- [x] `/router orchestrate auto|off` toggle; default **off** (opt-in). `auto` = Judge-driven: simple tasks stay on the plain router, complex tasks orchestrate. Status bar `🪄` indicator.
 - [x] Abort semantics: user message / `/router orchestrate off` mid-loop cancels and resets.
 - [x] **Backward-compat tests** (SPEC §9.3 contract): orchestration-off byte-identical behavior; simple task never orchestrates; config without `orchestration.*` parses unchanged; pi-subagents missing → prompt injection skipped, smart-tier run proceeds; abort mid-loop → clean reset; existing features (failover/telemetry/cache-aware) unaffected.
 

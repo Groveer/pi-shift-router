@@ -357,22 +357,29 @@ export function registerCommands(
 
       if (arg === "orchestrate") {
         ctx.ui.notify(
-          `pi-shift-router: 🧭 Usage: /router orchestrate on|off — task-level orchestration (complex tasks → Smart CTO delegates to Fast subagents)`,
+          `pi-shift-router: 🪄 Usage: /router orchestrate auto|off — task-level orchestration (auto: complex tasks → Smart CTO delegates to Fast subagents; simple tasks stay on the plain router)`,
           "info",
         );
         return;
       }
-      if (arg === "orchestrate on") {
-        config.orchestration.enabled = true;
+      if (arg === "orchestrate auto") {
+        config.orchestration.mode = "auto";
         onConfigChanged();
-        ctx.ui.notify("pi-shift-router: 🧭 Orchestration ON — complex tasks will run as Smart-orchestrated loops", "info");
+        ctx.ui.notify("pi-shift-router: 🪄 Orchestration AUTO — complex tasks will run as Smart-orchestrated loops, simple tasks stay on the plain router", "info");
         return;
       }
       if (arg === "orchestrate off") {
-        config.orchestration.enabled = false;
+        config.orchestration.mode = "off";
         resetOrchestration(state);
         onConfigChanged();
-        ctx.ui.notify("pi-shift-router: 🧭 Orchestration OFF — back to plain tier routing", "info");
+        ctx.ui.notify("pi-shift-router: 🪄 Orchestration OFF — back to plain tier routing", "info");
+        return;
+      }
+      if (arg === "orchestrate on") {
+        // Legacy alias: "on" meant the same judge-driven behavior; map to auto.
+        config.orchestration.mode = "auto";
+        onConfigChanged();
+        ctx.ui.notify("pi-shift-router: 🪄 Orchestration AUTO (legacy `on` mapped to auto) — complex tasks orchestrate, simple tasks stay on the plain router", "info");
         return;
       }
 
@@ -434,10 +441,10 @@ export function registerCommands(
         const sManual = state.manualOverride.active
           ? ` ✅ ${state.manualOverride.tier ?? state.manualOverride.modelId ?? "active"}`
           : " ✗";
-        const sOrch = config.orchestration.enabled
+        const sOrch = config.orchestration.mode === "auto"
           ? (state.orchestration.active
-              ? ` ✅ active (round ${state.orchestration.rounds}/${config.orchestration.maxRounds}, esc ${state.orchestration.escalations}/${config.orchestration.escalationThreshold})`
-              : ` ✅ enabled (idle)`)
+              ? ` 🪄 active (round ${state.orchestration.rounds}/${config.orchestration.maxRounds}, esc ${state.orchestration.escalations}/${config.orchestration.escalationThreshold})`
+              : ` 🪄 auto (idle)`)
           : " ✗ (off)";
         const totalTurns = state.window.length + state.upgradeCount + state.downgradeCount;
 

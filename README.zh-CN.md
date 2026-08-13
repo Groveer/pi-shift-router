@@ -44,7 +44,7 @@ SEO 元数据（用户不可见，供爬虫 / LLM 解析）：
 
 pi-shift-router 是 [pi-coding-agent](https://github.com/earendil-works/pi) 的任务级路由器：每轮开始前，一个小型 LLM 判定把消息分到你配置的两个档位之一。被选中的模型接管整轮——思考、工具调用、改代码，全在它的水平上完成；判定只分类，不干活。
 
-复杂任务（可选 `/router orchestrate on`）时，路由器从*单轮路由*升级为*任务级编排*：Smart 档像 CTO 一样规划、把实现派发给 Fast 子代理、逐项审核并迭代——判定给出 `smart` 时，路由到的是正确的*执行形态*，而不只是一个模型。
+复杂任务（可选 `/router orchestrate auto`）时，路由器从*单轮路由*升级为*任务级编排*：Smart 档像 CTO 一样规划、把实现派发给 Fast 子代理、逐项审核并迭代——判定给出 `smart` 时，路由到的是正确的*执行形态*，而不只是一个模型。
 
 ```text
 🦾 [deepseek-v4-flash] → 修一下这个失败的测试
@@ -146,7 +146,7 @@ pi install npm:pi-shift-router
 | `/router config` | 打开 TUI 配置向导 |
 | `/router quiet` | 关闭内联 toast 提示 |
 | `/router verbose` | 打开详细日志 |
-| `/router orchestrate on` | 开启任务级编排（复杂任务 → Smart 档作为 CTO 派发给 Fast 子代理） |
+| `/router orchestrate auto` | 任务级编排：复杂任务 → Smart 档作为 CTO 派发给 Fast 子代理；简单任务仍走普通路由 |
 | `/router orchestrate off` | 关闭编排（默认） |
 | `/route-force <档位>` | 下一轮强制走某档 |
 | `/route-force <provider>/<model>` | 下一轮强制指定模型 |

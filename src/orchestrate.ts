@@ -13,7 +13,7 @@
  *   tier chains (healthy-only, cooldown-filtered) into the prompt. We never
  *   write pi-subagents' settings — per-run model overrides are passed by the
  *   Smart agent, guided by the rendered chain.
- * - Backward compatibility: with `orchestration.enabled` false (default),
+ * - Backward compatibility: with `orchestration.mode` "off" (default),
  *   every path here is a no-op — behavior is byte-for-byte today's router.
  * - Simple tasks never orchestrate: only a Judge "smart" verdict can enter.
  * - Missing pi-subagents / unresolvable Smart model → skip injection and run
@@ -164,7 +164,8 @@ export function exitOrchestration(state: RouterState): void {
  * Decide whether THIS turn should run as an orchestration turn.
  *
  * All conditions must hold:
- * 1. Orchestration enabled (config, opt-in).
+ * 1. Orchestration mode "auto" (config, opt-in). There is no "always" mode —
+ *    orchestration is never forced on simple work.
  * 2. Router enabled.
  * 3. Judge said "smart" (complex) — simple tasks never orchestrate.
  * 4. Smart tier model is resolvable (or requireSmartModel is false).
@@ -181,7 +182,7 @@ export function shouldOrchestrate(
   subagentToolAvailable: boolean,
 ): boolean {
   if (!config.enabled) return false;
-  if (!config.orchestration.enabled) return false;
+  if (config.orchestration.mode !== "auto") return false;
   if (judgeTier !== "smart") return false;
   if (config.orchestration.requireSmartModel && !smartModelResolvable) return false;
   if (!subagentToolAvailable) return false;

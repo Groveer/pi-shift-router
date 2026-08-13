@@ -44,7 +44,7 @@ Routine turns shouldn't cost flagship money. The turns that matter shouldn't be 
 
 pi-shift-router is a task-level router for [pi-coding-agent](https://github.com/earendil-works/pi): before every turn, a small LLM judge classifies your message into one of the two tiers you configure. The tier it picks then drives the entire turn — thinking, tool calls, code edits — at that tier's level. The judge only classifies; it never does the work.
 
-For complex tasks (opt-in `/router orchestrate on`), the router graduates from *turn-level* routing to *task-level* orchestration: the Smart tier runs as a CTO that plans, delegates implementation to Fast subagents, reviews each result, and iterates — the judge's `smart` verdict routes to the right *execution shape*, not just a model.
+For complex tasks (opt-in `/router orchestrate auto`), the router graduates from *turn-level* routing to *task-level* orchestration: the Smart tier runs as a CTO that plans, delegates implementation to Fast subagents, reviews each result, and iterates — the judge's `smart` verdict routes to the right *execution shape*, not just a model.
 
 ```text
 🦾 [deepseek-v4-flash] → fix the failing test
@@ -146,7 +146,7 @@ You should see your current tier, scope, judge threshold, and throughput. Your n
 | `/router config` | Launch the TUI configuration wizard |
 | `/router quiet` | Toggle inline toast notifications |
 | `/router verbose` | Toggle verbose logging |
-| `/router orchestrate on` | Enable task-level orchestration (complex tasks → Smart CTO delegates to Fast subagents) |
+| `/router orchestrate auto` | Task-level orchestration: complex tasks → Smart CTO delegates to Fast subagents; simple tasks stay on the plain router |
 | `/router orchestrate off` | Disable orchestration (default) |
 | `/route-force <tier>` | Pin a tier for the next turn |
 | `/route-force <provider>/<model>` | Pin a specific model for the next turn |

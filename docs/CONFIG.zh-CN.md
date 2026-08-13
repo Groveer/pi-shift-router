@@ -53,7 +53,7 @@ pi-shift-router.json
     ├── inlineToast            模型切换提示；默认 true
     └── routerLogVerbose       调试日志；默认 false
 ├── orchestration            （SPEC §9.3，v1.0.0；全部可选）
-    ├── enabled                总开关；默认 false（/router orchestrate on 开启）
+    ├── mode                   "off" | "auto"；默认 off（/router orchestrate auto 开启）
     ├── maxRounds              每任务 delegate→review 轮数上限；默认 3
     ├── escalationThreshold    worker 失败 ≥N 次 → Smart 接管该阶段；默认 2
     └── requireSmartModel      Smart 模型不可用时跳过编排；默认 true
@@ -96,7 +96,7 @@ tiers:
 | `routing.cacheAware.sameFamilyThreshold` | `0.9` | 启用 cache-aware 时使用的降级阈值（替代 `window.threshold`）。 |
 | `routing.cacheAware.idleBoundaryMs` | `300000` | 空闲超过该时长视为 prompt 缓存已过期，恢复允许降级。 |
 | `ux.quietMode` / `statusBar` / `inlineToast` / `routerLogVerbose` | 各自 | 界面 / 日志开关。 |
-| `orchestration.enabled` | `false` | 任务级编排总开关。默认关闭（`/router orchestrate on` 开启）；关闭时行为与现有路由完全一致。 |
+| `orchestration.mode` | `"off"` | 任务级编排模式。`"off"`（默认）：行为与现有路由完全一致。`"auto"`（`/router orchestrate auto` 开启）：由 Judge 驱动——简单任务（fast 判定）走普通路由；复杂任务（smart 判定）升级为 Smart 编排执行。没有“总是”模式。 |
 | `orchestration.maxRounds` | `3` | 每任务 delegate→review 轮数硬上限；达到即停，无论 Smart 想继续多少轮。 |
 | `orchestration.escalationThreshold` | `2` | 某阶段 worker 失败 ≥N 次 → Smart 亲自接管该阶段。 |
 | `orchestration.requireSmartModel` | `true` | 为 true 且 Smart 模型不可解析时跳过编排，按现有 smart 档运行（不崩溃）。 |

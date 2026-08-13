@@ -745,7 +745,7 @@ we keep paying for it.
 
 **Backward compatibility contract (must not break existing behavior):**
 
-1. **Default off.** Orchestration is opt-in (`/router orchestrate on`); with it
+1. **Default off.** Orchestration is opt-in (`/router orchestrate auto`); with it
    off, behavior is byte-for-byte today's router (Judge → tier switch → failover
    → cache-aware → telemetry). No new event, no new default, no changed
    decision path.
@@ -778,7 +778,7 @@ we keep paying for it.
 3. **Review loop**: Smart reviews each phase result inline (natural for the
    orchestrator prompt) vs a dedicated review subagent. (Default: inline.)
 4. **Escalation threshold** N=2, configurable via `orchestration.*` config.
-5. **Default off** (opt-in `/router orchestrate on`) — a behavior change must
+5. **Default off** (opt-in `/router orchestrate auto`) — a behavior change must
    not silently alter the existing UX.
 6. **Interplay with §9.2**: the main-agent switches honor the warm-cache guard.
 7. **Orchestration lifecycle (session-scoped state)**: orchestration spans

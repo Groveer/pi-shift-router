@@ -166,12 +166,12 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
     }
 
     // ── Task-level orchestration (SPEC §9.3) ──────────────────────
-    // Judge said "smart" + orchestration enabled + smart model resolvable +
+    // Judge said "smart" + orchestration mode auto + smart model resolvable +
     // subagent tool available → inject the orchestrator instruction.
     // The Smart main agent then plans/delegates/reviews itself.
     //
-    // Backward-compat: all conditions gated by config.orchestration.enabled
-    // (default false); with it off this block is inert.
+    // Backward-compat: all conditions gated by config.orchestration.mode
+    // (default "off"); with it off this block is inert.
     const smartResolvable =
       (() => {
         try {
@@ -193,7 +193,7 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
       const orchPrompt = buildOrchestratorPrompt(config, cooldownPredicate(state.modelCooldowns, Date.now()));
       if (config.ux.routerLogVerbose) {
         console.log(
-          `[ShiftRouter] 🧭 orchestrating: judge=${judgeResult.tier}, injecting orchestrator prompt (${orchPrompt.length} chars)`,
+          `[ShiftRouter] 🪄 orchestrating: judge=${judgeResult.tier}, injecting orchestrator prompt (${orchPrompt.length} chars)`,
         );
       }
       // Inject the orchestrator instruction into this turn's system prompt.
@@ -280,7 +280,7 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
     if (state.orchestration.active) {
       exitOrchestration(state);
       if (config.ux.routerLogVerbose) {
-        console.log(`[ShiftRouter] 🧭 orchestration turn ended — exited orchestrator state`);
+        console.log(`[ShiftRouter] 🪄 orchestration turn ended — exited orchestrator state`);
       }
     }
 
