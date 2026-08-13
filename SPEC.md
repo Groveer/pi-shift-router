@@ -453,6 +453,7 @@ On failover, show a toast notification (unless `quietMode`):
 ## 9. Future Direction (Optional Enhancements)
 
 - **Cache-aware routing (v0.10.0)**: delivered — same-family threshold raise + warm-cache downgrade suppression, see §9.2.
+- **Task-level orchestration (planned v1.0.0)**: closed-loop plan → implement → review → escalate → accept workflow, see §9.3.
 - **Tool-result classification**: classify tool calls (long shell output may indicate debugging, not a question).
 - **Multilingual Judge *prompt* translations**: with-drawn — LLMs are multilingual; the English prompt handles non-English user input. Test inputs in zh / ja / es / fr through the real `classify()` if regressions surface.
 - **Per-tier thinking level**: withdrawn — tier classification already encodes prompt complexity, so a static per-tier thinking rule rarely saves more than it complicates.
@@ -528,3 +529,286 @@ OpenAI fast+smart) the router stops trading a 10x discount for a 2.5x one.
 Downgrades still happen, but only when the cache is already cold or the window
 majority is unambiguous. Cross-family setups are untouched (cache domains
 already distinct).
+
+### 9.3 Task-level orchestration (planned v1.0.0)
+
+**Vision (user-driven)**: stop at *per-turn model routing* and graduate to a
+*task-level closed loop* — a virtual dev team. On a user task, Judge decides
+(reusing §4): simple tasks route to fast as today; complex tasks escalate to a
+**Smart main agent that orchestrates multiple Fast subagents** — Smart plans,
+delegates implementation to Fast subagents (parallel where independent),
+reviews each result, sends failed work back with concrete feedback, takes over
+directly when a subagent repeatedly fails past a threshold, and does the final
+acceptance pass. This is the Teams / Orchestra pattern.
+
+**Two architectural layers (key correction).** Orchestration *authority* must
+live in the **LLM layer**, not in the extension:
+
+- **LLM layer (Smart main agent)** — owns planning, delegation, review,
+  escalation, acceptance. It uses pi's built-in **subagent tool** to spawn
+  isolated Fast worker processes. This is exactly how the official `subagent/`
+  extension and `pi-subagents` work: `spawn("pi", ["--mode","json","-p",
+  "--no-session","--model",<fast>,"--tools",...])` → independent process,
+  isolated context, JSON output, optional `worktree` isolation, parallel
+  fanout via `runs.all`. The Smart agent decides which Fast agents to spawn,
+  with what task, and how to aggregate.
+- **Plugin layer (pi-shift-router)** — stays a *router*, not an orchestrator.
+  It only (a) runs Judge, (b) decides *when* to enter orchestration mode, (c)
+  switches the main model to Smart and injects an orchestrator-context prompt
+  ("you are the CTO; delegate implementation to Fast subagents via the
+  subagent tool; review and iterate; take over when a worker fails ≥N times;…").
+  Everything after that is the Smart agent's own loop.
+
+**Why the plugin must NOT re-implement orchestration.** The extension API gives
+no control over pi's agent loop, so a plugin-side state machine would have to
+chain phases with `pi.sendUserMessage(…, { deliverAs: "followUp" })` and hold
+`currentPhase`/`attempts` state — duplicating the subagent machinery
+(process spawn, JSON parsing, concurrency, worktree isolation, intercom) that
+pi already ships. The subagent tool already provides verified isolation and
+parallelism; re-building it in the plugin violates AGENTS.md
+(simplicity / DRY / delete-before-adding).
+
+**Verified pi mechanisms (0.84.1 source) supporting this design:**
+
+1. **Subagent spawn**: official `examples/extensions/subagent/index.ts` spawns
+   `pi --mode json -p --no-session --model <agent.model> --tools <list>` as a
+   child process; `--mode json` emits NDJSON events with `usage` (tokens/cost)
+   per worker — the cost telemetry (§9.1) can attribute subagent spend.
+2. **Agent definition**: subagents are markdown files with `name` /
+   `description` / `model` / `tools` frontmatter (agents.ts) — the Fast tier
+   can map to a pre-defined "engineer" agent.
+3. **Model switch for the main run**: `session.setModel()` writes
+   `agent.state.model` (agent-session.js:1203); `createLoopConfig()` reads it
+   per loop (agent.js:291). Already proven by v0.6.0 failover.
+4. **Parallelism & isolation**: `pi-subagents` `runs.all([...])` gives parallel
+   fanout; `worktree: true` gives per-worker git worktree isolation.
+
+**Verified ready-made capability in installed pi-subagents 0.47.1** (checked
+against its shipped `prompts/` and `agents/`):
+
+- **Builtin worker** (`agents/worker.md`) = the Fast engineer: strict tool
+  allowlist (read/grep/find/ls/bash/edit/write + `contact_supervisor`),
+  `defaultContext: fork`, `systemPromptMode: replace`. The `worker` name maps
+  directly onto the Fast tier.
+- **Builtin reviewer** (`agents/reviewer.md`) = the Smart reviewer: read-only
+  tools, `thinking: high`, no write access.
+- **`/review-loop` prompt** (`prompts/review-loop.md`) already implements the
+  closed loop: async worker implement → parallel fresh-context reviewers →
+  parent synthesizes feedback → forked fix-worker applies fixes → re-review
+  until clean or max rounds (default 3). This is exactly the
+  implement → review → redo → cap loop in the vision, already shipped.
+- **Model pinning** (`docs/models.md`): `subagents.defaultModel` (e.g. Fast
+  tier model) + `subagents.agentOverrides.<name>.model` per role. Precedence:
+  per-run override → agent frontmatter → agentOverrides → defaultModel → parent
+  model. So the orchestrator can pin `worker` to Fast and `orchestrator` to
+  Smart without touching pi-shift-router tiers.
+- **Programmatic RPC** (`docs/extension-api.md`): in-process event-bus RPC
+  `subagents:rpc:v1:*` with `spawn/status/steer/interrupt/stop/resume` —
+  another extension could trigger subagent runs without LLM involvement
+  (future option; the LLM-layer approach is preferred for v1).
+
+**Implication**: the orchestration loop itself does not need to be built by
+pi-shift-router at all. The plugin's whole job reduces to (a) Judge, (b) decide
+complex vs simple, (c) on complex: switch the main agent to the Smart model and
+inject an orchestrator instruction that says "you are the CTO — plan, then
+delegate implementation to `worker` subagents and review with `reviewer`
+subagents, loop until clean (cap N), take over yourself if a worker fails ≥N
+times, then do the final acceptance pass". Everything else is the Smart agent
+using the `subagent` tool + the shipped prompts.
+
+**Tier injection — how Fast/Smart tiers reach the subagents (user-driven
+design).** The tiers defined in `pi-shift-router.json` are the *single source
+of truth* for models; pi-subagents must NOT be configured separately. Instead,
+the plugin carries the tier info into the orchestration dynamically:
+
+- When Judge says complex, the plugin reads `config.tiers.fast` and
+  `config.tiers.smart` and renders them into the injected orchestrator
+  instruction as concrete per-role model guidance:
+  - `worker` → the Fast tier chain (priority order, incl. failover chain);
+  - `reviewer` / the final acceptance pass → the Smart tier chain;
+  - the escalation note: "if a worker fails ≥N times, take over the phase
+    yourself (you are running the Smart model)".
+- The Smart orchestrator then spawns each subagent with a **per-run model
+  override** via `runs.run(key, { agent: "worker", model: "<fast-model>", … })`
+  — verified supported by the `subagent` tool schema
+  (`model: "Override model for this task"`, schemas.ts:147).
+- **Workers must use `context: "fresh"` (verified 2026-08-13).** With
+  `context: "fork"`, pi-subagents force-forces `thinking: off` for any model
+  whose API is `anthropic-messages` (MiniMax-M3 included — safety sanitizer
+  `forkedChildRequiresThinkingOff`, fork-context.ts:61-71), which degraded
+  output quality in testing; run params cannot override it. `context:
+  "fresh"` honors the `thinking` override (`minimax-cn/MiniMax-M3:high`
+  verified) and shrinks the worker context from ~176k inherited tokens to
+  ~8k task-local tokens (cost $0.064 → $0.004, 3× faster) — the right shape
+  for narrow Fast-tier execution. The orchestrator prompt should instruct
+  workers to be self-contained (include all needed context in the task).
+
+**Worker task-prompt design principles (fresh-mode consequence — user-driven).**
+Because fresh workers inherit *nothing*, the Smart orchestrator's task string
+IS the worker's world. It must be engineered for coverage without bloat:
+
+1. **Task contract over prose.** Structure the task as a contract: goal,
+   constraints, acceptance criteria (how to verify done), files/repos to
+   touch, and explicit out-of-scope. A worker should be able to finish
+   without asking a question (though it may escalate via contact_supervisor
+   for genuine decisions).
+2. **Reference, don't paste.** For files > ~2k tokens, give the path and a
+   1-line role summary, not the content — the worker reads them with its own
+   tools (read/grep). Pasting large files wastes prompt budget and adds
+   noise the model must filter.
+3. **Signal density over volume.** Include only facts the worker needs to
+   decide correctly: relevant interfaces/APIs, naming conventions,
+   the exact failure observed (with error text), the expected behavior.
+   Omit context that only explains *why* a decision was made unless it
+   changes what the worker should build.
+4. **Acceptance criteria are executable.** "tests pass", "lint clean",
+   "diff matches spec" are verifiable; "make it better" is not. The
+   orchestrator prompt must teach Smart to write acceptance criteria the
+   reviewer can check mechanically.
+5. **Per-phase boundaries.** The plan decomposes the task into phases; each
+   worker task references its phase inputs (files/APIs produced by earlier
+   phases) without re-importing the whole plan.
+6. **Budget-aware self-check.** The orchestrator reviews each worker result
+   with the same coverage lens: if the worker had to ask or guessed, the
+   task prompt was under-specified — a signal to fix the task prompt, not
+   just re-run.
+
+These principles make fresh workers *narrow by design*: small deterministic
+context → low cost, low hallucination, fast. The cost/quality numbers above
+($0.004 vs $0.064) are the direct payoff of getting this right.
+- Tier chain semantics carry over: if the top Fast model is in cooldown
+  (§8.5), the plugin renders the next healthy model in the chain; the
+  orchestrator prompt always lists the models that are actually usable now.
+- Format compatibility: tier model refs are already `provider/model-id`
+  (e.g. `minimax-cn/MiniMax-M3`), which is exactly the form the `model`
+  override field expects — no translation layer needed.
+
+**Why not write `settings.json` `subagents.*` instead.** Static subagent model
+config would create a second source of truth that must be kept in sync with the
+tiers (DRY violation), and one extension mutating another's config is an
+implicit side effect (violates explicit-over-implicit). Dynamic injection keeps
+pi-shift-router the only model authority and applies per task, per run, with
+today's cooldown/window state baked in.
+
+**Proposed flow:**
+
+```
+[Idle] ──Judge──▶ simple → fast agent run as today (degraded default)
+                 complex → Smart main agent + orchestrator prompt
+                             │
+                             ▼
+              Smart: plan → decompose into phases (with acceptance criteria)
+                             │
+                             ▼
+              Smart: delegate phase(s) → Fast subagents via subagent tool
+                             │   (parallel fanout for independent phases)
+                             ▼
+              Smart: review each subagent result
+                 ┌────┴─────┐
+               pass       fail (concrete feedback)
+                 │            │
+                 ▼            ▼
+         next phase /   Smart re-delegates to Fast subagent (or fixes inline)
+         final accept       │ fail ≥N times
+                             ▼
+                   Smart takes over the phase itself (full agent loop)
+```
+
+**Economics (when it pays).** Implicit assumption:
+`cost(smart review) + Σ cost(fast subagent) × (1 + fail-rate × retries) <
+cost(smart end-to-end)`. Fast subagents are spawned fresh with a narrow task
+→ small context, fast, cheap; Smart review reads artifacts + context, cheaper
+than Smart implementing. Escalation threshold N (default 2) is the economic
+safety valve. Holds for *implementation tasks* (verifiable acceptance:
+tests/lint/behavior). For *judgment tasks* (architecture trade-offs,
+direction) Fast has no useful implementation — Judge routes them to Smart
+directly, which the existing complexity axis already encodes.
+
+**Orchestration control — hard/soft split (how the loop is actually
+governed).** pi-subagents ships the *execution primitives* (runs.run / runs.all,
+worker & reviewer agents, worktree isolation, workflowScript) but NOT the
+*content decisions* of the loop. Those must be defined by us and split across
+two control layers, matching the existing Judge philosophy (LLM does content
+judgment, code does boundary control):
+
+| Control layer | Owns | Responsibilities |
+|---|---|---|
+| **Hard (plugin code)** | pi-shift-router state machine | entry gate (Judge complex), main-model switch to Smart, **max rounds cap**, **escalation threshold N**, **elapsed/cost budget**, abort/reset semantics, per-phase state (`currentPhase`, `attempts`, `spend`) |
+| **Soft (Smart main agent)** | CTO judgment | plan (phase list + per-phase acceptance criteria), delegation (which worker, what task), review pass/fail, final acceptance |
+
+**"Should the loop continue?" is a double judgment**: the *content* answer
+("phase X still has a blocking bug" / "all acceptance criteria met") is Smart's
+LLM review; the *quantity* answer (reached max rounds / N escalations / budget
+spent) is the plugin's hard cap. The loop stops when either one says stop —
+Smart's judgment decides *what* is wrong, the plugin's caps decide *how long*
+we keep paying for it.
+
+**Backward compatibility contract (must not break existing behavior):**
+
+1. **Default off.** Orchestration is opt-in (`/router orchestrate on`); with it
+   off, behavior is byte-for-byte today's router (Judge → tier switch → failover
+   → cache-aware → telemetry). No new event, no new default, no changed
+   decision path.
+2. **Simple tasks never orchestrate.** Even with orchestration on, Judge's
+   `fast` verdict keeps the existing direct fast run. Orchestration only
+   engages on Judge `smart`/complex verdicts.
+3. **Config fully backward compatible.** All `orchestration.*` fields are
+   optional with defaults; existing configs parse unchanged (deepMerge from
+   DEFAULT_CONFIG, as §5 does today).
+4. **Failure degrades to today's path.** If the subagent tool is unavailable
+   (pi-subagents not installed), the orchestrator prompt injection is skipped
+   and the turn proceeds exactly as today's smart-tier run. No crash, no
+   deadlock, no partial state.
+5. **Abort/reset.** User message or `/router orchestrate off` mid-loop cancels
+   pending runs and resets orchestrator state; the session continues as a
+   normal smart/fast session.
+6. **Existing features unaffected.** §8.5 failover, §9.1 cost telemetry, §9.2
+   cache-aware, §4 Judge, window (§3) all keep their exact current behavior
+   in both modes.
+
+**Open design decisions (to be settled before code):**
+
+1. **Entry trigger**: after Judge says complex, does the plugin auto-inject the
+   orchestrator prompt on the next turn, or does the user confirm first?
+   (Default proposal: auto, with a visible `🧭 orchestrating` status + a way to
+   abort.)
+2. **Worker mapping**: one pre-defined "engineer" Fast subagent, or multiple
+   specialized workers (frontend / backend / tests)? Derived from the Fast tier
+   chain.
+3. **Review loop**: Smart reviews each phase result inline (natural for the
+   orchestrator prompt) vs a dedicated review subagent. (Default: inline.)
+4. **Escalation threshold** N=2, configurable via `orchestration.*` config.
+5. **Default off** (opt-in `/router orchestrate on`) — a behavior change must
+   not silently alter the existing UX.
+6. **Interplay with §9.2**: the main-agent switches honor the warm-cache guard.
+7. **Orchestration lifecycle (session-scoped state)**: orchestration spans
+   multiple user turns (Smart plans in turn 1, worker executes as a subagent,
+   Smart reviews, user continues). The plugin must remember "we are in an
+   orchestration session" so `before_agent_start` keeps the main model Smart
+   and keeps the orchestrator context active, until the orchestrator signals
+   completion. Proposed model:
+   - `orchestration.active` (session state, not config) set when Judge says
+     complex AND orchestration enabled; cleared when Smart's run signals
+     completion (a defined output marker in the orchestrator instruction, e.g.
+     the final acceptance pass ends with a sentinel) or on abort.
+   - While active: main agent stays Smart for subsequent turns; the orchestrator
+     context is not re-injected on every turn (it persists in session history)
+     but the model lock persists.
+   - Exit: sentinel output OR `elapsed/budget` cap OR user abort
+     (`/router orchestrate off`). After exit, `before_agent_start` resumes
+     normal auto routing.
+   - Simpler MVP alternative: orchestration is *single-turn* — the orchestrator
+     prompt runs one Smart turn that does plan + delegate + review + accept all
+     inside that turn (subagents are spawned synchronously within the turn).
+     No cross-turn state needed. Trade-off: a long task holds the turn until
+     done; no user checkpoints mid-task. **Default proposal: single-turn MVP,
+     cross-turn lifecycle as Phase 3 extension.**
+
+**Risks**: review-loop convergence (a picky orchestrator can reject good work —
+the injected prompt must only flag blocking issues); subagent output quality
+variance (each worker is fresh-context, so the task prompt must be
+self-contained); orchestration runaway cost (needs a session budget or max
+phase cap); state robustness (user interrupts mid-orchestration need
+cancel/reset semantics). Suggested build order: prove one Smart-plan →
+Fast-subagent-execute → Smart-accept loop first, then add review iteration and
+escalation.
