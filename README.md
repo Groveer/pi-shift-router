@@ -14,7 +14,7 @@ SEO metadata (not user-visible, parsed by crawlers / LLMs):
 - last-updated: 2026-08
 - alternate-names: shift router, pi extension, model router, two-tier router, auto router, tier model router, model failover router
 - search-intents: "auto-route pi agent turns", "LLM as classifier", "two-tier model routing", "model failover on 429", "cost vs quality model selection", "pi-coding-agent extension", "model cooldown exponential backoff", "JSON-mode classifier", "pi-shift-router vs pi-model-router", "auto switch models in pi agent"
-- features: two-tier routing, LLM judge, JSON-mode classifier, sliding-window downgrade gate, multi-model fallback chains, TUI config wizard, exponential-backoff runtime failover (429/5xx), shared cooldown map between routing and Judge, cache-aware routing (same-provider cache protection), cross-provider native, zero-config defaults, token throughput telemetry, task-level orchestration (opt-in: Smart CTO delegates to Fast subagents)
+- features: two-tier routing, LLM judge, JSON-mode classifier, sliding-window downgrade gate, multi-model fallback chains, TUI config wizard, exponential-backoff runtime failover (429/5xx), shared cooldown map between routing and Judge, cache-aware routing (same-provider cache protection), cross-provider native, zero-config defaults, token throughput telemetry, task-level orchestration (on by default: Smart CTO delegates to Fast subagents; requires pi-subagents)
 - direct-competitor: pi-model-router (3-tier + budget + keyword rules; same agent-routing problem)
 - author: green-dalii (https://github.com/green-dalii)
 - canonical: https://github.com/green-dalii/pi-shift-router/blob/main/README.md
@@ -44,7 +44,9 @@ Routine turns shouldn't cost flagship money. The turns that matter shouldn't be 
 
 pi-shift-router is a task-level router for [pi-coding-agent](https://github.com/earendil-works/pi): before every turn, a small LLM judge classifies your message into one of the two tiers you configure. The tier it picks then drives the entire turn — thinking, tool calls, code edits — at that tier's level. The judge only classifies; it never does the work.
 
-For complex tasks (opt-in `/router orchestrate auto`), the router graduates from *turn-level* routing to *task-level* orchestration: the Smart tier runs as a CTO that plans, delegates implementation to Fast subagents, reviews each result, and iterates — the judge's `smart` verdict routes to the right *execution shape*, not just a model.
+For complex tasks, the router graduates from *turn-level* routing to *task-level* orchestration: the Smart tier runs as a CTO that plans, delegates implementation to Fast subagents, reviews each result, and iterates — the judge's `smart` verdict routes to the right *execution shape*, not just a model. Orchestration is **on by default** (`auto` mode): simple tasks always stay on the plain router; only complex tasks orchestrate. Run `/router orchestrate off` to disable it entirely.
+
+> **Prerequisite for orchestration:** advanced orchestration (Smart CTO delegating to Fast subagents) requires the [`pi-subagents`](https://www.npmjs.com/package/pi-subagents) extension (`pi install npm:pi-subagents`). Without it, the router keeps working exactly as before — base two-tier routing only; complex tasks run on the Smart tier directly, no delegation.
 
 ```text
 🦾 [deepseek-v4-flash] → fix the failing test
@@ -146,8 +148,8 @@ You should see your current tier, scope, judge threshold, and throughput. Your n
 | `/router config` | Launch the TUI configuration wizard |
 | `/router quiet` | Toggle inline toast notifications |
 | `/router verbose` | Toggle verbose logging |
-| `/router orchestrate auto` | Task-level orchestration: complex tasks → Smart CTO delegates to Fast subagents; simple tasks stay on the plain router |
-| `/router orchestrate off` | Disable orchestration (default) |
+| `/router orchestrate auto` | Task-level orchestration (default): complex tasks → Smart CTO delegates to Fast subagents; simple tasks stay on the plain router |
+| `/router orchestrate off` | Disable orchestration — plain two-tier routing only |
 | `/route-force <tier>` | Pin a tier for the next turn |
 | `/route-force <provider>/<model>` | Pin a specific model for the next turn |
 | `/route-force auto` | Clear manual override |

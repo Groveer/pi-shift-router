@@ -52,8 +52,8 @@ function noCooldown(_provider: string, _model: string): boolean {
 }
 
 describe("orchestration: default config", () => {
-  it("is disabled by default (backward-compat #1)", () => {
-    expect(DEFAULT_CONFIG.orchestration.mode).toBe("off");
+  it("is auto by default (v1.0.0 feature on by default)", () => {
+    expect(DEFAULT_CONFIG.orchestration.mode).toBe("auto");
   });
 
   it("config without orchestration.* parses unchanged (backward-compat #3)", () => {
@@ -62,7 +62,7 @@ describe("orchestration: default config", () => {
     // the default shape is present and complete.
     const cfg = JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as ShiftRouterConfig;
     expect(cfg.orchestration).toEqual({
-      mode: "off",
+      mode: "auto",
       maxRounds: 3,
       escalationThreshold: 2,
       requireSmartModel: true,
@@ -71,40 +71,45 @@ describe("orchestration: default config", () => {
 });
 
 describe("shouldOrchestrate", () => {
-  it("returns false when orchestration disabled (backward-compat #1)", () => {
+  it("returns true by default for smart verdict when everything available (default auto)", () => {
     const cfg = makeConfig();
+    expect(shouldOrchestrate(cfg, "smart", true, true)).toBe(true);
+  });
+
+  it("returns false when orchestration explicitly off (opt-out)", () => {
+    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, mode: "off" } });
     expect(shouldOrchestrate(cfg, "smart", true, true)).toBe(false);
   });
 
-  it("returns false for simple tasks even when enabled (backward-compat #2)", () => {
-    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, mode: "auto" } });
+  it("returns false for simple tasks even in auto mode (backward-compat #2)", () => {
+    const cfg = makeConfig();
     expect(shouldOrchestrate(cfg, "fast", true, true)).toBe(false);
   });
 
   it("returns false when router disabled", () => {
-    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, mode: "auto" }, enabled: false });
+    const cfg = makeConfig({ enabled: false });
     expect(shouldOrchestrate(cfg, "smart", true, true)).toBe(false);
   });
 
   it("returns true for smart verdict when everything available", () => {
-    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, mode: "auto" } });
+    const cfg = makeConfig();
     expect(shouldOrchestrate(cfg, "smart", true, true)).toBe(true);
   });
 
   it("returns false when Smart model unresolvable and requireSmartModel (backward-compat #4)", () => {
-    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, mode: "auto" } });
+    const cfg = makeConfig();
     expect(shouldOrchestrate(cfg, "smart", false, true)).toBe(false);
   });
 
   it("returns true when Smart model unresolvable but requireSmartModel=false", () => {
     const cfg = makeConfig({
-      orchestration: { ...DEFAULT_CONFIG.orchestration, mode: "auto", requireSmartModel: false },
+      orchestration: { ...DEFAULT_CONFIG.orchestration, requireSmartModel: false },
     });
     expect(shouldOrchestrate(cfg, "smart", false, true)).toBe(true);
   });
 
   it("returns false when subagent tool unavailable (backward-compat #4)", () => {
-    const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, mode: "auto" } });
+    const cfg = makeConfig();
     expect(shouldOrchestrate(cfg, "smart", true, false)).toBe(false);
   });
 });

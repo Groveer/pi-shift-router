@@ -51,7 +51,7 @@ Release history and planned work for **pi-shift-router**.
 - [x] **Worker task-prompt design principles** (SPEC §9.3): task-contract structure (goal/constraints/acceptance/out-of-scope), reference-don't-paste for large files, signal density, executable acceptance criteria, per-phase boundaries, budget-aware self-check. These shape the orchestrator template's delegation guidance.
 - [x] **Hard-control state machine** (plugin code): `currentPhase`, `attempts`, `maxRounds` cap, escalation threshold N, elapsed/cost budget — the loop stops when code says stop, not just when Smart says so.
 - [x] Simple tasks unchanged (fast direct run — degraded default).
-- [x] `/router orchestrate auto|off` toggle; default **off** (opt-in). `auto` = Judge-driven: simple tasks stay on the plain router, complex tasks orchestrate. Status bar `🪄` indicator.
+- [x] `/router orchestrate auto|off` toggle; default **auto** (v1.0.0 feature on by default; one-command opt-out). `auto` = Judge-driven: simple tasks stay on the plain router, complex tasks orchestrate (requires pi-subagents; without it degrades to today's smart run). Status bar `🪄` indicator.
 - [x] Abort semantics: user message / `/router orchestrate off` mid-loop cancels and resets.
 - [x] **Backward-compat tests** (SPEC §9.3 contract): orchestration-off byte-identical behavior; simple task never orchestrates; config without `orchestration.*` parses unchanged; pi-subagents missing → prompt injection skipped, smart-tier run proceeds; abort mid-loop → clean reset; existing features (failover/telemetry/cache-aware) unaffected.
 
@@ -68,7 +68,7 @@ Release history and planned work for **pi-shift-router**.
 - [ ] **Cross-turn orchestration lifecycle**: `orchestration.active` session state (set on complex entry, cleared on sentinel completion / budget cap / abort) — main model stays Smart across turns while active; resumes auto routing after exit. (MVP is single-turn: plan+delegate+review+accept inside one Smart turn; cross-turn is this extension.)
 - [ ] Examples directory entry (orchestration config + orchestrator prompt).
 
-**Design decisions recorded in SPEC §9.3 (Open design decisions):** entry trigger (auto vs confirm), worker mapping, review loop style, escalation threshold, default off, §9.2 interplay. **Hard/soft control split + backward-compatibility contract** (§9.3): plugin owns caps/budget/abort, Smart owns plan/review/accept; orchestration default off, simple tasks never orchestrate, missing pi-subagents degrades to today's smart run.
+**Design decisions recorded in SPEC §9.3 (Open design decisions):** entry trigger (auto vs confirm), worker mapping, review loop style, escalation threshold, default auto (settled), §9.2 interplay. **Hard/soft control split + backward-compatibility contract** (§9.3): plugin owns caps/budget/abort, Smart owns plan/review/accept; orchestration default auto (one-command opt-out), simple tasks never orchestrate, missing pi-subagents degrades to today's smart run.
 
 > **Withdrawn from earlier drafts.** Per-tier thinking level was proposed but is largely redundant — tier classification already encodes prompt complexity, so a static per-tier thinking rule rarely saves more than it complicates. Adaptive (per-prompt) thinking adds machinery without a clear win because the smart tier is already gated on real complexity. Dropped from v0.8.x.
 >

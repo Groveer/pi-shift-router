@@ -357,7 +357,7 @@ export function registerCommands(
 
       if (arg === "orchestrate") {
         ctx.ui.notify(
-          `pi-shift-router: 🪄 Usage: /router orchestrate auto|off — task-level orchestration (auto: complex tasks → Smart CTO delegates to Fast subagents; simple tasks stay on the plain router)`,
+          `pi-shift-router: 🪄 Usage: /router orchestrate auto|off — auto (default): complex tasks → Smart CTO delegates to Fast subagents (requires pi-subagents; without it, plain smart run); off: plain two-tier routing`,
           "info",
         );
         return;

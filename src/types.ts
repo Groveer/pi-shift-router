@@ -100,21 +100,23 @@ export interface ShiftRouterConfig {
 }
 
 /**
- * Task-level orchestration (SPEC §9.3). When enabled AND Judge says complex,
+ * Task-level orchestration (SPEC §9.3). When active AND Judge says complex,
  * the main agent runs the Smart model with an orchestrator instruction: it
  * plans, delegates implementation to Fast subagents (via the subagent tool),
  * reviews each result, and loops until clean — with plugin-side hard caps.
  *
- * Default off (opt-in via `/router orchestrate auto`). All fields optional —
- * an existing config without `orchestration.*` parses unchanged (deepMerge
- * from DEFAULT_CONFIG).
+ * Default "auto" (this is a v1.0.0 feature — shipped on by default so users
+ * experience it; anyone who prefers plain routing runs `/router orchestrate
+ * off`). All fields optional — an existing config without `orchestration.*`
+ * parses unchanged (deepMerge from DEFAULT_CONFIG).
  */
 export interface OrchestrationConfig {
   /**
-   * Mode. "off" (default): never orchestrate — byte-for-byte today's router.
-   * "auto": Judge-driven — simple tasks (fast verdict) keep the plain router;
-   * complex tasks (smart verdict) escalate to Smart-orchestrated execution.
-   * There is no "always" mode: orchestration is never forced on simple work.
+   * Mode. "auto" (default): Judge-driven — simple tasks (fast verdict) keep
+   * the plain router; complex tasks (smart verdict) escalate to
+   * Smart-orchestrated execution. "off": never orchestrate — byte-for-byte
+   * today's router. There is no "always" mode: orchestration is never forced
+   * on simple work.
    */
   mode: "auto" | "off";
   /** Max review/delegate rounds before Smart takes over (hard cap). */
@@ -171,7 +173,7 @@ export const DEFAULT_CONFIG: ShiftRouterConfig = {
     routerLogVerbose: false,
   },
   orchestration: {
-    mode: "off",
+    mode: "auto",
     maxRounds: 3,
     escalationThreshold: 2,
     requireSmartModel: true,

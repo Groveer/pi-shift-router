@@ -745,10 +745,15 @@ we keep paying for it.
 
 **Backward compatibility contract (must not break existing behavior):**
 
-1. **Default off.** Orchestration is opt-in (`/router orchestrate auto`); with it
-   off, behavior is byte-for-byte today's router (Judge → tier switch → failover
-   → cache-aware → telemetry). No new event, no new default, no changed
-   decision path.
+1. **Default `auto`, one-command opt-out.** Orchestration ships on by default
+   (`auto` mode — v1.0.0 feature; `/router orchestrate off` restores plain
+   routing). Existing behavior is preserved in two ways: (a) **simple tasks
+   never orchestrate** — Judge's `fast` verdict keeps the existing direct
+   fast run, so routine turns are byte-identical; (b) **missing
+   pi-subagents degrades** — without the extension the injection is skipped
+   and complex tasks run exactly as today's smart-tier run. No new event, no
+   changed decision path for anything except `smart`+subagents-present
+   turns, which gain delegation.
 2. **Simple tasks never orchestrate.** Even with orchestration on, Judge's
    `fast` verdict keeps the existing direct fast run. Orchestration only
    engages on Judge `smart`/complex verdicts.
@@ -778,8 +783,8 @@ we keep paying for it.
 3. **Review loop**: Smart reviews each phase result inline (natural for the
    orchestrator prompt) vs a dedicated review subagent. (Default: inline.)
 4. **Escalation threshold** N=2, configurable via `orchestration.*` config.
-5. **Default off** (opt-in `/router orchestrate auto`) — a behavior change must
-   not silently alter the existing UX.
+5. **Default `auto`** (settled 2026-08-13: v1.0.0 feature ships on by default so
+   users experience it; `/router orchestrate off` is the one-command opt-out).
 6. **Interplay with §9.2**: the main-agent switches honor the warm-cache guard.
 7. **Orchestration lifecycle (session-scoped state)**: orchestration spans
    multiple user turns (Smart plans in turn 1, worker executes as a subagent,

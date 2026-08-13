@@ -13,8 +13,12 @@
  *   tier chains (healthy-only, cooldown-filtered) into the prompt. We never
  *   write pi-subagents' settings — per-run model overrides are passed by the
  *   Smart agent, guided by the rendered chain.
- * - Backward compatibility: with `orchestration.mode` "off" (default),
- *   every path here is a no-op — behavior is byte-for-byte today's router.
+ * - Backward compatibility: with `orchestration.mode` "off" (explicit opt-out
+ *   via `/router orchestrate off`), every path here is a no-op — behavior is
+ *   byte-for-byte today's router. Default is "auto" (v1.0.0 feature shipped
+ *   on by default); even in auto, simple tasks (fast verdict) never
+ *   orchestrate, and missing subagent tool / unresolvable Smart model skip
+ *   injection — so the default change is invisible for plain routing.
  * - Simple tasks never orchestrate: only a Judge "smart" verdict can enter.
  * - Missing pi-subagents / unresolvable Smart model → skip injection and run
  *   the turn as today's smart-tier run (no crash).
@@ -164,8 +168,9 @@ export function exitOrchestration(state: RouterState): void {
  * Decide whether THIS turn should run as an orchestration turn.
  *
  * All conditions must hold:
- * 1. Orchestration mode "auto" (config, opt-in). There is no "always" mode —
- *    orchestration is never forced on simple work.
+ * 1. Orchestration mode "auto" (default; opt-out via `/router orchestrate
+ *    off`). There is no "always" mode — orchestration is never forced on
+ *    simple work.
  * 2. Router enabled.
  * 3. Judge said "smart" (complex) — simple tasks never orchestrate.
  * 4. Smart tier model is resolvable (or requireSmartModel is false).
