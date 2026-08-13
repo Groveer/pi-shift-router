@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > (0.1.0 – 0.3.1) were developed under the `pi-slim-router` working name and never
 > published to npm. The plugin was first published to npm as `pi-shift-router` at v0.4.0.
 
+## [1.0.0] — Task-level orchestration: the CTO delegates to Fast subagents
+
+### Added
+
+- **Task-level orchestration (SPEC §9.3).** Complex tasks (Judge `smart` verdict) now escalate from *turn-level* routing to *task-level* execution: the Smart tier runs as a CTO that plans the work, delegates implementation to Fast engineer subagents (via the `subagent` tool, `context: "fresh"`, model pinned from the Fast tier chain), reviews each result, iterates with concrete feedback, and does a final acceptance pass. Simple tasks (`fast` verdict) never orchestrate — they stay on the plain router, byte-for-byte unchanged.
+- **Orchestrator instruction** (`src/prompts/orchestrator.md`): injected into the Smart agent's system prompt when an orchestrated turn begins, with the current Fast/Smart tier chains rendered in (cooldown-filtered, priority-ordered). Includes the worker task-contract principles (goal / constraints / acceptance criteria / out-of-scope; reference-don't-paste; signal density; executable acceptance; per-phase boundaries).
+- **Hard-control state machine.** The plugin owns the caps independent of the Smart agent's judgment: `orchestration.maxRounds` (default 3) and `orchestration.escalationThreshold` (default 2 — after N worker failures on a phase, Smart takes over that phase itself). The loop stops when either the Smart agent says done or a cap is hit.
+- **`/router orchestrate auto|off` command.** `auto` (default) = Judge-driven: simple tasks stay on the plain router, complex tasks orchestrate. `off` = plain two-tier routing only (one-command opt-out; `on` kept as a legacy alias mapping to `auto`). Status bar / logs use `🪄` to distinguish orchestration from the judge's `🧭` compass.
+- **Backward compatibility contract** (SPEC §9.3): orchestration ships on by default, but existing behavior is preserved — simple tasks never orchestrate, and missing `pi-subagents` degrades to today's smart-tier run (no crash, no deadlock). All `orchestration.*` config fields are optional with defaults; existing configs parse unchanged.
+- **Prerequisite documented:** advanced orchestration requires the `pi-subagents` extension; without it the router keeps working as base two-tier routing.
+
+### Changed
+
+- **README×2, SPEC, ROADMAP, TROUBLESHOOTING×2** — comprehensive task-level orchestration documentation: how an orchestrated turn runs, fresh-context worker rationale (verified ~$0.004 narrow task vs ~$0.06 inherited 176k-token fork; thinking stays enabled vs forced-off in fork mode), hard caps, when orchestration doesn't engage, and a four-gate troubleshooting checklist for "orchestration never engages".
+- **package.json `pi.image`** — hero image added for the pi package gallery (PNG/JPEG/WebP public URL).
+
+### Removed
+
+- None (orchestration is additive; default behavior for existing configs is unchanged).
+
 ## [0.10.0] — Cache-aware routing, judge reason, coverage reporting
 
 ### Added
