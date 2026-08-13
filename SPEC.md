@@ -773,10 +773,10 @@ we keep paying for it.
 
 **Open design decisions (to be settled before code):**
 
-1. **Entry trigger**: after Judge says complex, does the plugin auto-inject the
-   orchestrator prompt on the next turn, or does the user confirm first?
-   (Default proposal: auto, with a visible `🧭 orchestrating` status + a way to
-   abort.)
+1. **Entry trigger** (settled 2026-08-13): auto-inject on Judge `smart` when
+   orchestration is in `auto` mode, with a visible `🪄` status; abort via user
+   message or `/router orchestrate off`. No confirmation prompt — the judge
+   already gates on complexity.
 2. **Worker mapping**: one pre-defined "engineer" Fast subagent, or multiple
    specialized workers (frontend / backend / tests)? Derived from the Fast tier
    chain.
@@ -793,7 +793,7 @@ we keep paying for it.
    and keeps the orchestrator context active, until the orchestrator signals
    completion. Proposed model:
    - `orchestration.active` (session state, not config) set when Judge says
-     complex AND orchestration enabled; cleared when Smart's run signals
+     complex AND orchestration mode is `auto`; cleared when Smart's run signals
      completion (a defined output marker in the orchestrator instruction, e.g.
      the final acceptance pass ends with a sentinel) or on abort.
    - While active: main agent stays Smart for subsequent turns; the orchestrator

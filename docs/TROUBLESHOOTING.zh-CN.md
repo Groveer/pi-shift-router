@@ -31,3 +31,28 @@ Judge 误分类（`/router verbose` 查看）或阈值太激进。调高：
 ```json
 "routing": { "window": { "size": 5, "threshold": 0.8, "minConfidence": 0.5 } }
 ```
+
+---
+
+## 编排一直不触发（看不到 `🪄`）
+
+编排（SPEC §9.3）需要同时满足以下条件：
+
+1. **`/router status` 显示 `Orchestration: 🪄 auto`** —— 若显示 `✗ (off)`，运行 `/router orchestrate auto`（或改配置文件 `orchestration.mode`）。
+2. **已安装 pi-subagents** —— 必须有 `subagent` 工具。检查 `~/.pi/agent/settings.json` 里是否有 `npm:pi-subagents`，或 `pi list`。没有它，复杂任务直接在 Smart 档运行（不派发）——这是设计内的降级，不是 bug。
+3. **该轮被判为 `smart`** —— 编排只在复杂任务上触发。`fast` 判定意味着普通路由，这是设计。试一个真正复杂的请求（架构设计、多步规划、以审核为交付物），并用 `/router verbose` 看是否出现 `judge: smart`。
+4. **Smart 模型可解析** —— Smart 档至少要有一个 pi 能找到的模型（不在冷却、在模型库中注册）。若 `requireSmartModel` 为 true（默认）且模型不可解析，编排被跳过。
+
+用 `/router verbose` 逐步验证：
+
+```
+[ShiftRouter] judge: smart (llm) …
+[ShiftRouter] 🪄 orchestrating: judge=smart, injecting orchestrator prompt (N chars)
+[ShiftRouter] 🪄 orchestration turn ended — exited orchestrator state
+```
+
+若看到 `judge: smart` 但没有 `🪄 orchestrating` 行，说明上面某个门没通过——检查 1–4。若看到 `🧭 judging…` 但 judge 返回 `fast`，说明模型判定该任务属例行——这是 Judge 在干活，不是路由 bug。
+
+## 编排轮次没有实际派发
+
+编排指令告诉 Smart 用 `subagent` 工具，但派不派发是 LLM 的判断。如果它自己实现了任务，要么任务比判定时想的简单，要么该模型对派发引导不够上心。这不阻塞：工作还是以 Smart 质量完成了。调试可检查编排 prompt（已注入 system prompt，verbose 模式可见）和轮次末尾的 CTO 总结。

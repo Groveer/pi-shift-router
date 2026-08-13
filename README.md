@@ -13,14 +13,14 @@ SEO metadata (not user-visible, parsed by crawlers / LLMs):
 - latest: v0.10.0
 - last-updated: 2026-08
 - alternate-names: shift router, pi extension, model router, two-tier router, auto router, tier model router, model failover router
-- search-intents: "auto-route pi agent turns", "LLM as classifier", "two-tier model routing", "model failover on 429", "cost vs quality model selection", "pi-coding-agent extension", "model cooldown exponential backoff", "JSON-mode classifier", "pi-shift-router vs pi-model-router", "auto switch models in pi agent"
+- search-intents: "auto-route pi agent turns", "LLM as classifier", "two-tier model routing", "model failover on 429", "cost vs quality model selection", "pi-coding-agent extension", "model cooldown exponential backoff", "JSON-mode classifier", "pi-shift-router vs pi-model-router", "auto switch models in pi agent", "task-level orchestration pi", "Smart CTO delegates to Fast subagents", "pi agent subagent orchestration"
 - features: two-tier routing, LLM judge, JSON-mode classifier, sliding-window downgrade gate, multi-model fallback chains, TUI config wizard, exponential-backoff runtime failover (429/5xx), shared cooldown map between routing and Judge, cache-aware routing (same-provider cache protection), cross-provider native, zero-config defaults, token throughput telemetry, task-level orchestration (on by default: Smart CTO delegates to Fast subagents; requires pi-subagents)
 - direct-competitor: pi-model-router (3-tier + budget + keyword rules; same agent-routing problem)
 - author: green-dalii (https://github.com/green-dalii)
 - canonical: https://github.com/green-dalii/pi-shift-router/blob/main/README.md
 -->
 
-![pi-shift-router hero — routine turns stay on the cheap tier, a judge moment upgrades the work that matters to the strong tier](assets/hero.jpeg)
+![pi-shift-router hero — routine turns stay on the cheap tier; a judge moment upgrades the work that matters to the strong tier, which plans and delegates to fast engineers](assets/hero.jpeg)
 
 # pi-shift-router
 
@@ -58,7 +58,7 @@ For complex tasks, the router graduates from *turn-level* routing to *task-level
 
 - **Upgrades are instant**; downgrades wait for a sustained trend — no mid-session bouncing.
 - Per-tier fallback chains plus exponential-backoff cooldown on 429/5xx — turns keep flowing.
-- Zero runtime dependencies, one config file — and it does nothing until you configure.
+- Zero runtime dependencies, one config file — a no-op until you pick models; then routing just works (and complex tasks orchestrate automatically).
 
 ```bash
 pi install npm:pi-shift-router   # then: /router config → /router status
@@ -91,6 +91,38 @@ The judge shares the same cooldown map (it walks the full fast-tier chain before
 
 ---
 
+## Task-level orchestration (v1.0.0)
+
+Turn-level routing picks *which model* runs a turn. Task-level orchestration picks *how a complex task executes*. When the judge says `smart` and orchestration is in `auto` mode (default), the router hands the turn to the Smart tier as a **CTO**: it plans the work, delegates implementation to Fast engineer subagents, reviews each result, and iterates until the work is clean — then does a final acceptance pass. Simple tasks (`fast` verdict) never trigger this; they stay on the plain router, byte-for-byte unchanged.
+
+### How an orchestrated turn runs
+
+1. **Enter.** Judge says `smart` → the router switches the main agent to the Smart model and injects an orchestrator instruction (your role, delegation rules, hard caps). The status bar / verbose log shows `🪄 orchestrating`.
+2. **Plan.** The Smart agent decomposes the task into phases, each with acceptance criteria.
+3. **Delegate.** For each phase it spawns a Fast subagent via the `subagent` tool — `agent: "worker"`, `context: "fresh"`, model pinned from your **Fast tier** — with a self-contained task contract (goal, constraints, acceptance criteria, files to touch).
+4. **Review.** It reads each worker's result against the phase's acceptance criteria. Failed phases go back to a worker with concrete feedback — or the Smart agent takes over the phase itself after N failures.
+5. **Accept.** It finishes with a short CTO summary and a final acceptance pass.
+
+### Why fresh-context workers
+
+Workers run with `context: "fresh"` — no inherited session history. The task string *is* their world, so it must be a precise contract: goal, constraints, acceptance criteria, out-of-scope. This keeps each worker's context small (fast, cheap, focused — a verified ~$0.004 narrow task vs ~$0.06 for an inherited 176k-token fork) and is the verified way to keep thinking enabled on anthropic-compatible endpoints, which otherwise force `thinking: off` in fork mode.
+
+### Hard caps (the router's part)
+
+The plugin enforces two numbers, independent of what the Smart agent wants:
+- **`orchestration.maxRounds`** (default 3) — max delegate→review rounds per task.
+- **`orchestration.escalationThreshold`** (default 2) — after N worker failures on a phase, the Smart agent takes over that phase itself.
+
+The loop stops when either the Smart agent says done or a cap is hit.
+
+### When it doesn't engage
+
+- **Simple tasks** (`fast` verdict) — plain routing, always. Orchestration is never forced on routine work.
+- **`pi-subagents` not installed** — complex tasks run on the Smart tier directly, exactly as before. No crash, no deadlock.
+- **Orchestration set to `off`** (`/router orchestrate off`) — plain two-tier routing only.
+
+---
+
 ## When it pays off / when it doesn't
 
 **Worth it when**
@@ -118,6 +150,14 @@ pi install npm:pi-shift-router
 ```
 
 Local checkout: `pi install <path-to-repo>`. From git: `pi install git:github.com/green-dalii/pi-shift-router`. Installation registers the extension in `~/.pi/agent/settings.json` and loads it on the next pi launch.
+
+**1.5. (Recommended) Enable orchestration**
+
+```bash
+pi install npm:pi-subagents   # Smart CTO → Fast subagent delegation
+```
+
+Orchestration is **on by default** (`auto` mode); this installs the subagent machinery it delegates to. Without it, the router still works — plain two-tier routing only.
 
 **2. Configure**
 
@@ -171,6 +211,7 @@ The baseline asks: *what would this session have cost if every turn ran on your 
 |---|---|---|
 | **Judging** | Pure LLM (JSON mode enforced) — one readable, editable prompt, zero rules to maintain | LLM classifier with a keyword fallback — the rule list grows with every new scenario |
 | **Tiers** | Just 2 — a codebase you can read end to end in an evening | 3 tiers + a USD budget cap + keyword pinning — more powerful, heavier |
+| **Orchestration** | Task-level: on complex tasks the Smart tier plans and delegates implementation to Fast subagents (on by default; needs pi-subagents) | — (per-turn model selection only) |
 | **Resilience** | Same-turn 429/5xx failover with exponential-backoff cooldown, shared with the judge | Profile-level fallback chain |
 
 Want zero deps, a pure-LLM judge, and same-turn failover — pick us. Want a hard USD cap, cross-session state, or keyword pinning — pick it.
@@ -194,6 +235,18 @@ Only when the last five turns weigh ≥ `threshold` (default 0.6) toward `fast`;
 ### Can I disable it without uninstalling?
 
 `/router off` disables it for the session, `/router on` re-enables it; the switch persists in the config file.
+
+### What triggers orchestration?
+
+Only a `smart` verdict on a complex task — with orchestration in `auto` mode (default). Simple tasks (`fast`) never orchestrate; they stay on the plain router. See [Task-level orchestration](#task-level-orchestration-v100).
+
+### Does orchestration cost more?
+
+The Smart tier plans and reviews; the Fast tier implements — workers run `fresh`-context, so each is small and cheap (~$0.004 for a narrow task vs ~$0.06 for an inherited 176k-token fork). The judge still costs its normal single classification call. If a task turns out simple, the orchestration machinery never engages.
+
+### How do I know a turn orchestrated?
+
+`/router verbose` prints `🪄 orchestrating` when the orchestrator instruction is injected. `/router status` shows `Orchestration: 🪄 auto (idle)` normally, `(active)` during an orchestrated run, or `✗ (off)` when disabled.
 
 ---
 

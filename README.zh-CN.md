@@ -14,13 +14,13 @@ SEO 元数据（用户不可见，供爬虫 / LLM 解析）：
 - latest: v0.10.0
 - last-updated: 2026-08
 - alternate-names: shift router, pi extension, model router, two-tier router, auto router, tier model router, model failover router
-- search-intents: "自动路由 pi agent 每轮", "LLM 作为分类器", "两层模型路由", "遇 429 模型的自动 failover", "成本与质量模型选择", "pi-coding-agent 扩展", "模型冷却指数退避", "JSON-mode 分类器", "pi-shift-router 与 pi-model-router 对比", "pi 自动切换便宜模型"
+- search-intents: "自动路由 pi agent 每轮", "LLM 作为分类器", "两层模型路由", "遇 429 模型的自动 failover", "成本与质量模型选择", "pi-coding-agent 扩展", "模型冷却指数退避", "JSON-mode 分类器", "pi-shift-router 与 pi-model-router 对比", "pi 自动切换便宜模型", "任务级编排 pi", "Smart CTO 派发 Fast 子代理", "pi agent 子代理编排"
 - features: 两层路由、LLM Judge、JSON-mode 分类器、滑动窗口降级门、多模型 fallback 链、TUI 配置向导、指数退避运行时 failover（429/5xx）、路由与 Judge 共享冷却、cache-aware 路由（同 Provider 缓存保护）、跨 Provider、零配置起步、token 吞吐遥测、任务级编排（默认开启：Smart 档作为 CTO 派发给 Fast 子代理；需安装 pi-subagents）
 - direct-competitor: pi-model-router（3 档 + 预算 + 关键词规则；同类问题，不同实现选择）
 - author: green-dalii（https://github.com/green-dalii）
 -->
 
-![pi-shift-router 首图 —— 例行的轮次留在便宜档，判定时刻把重要的一轮升级到强档](assets/hero.jpeg)
+![pi-shift-router 首图 —— 例行的轮次留在便宜档；判定时刻把重要的工作升级到强档，由它规划并派发给 Fast 工程师](assets/hero.jpeg)
 
 # pi-shift-router
 
@@ -58,7 +58,7 @@ pi-shift-router 是 [pi-coding-agent](https://github.com/earendil-works/pi) 的�
 
 - **升级立即**，降级要等趋势稳定——不会来回抖。
 - 每档可配多模型链，429/5xx 指数退避冷却，任务不中断。
-- 零运行时依赖、一个配置文件；**不配置就什么都不做**。
+- 零运行时依赖、一个配置文件——配好模型之前是 no-op，之后路由开箱即用（复杂任务自动编排）。
 
 ```bash
 pi install npm:pi-shift-router   # 然后：/router config → /router status
@@ -91,6 +91,38 @@ Judge 与路由共用同一张冷却表（判定失败也会走完整条 fast �
 
 ---
 
+## 任务级编排（v1.0.0）
+
+单轮路由决定*哪台模型*跑这一轮；任务级编排决定*复杂任务怎么执行*。当判定说 `smart` 且编排处于 `auto` 模式（默认）时，路由器把这一轮交给 Smart 档当 **CTO**：它规划工作、把实现派发给 Fast 工程师子代理、逐项审核并迭代，直到工作干净——最后做一次最终验收。简单任务（`fast` 判定）永不触发编排，照旧走普通路由，逐字节不变。
+
+### 一个编排轮次怎么跑
+
+1. **进入。** 判定说 `smart` → 路由器把主模型切到 Smart 档并注入一条编排指令（你的角色、派发规则、硬上限）。状态栏 / 详细日志显示 `🪄 orchestrating`。
+2. **规划。** Smart 把任务拆成多个阶段，每个阶段带验收标准。
+3. **派发。** 每个阶段通过 `subagent` 工具拉起一个 Fast 子代理——`agent: "worker"`、`context: "fresh"`、模型钉在你** Fast 档**——配一份自包含的任务契约（目标、约束、验收标准、要动的文件）。
+4. **审核。** Smart 按验收标准读每个 worker 的结果。失败阶段带着具体反馈回到 worker——或连续失败 N 次后由 Smart 亲自接管。
+5. **验收。** 以一段简短的 CTO 总结 + 最终验收收尾。
+
+### 为什么用 fresh 上下文 worker
+
+worker 以 `context: "fresh"` 运行——不继承会话历史。任务字符串*就是它的全部世界*，所以必须是一份精确契约：目标、约束、验收标准、范围外。这让每个 worker 的上下文都很小（快、便宜、专注——实测窄任务约 $0.004，继承 176k token fork 约 $0.06），也是让 anthropic 兼容端点保持思考开启的已验证方式（fork 模式会被强制 `thinking: off`）。
+
+### 硬上限（路由器负责的部分）
+
+插件强制执行两个数字，与 Smart 想做什么无关：
+- **`orchestration.maxRounds`**（默认 3）——每个任务最多 delegate→review 轮数。
+- **`orchestration.escalationThreshold`**（默认 2）——某阶段 worker 连续失败 N 次，Smart 亲自接管该阶段。
+
+循环在 Smart 说完成、或命中上限时停止——两者任一即停。
+
+### 什么时候不触发
+
+- **简单任务**（`fast` 判定）——永远普通路由。例行工作绝不强制编排。
+- **未安装 `pi-subagents`**——复杂任务直接在 Smart 档运行，和以前一模一样。不崩溃、不死锁。
+- **编排设为 `off`**（`/router orchestrate off`）——仅基础两档路由。
+
+---
+
 ## 什么时候值得 / 什么时候不值得
 
 **值得用**
@@ -118,6 +150,14 @@ pi install npm:pi-shift-router
 ```
 
 本地开发用 `pi install <仓库路径>`，git 安装用 `pi install git:github.com/green-dalii/pi-shift-router`。安装后注册进 `~/.pi/agent/settings.json`，下次启动 pi 自动加载。
+
+**1.5.（推荐）开启编排能力**
+
+```bash
+pi install npm:pi-subagents   # Smart CTO → Fast 子代理派发
+```
+
+编排**默认开启**（`auto` 模式）；这一步装上它要派发的子代理机制。不装也能用——仅基础两档路由。
 
 **2. 配置**
 
@@ -171,6 +211,7 @@ Spend: fast $0.045 (9 calls) · smart $0.42 (3 calls) · total $0.465
 |---|---|---|
 | **判定** | 纯 LLM（JSON mode 强制），一个 prompt 就能读懂和改写，零规则可维护 | LLM 分类器 + 关键词兜底，规则随场景越积越多 |
 | **档位** | 只有 2 档，逻辑一晚上能读完 | 3 档 + USD 预算上限 + 关键词钉选，更重但控制力更强 |
+| **编排** | 任务级：复杂任务由 Smart 档规划并把实现派发给 Fast 子代理（默认开启；需 pi-subagents） | —（仅单轮选模型） |
 | **韧性** | 429/5xx 同轮接管 + 指数退避冷却（与 Judge 共享） | profile 级 fallback 链 |
 
 要零依赖、纯 LLM 判定、同轮故障接管——选我们；要硬性预算上限、跨会话状态、关键词钉选——选它。
@@ -194,6 +235,18 @@ Spend: fast $0.045 (9 calls) · smart $0.42 (3 calls) · total $0.465
 ### 能临时停用而不卸载吗？
 
 `/router off` 停用当前会话，`/router on` 恢复，开关写入配置文件。
+
+### 什么会触发编排？
+
+只有复杂任务被判 `smart` 且编排处于 `auto` 模式（默认）时才触发。简单任务（`fast`）永不编排，走普通路由。见[任务级编排](#任务级编排v100)。
+
+### 编排会更贵吗？
+
+Smart 档负责规划与审核，Fast 档负责实现——worker 用 `fresh` 上下文，每个都很小很便宜（窄任务约 $0.004，继承 176k token fork 约 $0.06）。判定仍是原来的单次分类调用。若任务实际很简单，编排机制根本不启动。
+
+### 怎么知道一轮是否编排了？
+
+`/router verbose` 在注入编排指令时会打印 `🪄 orchestrating`。`/router status` 显示 `Orchestration: 🪄 auto (idle)`（空闲）、`(active)`（编排运行中）、或 `✗ (off)`（已关闭）。
 
 ---
 
