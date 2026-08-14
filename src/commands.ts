@@ -443,7 +443,7 @@ export function registerCommands(
           : " ✗";
         const sOrch = config.orchestration.mode === "auto"
           ? (state.orchestration.active
-              ? ` 🪄 active (round ${state.orchestration.rounds}/${config.orchestration.maxRounds}, esc ${state.orchestration.escalations}/${config.orchestration.escalationThreshold})`
+              ? ` 🪄 active (round ${state.orchestration.rounds}/${config.orchestration.maxRounds}, esc ${state.orchestration.escalations}/${config.orchestration.escalationThreshold}, workers ${state.orchestration.done}/${state.orchestration.spawned})`
               : ` 🪄 auto (idle)`)
           : " ✗ (off)";
         const totalTurns = state.window.length + state.upgradeCount + state.downgradeCount;

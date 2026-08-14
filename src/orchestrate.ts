@@ -136,6 +136,8 @@ export function createOrchestrationState(): OrchestrationState {
     escalations: 0,
     startedAt: null,
     spend: 0,
+    spawned: 0,
+    done: 0,
   };
 }
 
@@ -156,6 +158,8 @@ export function enterOrchestration(state: RouterState): void {
     orch.rounds = 0;
     orch.escalations = 0;
     orch.spend = 0;
+    orch.spawned = 0;
+    orch.done = 0;
   }
 }
 
@@ -173,8 +177,11 @@ export function exitOrchestration(state: RouterState): void {
  *    simple work.
  * 2. Router enabled.
  * 3. Judge said "smart" (complex) — simple tasks never orchestrate.
- * 4. Smart tier model is resolvable (or requireSmartModel is false).
- * 5. pi-subagents is available (the subagent tool exists) — otherwise
+ * 4. Judge's explicit orchestration signal does not veto: `orchestrate:
+ *    false` → Smart runs the turn directly. Absent (undefined) = no veto,
+ *    default behavior (smart → orchestrate). `true` = explicit go.
+ * 5. Smart tier model is resolvable (or requireSmartModel is false).
+ * 6. pi-subagents is available (the subagent tool exists) — otherwise
  *    degrade to today's smart-tier run.
  *
  * Pure decision — no side effects. Returns true when the orchestrator
@@ -183,12 +190,15 @@ export function exitOrchestration(state: RouterState): void {
 export function shouldOrchestrate(
   config: ShiftRouterConfig,
   judgeTier: string,
+  judgeOrchestrate: boolean | undefined,
   smartModelResolvable: boolean,
   subagentToolAvailable: boolean,
 ): boolean {
   if (!config.enabled) return false;
   if (config.orchestration.mode !== "auto") return false;
   if (judgeTier !== "smart") return false;
+  // Explicit veto from the Judge wins: judge said smart but NOT orchestratable.
+  if (judgeOrchestrate === false) return false;
   if (config.orchestration.requireSmartModel && !smartModelResolvable) return false;
   if (!subagentToolAvailable) return false;
   return true;

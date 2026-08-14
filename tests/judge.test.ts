@@ -141,6 +141,30 @@ describe("parseJudgeAnswer — reason field", () => {
     expect(r?.reason?.length).toBe(120);
   });
 
+  it("parses orchestrate:true from JSON", () => {
+    expect(
+      parseJudgeAnswer('{"tier":"smart","confidence":0.9,"orchestrate":true,"reason":"multi-file feature"}'),
+    ).toEqual({ tier: "smart", confidence: 0.9, orchestrate: true, reason: "multi-file feature" });
+  });
+
+  it("parses orchestrate:false from JSON", () => {
+    expect(
+      parseJudgeAnswer('{"tier":"smart","orchestrate":false}'),
+    ).toEqual({ tier: "smart", orchestrate: false });
+  });
+
+  it("accepts loose orchestrate=true syntax", () => {
+    expect(parseJudgeAnswer('{"tier":"smart", orchestrate: true}')?.orchestrate).toBe(true);
+  });
+
+  it("omits orchestrate when absent (backward compat)", () => {
+    expect(parseJudgeAnswer('{"tier":"fast","confidence":0.9}')).toEqual({ tier: "fast", confidence: 0.9 });
+  });
+
+  it("ignores malformed orchestrate value", () => {
+    expect(parseJudgeAnswer('{"tier":"smart","orchestrate":"yes"}')?.orchestrate).toBeUndefined();
+  });
+
   it("returns null for unparseable text", () => {
     expect(parseJudgeAnswer("@#$%")).toBeNull();
   });

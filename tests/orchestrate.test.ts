@@ -73,44 +73,60 @@ describe("orchestration: default config", () => {
 describe("shouldOrchestrate", () => {
   it("returns true by default for smart verdict when everything available (default auto)", () => {
     const cfg = makeConfig();
-    expect(shouldOrchestrate(cfg, "smart", true, true)).toBe(true);
+    // judgeOrchestrate undefined (older prompt / not emitted) → no veto, default smart→orchestrate
+    expect(shouldOrchestrate(cfg, "smart", undefined, true, true)).toBe(true);
   });
 
   it("returns false when orchestration explicitly off (opt-out)", () => {
     const cfg = makeConfig({ orchestration: { ...DEFAULT_CONFIG.orchestration, mode: "off" } });
-    expect(shouldOrchestrate(cfg, "smart", true, true)).toBe(false);
+    expect(shouldOrchestrate(cfg, "smart", undefined, true, true)).toBe(false);
   });
 
   it("returns false for simple tasks even in auto mode (backward-compat #2)", () => {
     const cfg = makeConfig();
-    expect(shouldOrchestrate(cfg, "fast", true, true)).toBe(false);
+    expect(shouldOrchestrate(cfg, "fast", undefined, true, true)).toBe(false);
   });
 
   it("returns false when router disabled", () => {
     const cfg = makeConfig({ enabled: false });
-    expect(shouldOrchestrate(cfg, "smart", true, true)).toBe(false);
+    expect(shouldOrchestrate(cfg, "smart", undefined, true, true)).toBe(false);
   });
 
   it("returns true for smart verdict when everything available", () => {
     const cfg = makeConfig();
-    expect(shouldOrchestrate(cfg, "smart", true, true)).toBe(true);
+    expect(shouldOrchestrate(cfg, "smart", undefined, true, true)).toBe(true);
+  });
+
+  it("returns false when Judge explicitly vetoes orchestration (orchestrate:false)", () => {
+    const cfg = makeConfig();
+    expect(shouldOrchestrate(cfg, "smart", false, true, true)).toBe(false);
+  });
+
+  it("returns true when Judge explicitly asks for orchestration (orchestrate:true)", () => {
+    const cfg = makeConfig();
+    expect(shouldOrchestrate(cfg, "smart", true, true, true)).toBe(true);
+  });
+
+  it("ignores orchestrate signal on fast verdict (simple never orchestrates)", () => {
+    const cfg = makeConfig();
+    expect(shouldOrchestrate(cfg, "fast", true, true, true)).toBe(false);
   });
 
   it("returns false when Smart model unresolvable and requireSmartModel (backward-compat #4)", () => {
     const cfg = makeConfig();
-    expect(shouldOrchestrate(cfg, "smart", false, true)).toBe(false);
+    expect(shouldOrchestrate(cfg, "smart", undefined, false, true)).toBe(false);
   });
 
   it("returns true when Smart model unresolvable but requireSmartModel=false", () => {
     const cfg = makeConfig({
       orchestration: { ...DEFAULT_CONFIG.orchestration, requireSmartModel: false },
     });
-    expect(shouldOrchestrate(cfg, "smart", false, true)).toBe(true);
+    expect(shouldOrchestrate(cfg, "smart", undefined, false, true)).toBe(true);
   });
 
   it("returns false when subagent tool unavailable (backward-compat #4)", () => {
     const cfg = makeConfig();
-    expect(shouldOrchestrate(cfg, "smart", true, false)).toBe(false);
+    expect(shouldOrchestrate(cfg, "smart", undefined, true, false)).toBe(false);
   });
 });
 

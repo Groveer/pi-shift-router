@@ -30,6 +30,15 @@ export interface JudgeResult {
    * — a debugging aid, never used by the routing algorithm itself.
    */
   reason?: string;
+  /**
+   * Judge's explicit orchestration signal (v1.1.0+). true = task is large
+   * enough / decomposable enough that the Smart tier should orchestrate
+   * Fast subagents instead of running the turn directly; false = Smart
+   * runs the turn directly. Absent (older prompt / model didn't emit) =
+   * no opinion — caller falls back to the tier-based default (smart →
+   * orchestrate), preserving v1.0.0 behavior.
+   */
+  orchestrate?: boolean;
 }
 
 /** A reference to a specific model in a specific provider */
@@ -139,6 +148,10 @@ export interface OrchestrationState {
   startedAt: number | null;
   /** Estimated spend so far (USD) — hard budget guard. */
   spend: number;
+  /** Subagent workers spawned during this orchestration task. */
+  spawned: number;
+  /** Subagent workers completed (tool_result received) this task. */
+  done: number;
 }
 
 /** Default configuration */

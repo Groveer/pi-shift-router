@@ -52,8 +52,37 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
   let fastEndpoints: ProviderEndpoint[] = [];
   let initialized = false;
 
+  // Status-bar loading animation. `setStatus` frames are cheap and the bar
+  // repaints every frame — we animate by cycling a suffix (· → ·· → ···) so
+  // the user sees progress during the Judge API call and orchestration runs
+  // instead of a frozen badge (which reads as "hung"). The interval is
+  // per-turn; stopped on agent_end / judge-complete.
+  let loadingTimer: ReturnType<typeof setInterval> | null = null;
+  let loadingPhase = 0;
+  const LOADING_DOTS = ["", ".", "..", "..."];
+
   const getConfig = () => config;
   const getState = () => state;
+
+  /** Animate the status badge suffix until stopLoading is called. */
+  function startLoading(ui: any, base: string) {
+    stopLoading();
+    if (!config?.ux?.statusBar) return;
+    loadingPhase = 0;
+    ui.setStatus("shift-router", base + LOADING_DOTS[loadingPhase]);
+    loadingTimer = setInterval(() => {
+      loadingPhase = (loadingPhase + 1) % LOADING_DOTS.length;
+      try { ui.setStatus("shift-router", base + LOADING_DOTS[loadingPhase]); } catch { /* ignore */ }
+    }, 250);
+  }
+
+  /** Stop the loading animation (idempotent). */
+  function stopLoading() {
+    if (loadingTimer !== null) {
+      clearInterval(loadingTimer);
+      loadingTimer = null;
+    }
+  }
 
   // ── Init ────────────────────────────────────────────────────
 
@@ -69,6 +98,16 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
 
   function updateBar(ui: any, cfg: ShiftRouterConfig, s: RouterState) {
     if (!cfg.ux.statusBar) { ui.setStatus("shift-router", undefined); return; }
+    if (s.orchestration.active) {
+      // Orchestration runs on the Smart tier — show what the CTO is doing:
+      // how many Fast subagents spawned / completed so far.
+      const o = s.orchestration;
+      const label = o.spawned === 0
+        ? "🪄 orchestrating"
+        : `🪄 ${o.done}/${o.spawned} workers`;
+      ui.setStatus("shift-router", label);
+      return;
+    }
     const speed = s.recentSpeeds.length > 0 ? s.recentSpeeds[s.recentSpeeds.length - 1] : 0;
     const badge = cfg.enabled
       ? formatTierDisplayWithSpeed(s.currentTier, s.currentModelId, speed)
@@ -122,9 +161,9 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
       ctx.ui.setWorkingVisible(true);
     } catch { /* ignore */ }
 
-    // Show transient "judging..." badge in status bar so the user sees
-    // the router is working during the Judge API call.
-    if (config.ux.statusBar) ctx.ui.setStatus("shift-router", "🧭 judging…");
+    // Animate a "judging…" badge in the status bar so the user sees the
+    // router working during the Judge API call (static text reads as hung).
+    if (config.ux.statusBar) startLoading(ctx.ui, "🧭 judging");
 
     let judgeResult;
     try {
@@ -143,6 +182,7 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
       );
     } finally {
       // Restore the proper status badge immediately, regardless of judge outcome.
+      stopLoading();
       updateBar(ctx.ui, config, state);
     }
 
@@ -185,17 +225,36 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
           return false;
         }
       })();
-    const subagentAvailable = typeof (pi as any).tools?.subagent !== "undefined"
-      || typeof (ctx as any).tools?.subagent !== "undefined"
-      || typeof (pi as any).toolManager?.get?.("subagent") !== "undefined";
-    if (shouldOrchestrate(config, judgeResult.tier, smartResolvable, subagentAvailable)) {
+    const subagentAvailable = (() => {
+      try {
+        // ExtensionAPI exposes configured tools via getAllTools/getActiveTools
+        // (pi.tools is an internal Map on the Extension object, NOT on the
+        // ExtensionAPI — dot-access on it was always undefined, which silently
+        // disabled orchestration). pi-subagents registers the `subagent` tool
+        // via pi.registerTool, so it shows up in both lists.
+        const api = pi as any;
+        const all: { name?: string }[] = typeof api.getAllTools === "function" ? api.getAllTools() : [];
+        if (Array.isArray(all) && all.some((t) => t?.name === "subagent")) return true;
+        const active: string[] = typeof api.getActiveTools === "function" ? api.getActiveTools() : [];
+        return Array.isArray(active) && active.includes("subagent");
+      } catch {
+        return false;
+      }
+    })();
+    if (shouldOrchestrate(config, judgeResult.tier, judgeResult.orchestrate, smartResolvable, subagentAvailable)) {
       enterOrchestration(state);
       const orchPrompt = buildOrchestratorPrompt(config, cooldownPredicate(state.modelCooldowns, Date.now()));
       if (config.ux.routerLogVerbose) {
         console.log(
-          `[ShiftRouter] 🪄 orchestrating: judge=${judgeResult.tier}, injecting orchestrator prompt (${orchPrompt.length} chars)`,
+          `[ShiftRouter] 🪄 orchestrating: judge=${judgeResult.tier}` +
+            (judgeResult.orchestrate !== undefined ? ` orchestrate=${judgeResult.orchestrate}` : "") +
+            `, injecting orchestrator prompt (${orchPrompt.length} chars)`,
         );
       }
+      // Animate the orchestration badge in the status bar while the Smart
+      // agent plans/delegates. updateBar() paints the live worker count;
+      // the dots animation keeps it visibly alive between spawn events.
+      if (config.ux.statusBar) startLoading(ctx.ui, "🪄 orchestrating");
       // Inject the orchestrator instruction into this turn's system prompt.
       // Chained across extensions — later handlers can still modify it.
       const systemPrompt = (event as any).systemPrompt;
@@ -278,10 +337,15 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
     // healthy orchestration turn still releases its state. (Cross-turn
     // lifecycle is Phase 3.)
     if (state.orchestration.active) {
-      exitOrchestration(state);
+      stopLoading();
+      const o = state.orchestration;
       if (config.ux.routerLogVerbose) {
-        console.log(`[ShiftRouter] 🪄 orchestration turn ended — exited orchestrator state`);
+        console.log(
+          `[ShiftRouter] 🪄 orchestration turn ended — exited orchestrator state ` +
+            `(workers ${o.done}/${o.spawned}, spend $${o.spend.toFixed(4)})`,
+        );
       }
+      exitOrchestration(state);
     }
 
     if (!plan) {
@@ -325,6 +389,41 @@ export default function slimRouterExtension(pi: ExtensionAPI) {
     if (config.ux.routerLogVerbose) {
       console.log(`[ShiftRouter][diag] agent_settled handler @${Date.now()}`);
     }
+  });
+
+  // ── Orchestration observability (SPEC §9.3) ────────────────────
+  // Count subagent spawns/completions so the status bar can show live
+  // progress (`🪄 2/5 workers`) and agent_end can report the run summary.
+  // Works whether the subagent tool comes from pi-subagents or anywhere
+  // else — we only watch the tool name.
+
+  pi.on("tool_call", async (event, ctx) => {
+    if (!initialized) await init(ctx);
+    if (!config?.enabled) return;
+    const e: any = event;
+    if (e?.toolName !== "subagent") return;
+    if (!state.orchestration.active) return;
+    state.orchestration.spawned += 1;
+    // Stop the "orchestrating…" dots once real workers are in flight —
+    // show the live count instead (static, no interval to fight the bar).
+    stopLoading();
+    if (config.ux.statusBar) updateBar(ctx.ui, config, state);
+  });
+
+  pi.on("tool_result", async (event, ctx) => {
+    if (!initialized) await init(ctx);
+    if (!config?.enabled) return;
+    const e: any = event;
+    if (e?.toolName !== "subagent") return;
+    if (!state.orchestration.active) return;
+    state.orchestration.done += 1;
+    // Cost attribution (Phase 2): pi-subagents reports the subagent's usage
+    // on the tool result. Fold it into the orchestration spend so agent_end
+    // and (later) /router stats can show what delegation cost.
+    const usage = e?.usage;
+    const cost = usage?.cost?.total ?? 0;
+    if (cost > 0) state.orchestration.spend += cost;
+    if (config.ux.statusBar) updateBar(ctx.ui, config, state);
   });
 
   pi.on("turn_end", async (event) => {

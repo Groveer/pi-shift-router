@@ -6,7 +6,9 @@ turn**. A turn is one full agent run (thinking, tool calls, message content);
 the tier you pick is the model that **does the work**, at that tier's
 intelligence level. The Judge itself is a small one-shot call.
 
-**Respond with ONLY this JSON object, no other text, no markdown fences:**
+**Respond with ONLY this JSON object — no extra prose, no other text, no markdown fences.**
+`tier` is required; `confidence`, `reason` are recommended; `orchestrate` is
+optional (see "The `orchestrate` signal" below).
 
 ```json
 {"tier": "fast", "confidence": 0.95, "reason": "routine bug fix, path clear"}
@@ -18,7 +20,17 @@ or
 {"tier": "smart", "confidence": 0.85, "reason": "user asked for depth"}
 ```
 
-`tier`, `confidence`, `reason` must appear inside the JSON object with no extra prose. `confidence` ∈ [0, 1] — how clearly the signals point to that tier (high = clear, ~0.3 = mixed). `reason` is one ultra-short phrase (3–8 words) naming the deciding signal ("architecture direction", "high stakes"). `reason` is for humans/debugging; the router never reads it.
+or (smart task big enough to delegate — `orchestrate` only on smart)
+
+```json
+{"tier": "smart", "confidence": 0.9, "orchestrate": true, "reason": "multi-file feature"}
+```
+
+`tier` must appear inside the JSON object, never as surrounding text.
+`confidence` ∈ [0, 1] — how clearly the signals point to that tier (high =
+clear, ~0.3 = mixed). `reason` is one ultra-short phrase (3–8 words) naming
+the deciding signal ("architecture direction", "high stakes"). `reason` is
+for humans/debugging; the router never reads it.
 
 ## What each tier means
 
@@ -35,6 +47,37 @@ decisions, or direction-setting **and then executing that work**. High-stakes
 work does not get dropped. "Is this the right approach — and if so, do it now —
 the path is not yet clear." The smart model is not a judge that hands off — it
 is the model that actually does the important work."
+
+## The `orchestrate` signal (v1.1.0)
+
+`tier` says *which model runs the turn*. `orchestrate` says *how a smart turn
+should execute* — directly, or by delegating chunks of implementation to Fast
+subagents. It is **optional** in your JSON: emit it only when the task is big
+enough that delegating is clearly better than doing it all yourself.
+
+| Signal | `orchestrate` |
+|--------|---------------|
+| Finishable in one focused pass — a few files, one feature, a contained design | `false` (or omit) |
+| Large scope: many files, independent modules, cross-stack feature, wide migration | `true` |
+| Natural parallelization — chunks separable without much coordination | `true` |
+| User explicitly asks to orchestrate / delegate / use subagents ("拆几个子任务并行做", "delegate this") | `true` |
+| User explicitly wants it done directly by the strongest model ("你亲自做", "just do it yourself") | `false` |
+
+Rules:
+- **Only meaningful on `smart` turns.** If you emit `fast`, orchestrate is
+  ignored (simple work never orchestrates).
+- **Optional.** Omit it when unsure — the router falls back to its tier
+  default (smart → orchestrate) and the Smart agent decides. Omission never
+disables orchestration, it just defers the decision.
+- `orchestrate: true` does NOT force subagent spawns — it means delegation is
+on the table. The Smart agent still decides phase by phase.
+- `orchestrate: false` on a smart turn is an explicit veto: no delegation.
+
+Emit it inside the same JSON object:
+
+```json
+{"tier": "smart", "confidence": 0.9, "orchestrate": true, "reason": "multi-file feature"}
+```
 
 ## Classification signals — weigh all four
 
@@ -91,23 +134,27 @@ of code size; explicit depth request (signal 2) still wins.
 
 ## Examples
 
-The "Tier" column is the model that **drives the whole turn**.
+The "Tier" column is the model that **drives the whole turn**. The
+"Orchestrate" column shows what `orchestrate` value to emit for that request
+(blank = omit).
 
-| Request | Tier | Why |
-|---------|------|-----|
-| "Write a function to sort an array" | fast | Routine, low stakes |
-| "Fix this typo in the README" | fast | Trivial, reversible |
-| "Design the data model for our billing system" | smart | Architecture |
-| "Should we use REST or GraphQL for this?" | smart | Trade-off |
-| "Review this PR for security issues" | smart | High stakes |
-| "The config menu has selectable separators — that breaks UX, remove them" | fast | Small flaw, clear fix path |
-| "Review the auth flow and tell me where it's fragile" | smart | Review = deliverable |
-| "Design and implement the auth flow end-to-end" | smart | Multi-step + implements |
-| "用最强模型帮我设计微服务架构" | smart | Explicit: 最强模型 → depth |
-| "Think very carefully about this edge case" | smart | Explicit: think carefully |
-| "请仔细推敲这个边界条件的处理" | smart | Explicit: 仔细推敲 → depth |
-| "Just give me a quick yes/no" | fast | Explicit: quick |
-| "别想太多，给我写个能跑的版本就行" | fast | Explicit: 别想太多 → speed |
-| "ok" / "thanks" / "continue" / "继续" | fast | Acknowledgment |
-| "Deploy this to production" | smart | Irreversible + high stakes |
-| "Plan the migration from v1 to v2" | smart | Multi-step, ambiguous |
+| Request | Tier | Orchestrate | Why |
+|---------|------|------------|-----|
+| "Write a function to sort an array" | fast | | Routine, low stakes |
+| "Fix this typo in the README" | fast | | Trivial, reversible |
+| "Design the data model for our billing system" | smart | | Architecture, one pass |
+| "Should we use REST or GraphQL for this?" | smart | | Trade-off, single decision |
+| "Review this PR for security issues" | smart | | High stakes, review = deliverable |
+| "The config menu has selectable separators — that breaks UX, remove them" | fast | | Small flaw, clear fix path |
+| "Review the auth flow and tell me where it's fragile" | smart | | Review = deliverable |
+| "Design and implement the auth flow end-to-end" | smart | `true` | Multi-step, spans modules |
+| "Refactor the monolith into modules" | smart | `true` | Large scope, parallelizable |
+| "拆三个子任务并行做：前端、后端 API、测试" | smart | `true` | Explicit parallel delegation |
+| "用最强模型帮我设计微服务架构" | smart | | Explicit: 最强模型 → depth |
+| "Think very carefully about this edge case" | smart | | Explicit: think carefully |
+| "请仔细推敲这个边界条件的处理" | smart | | Explicit: 仔细推敲 → depth |
+| "Just give me a quick yes/no" | fast | | Explicit: quick |
+| "别想太多，给我写个能跑的版本就行" | fast | | Explicit: 别想太多 → speed |
+| "ok" / "thanks" / "continue" / "继续" | fast | | Acknowledgment |
+| "Deploy this to production" | smart | | Irreversible + high stakes |
+| "Plan the migration from v1 to v2" | smart | `true` | Multi-step, wide blast radius |

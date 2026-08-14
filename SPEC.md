@@ -771,6 +771,39 @@ we keep paying for it.
    cache-aware, §4 Judge, window (§3) all keep their exact current behavior
    in both modes.
 
+**v1.1.0 field findings (implemented):**
+
+1. **`subagent` availability detection bug (root cause of "orchestration never
+   triggers").** The original check probed `pi.tools?.subagent` and
+   `pi.toolManager?.get("subagent")` — neither exists on `ExtensionAPI`
+   (`pi.tools` is an internal `Map` on the loaded `Extension` object, and
+   there is no `toolManager` at all), so the gate was *always false* and
+   orchestration could never engage, even with an explicit user request.
+   Correct API: `pi.getAllTools(): ToolInfo[]` (all registered tool
+   definitions, including extension tools) and `pi.getActiveTools(): string[]`
+   (agent's active tool names). pi-subagents registers `subagent` via
+   `pi.registerTool`, and pi's `_refreshToolRegistry` auto-activates
+   newly-registered tools, so both APIs reflect it. **Rule: never probe
+   `pi.<field>` dot-access for tools — use the `get*Tools()` methods.**
+2. **Judge `orchestrate` signal (explicit, not inferred).** `tier` says which
+   model; `orchestrate: true|false` says *how a smart turn executes* —
+   directly, or by delegating to Fast subagents. Emitted inside the same
+   JSON object; absent = no opinion (caller falls back to the tier default:
+   smart → orchestrate, preserving v1.0.0). `false` on a smart verdict is an
+   explicit veto (smart runs the turn directly); `true` is an explicit go
+   (e.g. user says "拆几个子任务并行做"). Only meaningful on smart turns —
+   fast never orchestrates regardless. This decouples *complexity* (which
+   model) from *scale/decomposability* (whether to delegate) — a task can be
+   judgment-heavy but small (smart, no orchestration) or simple-scope but
+   large (smart, orchestrate).
+3. **Orchestration observability.** Status bar animates during Judge
+   (`🧭 judging` + cycling dots — a static badge read as "hung" during the
+   1-2s API call) and during orchestration (`🪄 orchestrating…` → live
+   `🪄 done/spawned workers`). `tool_call`/`tool_result` events with
+   `toolName === "subagent"` increment spawn/done counters (and fold
+   `tool_result.usage.cost.total` into `orchestration.spend` — Phase 2 cost
+   attribution). `/router status` shows workers `done/spawned` while active.
+
 **Open design decisions (to be settled before code):**
 
 1. **Entry trigger** (settled 2026-08-13): auto-inject on Judge `smart` when

@@ -208,6 +208,8 @@ export interface ParsedJudgeResponse {
   confidence?: number;
   /** Ultra-short classification reason (one phrase); absent when not emitted. */
   reason?: string;
+  /** Explicit orchestration signal (true/false); absent when not emitted. */
+  orchestrate?: boolean;
 }
 
 function parseResponse(raw: Record<string, unknown>, apiType: string): ParsedJudgeResponse | null {
@@ -240,10 +242,26 @@ export function parseJudgeAnswer(text: string): ParsedJudgeResponse | null {
   if (!tier) return null;
   const confidence = parseConfidenceFromText(text);
   const reason = parseReasonFromText(text);
+  const orchestrate = parseOrchestrateFromText(text);
   const out: ParsedJudgeResponse = { tier };
   if (confidence !== undefined) out.confidence = confidence;
   if (reason !== undefined) out.reason = reason;
+  if (orchestrate !== undefined) out.orchestrate = orchestrate;
   return out;
+}
+
+/**
+ * Extract the Judge's explicit orchestration signal from its answer string.
+ * Accepts a JSON `orchestrate: true/false` field (or loose `orchestrate=`).
+ * Returns undefined when absent or unparseable (older prompt / model chose
+ * not to emit) — the caller decides the fallback.
+ */
+function parseOrchestrateFromText(text: string): boolean | undefined {
+  const jsonMatch = text.match(/"\s*orchestrate\s*"\s*:\s*(true|false)/i);
+  if (jsonMatch) return jsonMatch[1]!.toLowerCase() === "true";
+  const looseMatch = text.match(/["']?orchestrate["']?\s*[:=]\s*(true|false)/i);
+  if (looseMatch) return looseMatch[1]!.toLowerCase() === "true";
+  return undefined;
 }
 
 /**
